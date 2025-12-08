@@ -4,7 +4,7 @@
 IMAGE_NAME=fetch-repositories
 
 # Абсолютный путь для клонирования репозиториев
-CLONE_PATH=$(shell pwd)/repositories
+CLONE_PATH?=$(shell pwd)/repositories
 
 # Путь к виртуальному окружению
 VENV_PATH=venv
@@ -23,9 +23,10 @@ run: check_env
 # Создание и установка виртуального окружения
 venv:
 	@echo "Создание виртуального окружения..."
-	python3 -m venv $(VENV_PATH)
-	@echo "Установка зависимостей в виртуальное окружение..."
-	$(VENV_PATH)/bin/pip install --no-cache-dir -r requirements.txt
+	@[ -d $(VENV_PATH) ] || python3 -m venv $(VENV_PATH)
+	@echo "Обновление pip и установка зависимостей..."
+	@$(VENV_PATH)/bin/pip install --upgrade pip
+	@$(VENV_PATH)/bin/pip install --no-cache-dir -r requirements.txt
 
 # Установка зависимостей в виртуальное окружение
 install: venv
@@ -43,10 +44,6 @@ check_env:
 	fi
 	@if [ -z "$(GITLAB_GROUP)" ]; then \
 		echo "Ошибка: Переменная GITLAB_GROUP не установлена."; \
-		exit 1; \
-	fi
-	@if [ -z "$(CLONE_PATH)" ]; then \
-		echo "Ошибка: Переменная CLONE_PATH не установлена."; \
 		exit 1; \
 	fi
 	@echo "Все необходимые переменные окружения установлены."

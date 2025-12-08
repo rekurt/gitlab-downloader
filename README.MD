@@ -1,99 +1,78 @@
-# Gitlab Downloader
+# Gitlab Downloader (RU)
 
-`Gitlab Downloader` is a tool for automatically fetching and cloning all repositories from a specified GitLab group, including repositories in subgroups.
-Repositories are organized into a hierarchical folder structure matching the subgroup structure in GitLab.
+`Gitlab Downloader` — инструмент для автоматического получения и клонирования всех репозиториев из указанной группы GitLab, включая подгруппы. Репозитории складываются в иерархию папок, повторяя структуру групп в GitLab.  
+English version: [README.en.md](README.en.md)
 
-## Features
-- Support for recursively fetching repositories from groups and subgroups.
-- Clone repositories via HTTPS using a personal GitLab access token.
-- Asynchronous cloning for faster processing.
-- Create a local folder structure matching the GitLab subgroup hierarchy.
+## Функционал
+- Рекурсивное получение репозиториев из групп и подгрупп.
+- Клонирование через HTTPS с использованием персонального токена GitLab.
+- Асинхронное клонирование для ускорения работы.
+- Создание локальной структуры папок, соответствующей иерархии GitLab.
 
-## Installation
+## Установка
 
-### Local Installation
-
-1. Ensure Python 3.10 or higher is installed.
-2. Install dependencies:
+### Локальная установка
+1. Установите Python 3.10 или выше.
+2. Установите зависимости:
    ```bash
    pip install -r requirements.txt
    ```
 
-### Using Docker
-
-1. Build the Docker image:
+### Запуск через Docker
+1. Соберите образ:
    ```bash
    docker build -t fetch-repositories .
    ```
-
-2. Run the container:
+2. Запустите контейнер:
    ```bash
    make docker_run
    ```
 
-## Usage
+## Использование
 
-### Local Execution
-
-1. Create a `.env` file in the project root with the following variables:
+### Локальный запуск
+1. Создайте файл `.env` в корне проекта:
    ```env
    GITLAB_URL=https://gitlab.com
-   GITLAB_TOKEN=your_personal_access_token
-   GITLAB_GROUP=group_name
+   GITLAB_TOKEN=ваш_персональный_токен
+   GITLAB_GROUP=название_группы
    CLONE_PATH=./repositories
    ```
-
-2. Run the script:
+2. Запустите скрипт:
    ```bash
    python fetch_repositories.py
    ```
 
-### Using Docker
-
-1. Ensure the `.env` file is available.
-2. Use the Makefile to build and run the container:
+### Запуск в Docker
+1. Убедитесь, что `.env` доступен контейнеру.
+2. Используйте Makefile для сборки и запуска:
    ```bash
    make docker_run
    ```
 
-## How to Obtain a GitLab Token
+## Как получить токен GitLab
+1. Войдите в аккаунт GitLab.
+2. Откройте **Settings** → **Access Tokens** или перейдите по [ссылке](https://gitlab.com/-/profile/personal_access_tokens).
+3. Укажите имя токена, срок действия (опционально) и отметьте права:
+   - `read_api` — чтение через API.
+   - `read_repository` — доступ к репозиториям.
+4. Нажмите **Create personal access token** и сохраните токен.
 
-1. Log in to your GitLab account.
-2. Go to user settings (**Settings**).
-3. Select **Access Tokens** or use [this link](https://gitlab.com/-/profile/personal_access_tokens).
-4. Specify the token name, expiration date (optional), and enable the following permissions:
-   - `read_api` — to read through the API.
-   - `read_repository` — to access repositories.
-5. Click **Create personal access token** and save the token.
+## Основные файлы
+- `fetch_repositories.py`: основной скрипт для получения и клонирования репозиториев.
+- `Dockerfile`: сборка Docker-образа.
+- `Makefile`: автоматизация сборки и запуска контейнера.
+- `requirements.txt`: список зависимостей.
 
-## Files
-
-- `fetch_repositories.py`: The main script for fetching and cloning repositories.
-- `Dockerfile`: File for building the Docker image.
-- `Makefile`: Automates the build and run process for the container.
-- `requirements.txt`: List of dependencies.
-
-## Requirements
-
+## Требования
 - Python 3.10+
-- Docker (for containerized execution)
-- Personal GitLab access token with appropriate API permissions.
+- Docker (для контейнерного запуска)
+- Персональный токен GitLab с правами `read_api` и `read_repository`
 
-## Usage Scenarios
+## Типовые сценарии
+- Клонирование всех репозиториев группы (указать переменные среды и запустить скрипт).
+- Асинхронное клонирование: ускоряет массовое получение проектов.
+- Интеграция в CI/CD: автоматическое обновление локальных копий репозиториев.
 
-### Cloning Repositories from a Group
-
-1. Specify environment variables in `.env` or pass them through the command line.
-2. Run the script to clone all repositories, including those in subgroups.
-
-### Asynchronous Cloning
-
-The script processes multiple repositories simultaneously, reducing the overall cloning time.
-
-### CI/CD Integration
-
-Integrate the tool into CI/CD pipelines to automatically update local copies of repositories.
-
-## License
-
-This project is licensed under the MIT License. Use freely.
+## Лицензия
+MIT. Свободное использование и модификация.
