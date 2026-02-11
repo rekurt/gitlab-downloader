@@ -1,79 +1,82 @@
-# Gitlab Downloader (EN)
+# Gitlab Downloader
 
-Russian version: [README.MD](README.MD)
+> **[Русская версия](README.MD)**
 
-`Gitlab Downloader` is a tool for automatically fetching and cloning all repositories from a specified GitLab group, including repositories in subgroups. Repositories are organized into a hierarchical folder structure matching the subgroup structure in GitLab.
+A tool for automatically cloning all repositories from a specified GitLab group, including subgroups. The local folder structure mirrors the group hierarchy in GitLab.
 
 ## Features
-- Recursively fetch repositories from groups and subgroups.
-- Clone via HTTPS using a personal GitLab access token.
-- Asynchronous cloning for faster processing.
-- Create a local folder structure matching the GitLab subgroup hierarchy.
 
-## Installation
+- Recursive traversal of groups and subgroups
+- HTTPS cloning using a personal GitLab token
+- Asynchronous cloning (up to 5 repositories in parallel)
+- Retry with exponential backoff on API errors
+- Local folder structure matching the GitLab hierarchy
 
-### Local Installation
-1. Ensure Python 3.10 or higher is installed.
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Quick start
 
-### Using Docker
-1. Build the Docker image:
-   ```bash
-   docker build -t fetch-repositories .
-   ```
-2. Run the container:
-   ```bash
-   make docker_run
-   ```
+### Requirements
 
-## Usage
+- Python 3.10+
+- Git
+- Personal GitLab access token with `read_api` and `read_repository` scopes
 
-### Local Execution
-1. Create a `.env` file in the project root with:
-   ```env
-   GITLAB_URL=https://gitlab.com
-   GITLAB_TOKEN=your_personal_access_token
-   GITLAB_GROUP=group_name
-   CLONE_PATH=./repositories
-   ```
-2. Run the script:
-   ```bash
-   python fetch_repositories.py
-   ```
+### Installation
 
-### Using Docker
-1. Ensure the `.env` file is available.
-2. Use the Makefile to build and run the container:
-   ```bash
-   make docker_run
-   ```
+```bash
+make venv        # create virtual environment and install dependencies
+```
 
-## How to Obtain a GitLab Token
+### Configuration
+
+Create a `.env` file in the project root (see `.env.example`):
+
+```env
+GITLAB_URL=https://gitlab.com
+GITLAB_TOKEN=your_token
+GITLAB_GROUP=group_name_or_id
+CLONE_PATH=./repositories          # optional, defaults to ./repositories
+```
+
+### Running
+
+```bash
+make run         # run locally (validates environment variables first)
+```
+
+or directly:
+
+```bash
+python fetch_repositories.py
+```
+
+## Docker
+
+```bash
+make build       # build the image
+make docker_run  # build and run the container
+```
+
+The container mounts `./repositories` and the SSH agent; environment variables are passed from `.env`.
+
+## Obtaining a GitLab token
+
 1. Log in to your GitLab account.
-2. Go to **Settings** → **Access Tokens** or use [this link](https://gitlab.com/-/profile/personal_access_tokens).
-3. Specify the token name, expiration date (optional), and enable:
-   - `read_api` — to read through the API.
-   - `read_repository` — to access repositories.
+2. Go to **Settings** → **Access Tokens** ([link for gitlab.com](https://gitlab.com/-/profile/personal_access_tokens)).
+3. Enter a token name and select the scopes:
+   - `read_api` — read access via API
+   - `read_repository` — repository access
 4. Click **Create personal access token** and save the token.
 
-## Files
-- `fetch_repositories.py`: Main script for fetching and cloning repositories.
-- `Dockerfile`: Builds the Docker image.
-- `Makefile`: Automates build and run for the container.
-- `requirements.txt`: List of dependencies.
+## Project structure
 
-## Requirements
-- Python 3.10+
-- Docker (for containerized execution)
-- Personal GitLab access token with appropriate API permissions.
-
-## Usage Scenarios
-- Clone repositories from a group (including subgroups).
-- Leverage asynchronous cloning to reduce total runtime.
-- Integrate into CI/CD pipelines to keep local copies in sync.
+| File | Description |
+|------|-------------|
+| `fetch_repositories.py` | Main script (entry point) |
+| `Makefile` | Commands for running, building, and Docker |
+| `Dockerfile` | Docker image build |
+| `requirements.txt` | Python dependencies (aiohttp, python-dotenv) |
+| `.env.example` | Environment variables template |
 
 ## License
-MIT License.
+
+MIT
