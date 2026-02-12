@@ -42,11 +42,11 @@ ci: lint typecheck test
 
 binary:
 	@$(VENV_PATH)/bin/pip install --no-cache-dir pyinstaller
-	@$(VENV_PATH)/bin/pyinstaller --onedir --name gitlab-dump fetch_repositories.py
+	@$(VENV_PATH)/bin/pyinstaller --onedir --name gitlab-dump --exclude-module multiprocessing fetch_repositories.py
 
 binary_onefile:
 	@$(VENV_PATH)/bin/pip install --no-cache-dir pyinstaller
-	@$(VENV_PATH)/bin/pyinstaller --onefile --name gitlab-dump fetch_repositories.py
+	@$(VENV_PATH)/bin/pyinstaller --onefile --name gitlab-dump --exclude-module multiprocessing fetch_repositories.py
 
 binary_clean:
 	@rm -rf build dist *.spec

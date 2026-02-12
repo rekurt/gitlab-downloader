@@ -84,6 +84,6 @@ async def main(argv: list[str] | None = None) -> int:
 def run() -> int:
     try:
         return asyncio.run(main())
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, EOFError):
         print("\nInterrupted by user")
         return 130
