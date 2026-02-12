@@ -1,79 +1,61 @@
-# Gitlab Downloader (EN)
+# Gitlab Downloader
 
-Russian version: [README.MD](README.MD)
+Language: **English (additional)** | [Русский (основной)](README.MD)
 
-`Gitlab Downloader` is a tool for automatically fetching and cloning all repositories from a specified GitLab group, including repositories in subgroups. Repositories are organized into a hierarchical folder structure matching the subgroup structure in GitLab.
+`Gitlab Downloader` is an async utility for fetching and cloning all repositories from a GitLab group and its subgroups while preserving directory hierarchy.
 
 ## Features
-- Recursively fetch repositories from groups and subgroups.
-- Clone via HTTPS using a personal GitLab access token.
-- Asynchronous cloning for faster processing.
-- Create a local folder structure matching the GitLab subgroup hierarchy.
+- Recursive group/subgroup traversal.
+- Async cloning with concurrency limits.
+- Retry for API requests and `git clone`.
+- Final summary (`success`, `updated`, `skipped`, `failed`).
+- `--dry-run` mode to preview operations.
+- `--update` mode to run `git pull --ff-only` for existing clones.
 
 ## Installation
+```bash
+python3 -m venv venv
+venv/bin/pip install -r requirements.txt
+venv/bin/pip install -e .[dev]
+```
 
-### Local Installation
-1. Ensure Python 3.10 or higher is installed.
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+or:
 
-### Using Docker
-1. Build the Docker image:
-   ```bash
-   docker build -t fetch-repositories .
-   ```
-2. Run the container:
-   ```bash
-   make docker_run
-   ```
+```bash
+make install
+```
 
 ## Usage
 
-### Local Execution
-1. Create a `.env` file in the project root with:
-   ```env
-   GITLAB_URL=https://gitlab.com
-   GITLAB_TOKEN=your_personal_access_token
-   GITLAB_GROUP=group_name
-   CLONE_PATH=./repositories
-   ```
-2. Run the script:
-   ```bash
-   python fetch_repositories.py
-   ```
+You can use CLI flags or environment variables (`GITLAB_URL`, `GITLAB_TOKEN`, `GITLAB_GROUP`, `CLONE_PATH`).
 
-### Using Docker
-1. Ensure the `.env` file is available.
-2. Use the Makefile to build and run the container:
-   ```bash
-   make docker_run
-   ```
+```bash
+python fetch_repositories.py --help
+python fetch_repositories.py --url https://gitlab.com --token <token> --group <group>
+python fetch_repositories.py --dry-run --url https://gitlab.com --token <token> --group <group>
+python fetch_repositories.py --update --url https://gitlab.com --token <token> --group <group>
+```
 
-## How to Obtain a GitLab Token
-1. Log in to your GitLab account.
-2. Go to **Settings** → **Access Tokens** or use [this link](https://gitlab.com/-/profile/personal_access_tokens).
-3. Specify the token name, expiration date (optional), and enable:
-   - `read_api` — to read through the API.
-   - `read_repository` — to access repositories.
-4. Click **Create personal access token** and save the token.
+## Docker
+```bash
+docker build -t fetch-repositories .
+docker run --rm \
+  -e GITLAB_URL=https://gitlab.com \
+  -e GITLAB_TOKEN=<token> \
+  -e GITLAB_GROUP=<group> \
+  -e CLONE_PATH=/app/repositories \
+  -v $(pwd)/repositories:/app/repositories \
+  fetch-repositories --dry-run
+```
 
-## Files
-- `fetch_repositories.py`: Main script for fetching and cloning repositories.
-- `Dockerfile`: Builds the Docker image.
-- `Makefile`: Automates build and run for the container.
-- `requirements.txt`: List of dependencies.
+## Development
+```bash
+make lint
+make format
+make test
+```
 
 ## Requirements
 - Python 3.10+
-- Docker (for containerized execution)
-- Personal GitLab access token with appropriate API permissions.
-
-## Usage Scenarios
-- Clone repositories from a group (including subgroups).
-- Leverage asynchronous cloning to reduce total runtime.
-- Integrate into CI/CD pipelines to keep local copies in sync.
-
-## License
-MIT License.
+- Git
+- GitLab token with `read_api` and `read_repository` scopes

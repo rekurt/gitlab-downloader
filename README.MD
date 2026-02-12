@@ -1,78 +1,61 @@
-# Gitlab Downloader (RU)
+# Gitlab Downloader
 
-`Gitlab Downloader` — инструмент для автоматического получения и клонирования всех репозиториев из указанной группы GitLab, включая подгруппы. Репозитории складываются в иерархию папок, повторяя структуру групп в GitLab.  
-English version: [README.en.md](README.en.md)
+Язык: **Русский (основной)** | [English](README.en.md)
 
-## Функционал
-- Рекурсивное получение репозиториев из групп и подгрупп.
-- Клонирование через HTTPS с использованием персонального токена GitLab.
-- Асинхронное клонирование для ускорения работы.
-- Создание локальной структуры папок, соответствующей иерархии GitLab.
+`Gitlab Downloader` — асинхронная утилита для получения и клонирования всех репозиториев из GitLab-группы и её подгрупп с сохранением структуры директорий.
+
+## Возможности
+- Рекурсивный обход групп и подгрупп.
+- Асинхронное клонирование с ограничением конкурентности.
+- Retry для API и `git clone`.
+- Итоговый отчёт (`success`, `updated`, `skipped`, `failed`).
+- `--dry-run` для проверки без клонирования.
+- `--update` для `git pull --ff-only` в уже существующих репозиториях.
 
 ## Установка
+```bash
+python3 -m venv venv
+venv/bin/pip install -r requirements.txt
+venv/bin/pip install -e .[dev]
+```
 
-### Локальная установка
-1. Установите Python 3.10 или выше.
-2. Установите зависимости:
-   ```bash
-   pip install -r requirements.txt
-   ```
+или:
 
-### Запуск через Docker
-1. Соберите образ:
-   ```bash
-   docker build -t fetch-repositories .
-   ```
-2. Запустите контейнер:
-   ```bash
-   make docker_run
-   ```
+```bash
+make install
+```
 
 ## Использование
 
-### Локальный запуск
-1. Создайте файл `.env` в корне проекта:
-   ```env
-   GITLAB_URL=https://gitlab.com
-   GITLAB_TOKEN=ваш_персональный_токен
-   GITLAB_GROUP=название_группы
-   CLONE_PATH=./repositories
-   ```
-2. Запустите скрипт:
-   ```bash
-   python fetch_repositories.py
-   ```
+Можно передавать параметры через CLI или через переменные окружения (`GITLAB_URL`, `GITLAB_TOKEN`, `GITLAB_GROUP`, `CLONE_PATH`).
 
-### Запуск в Docker
-1. Убедитесь, что `.env` доступен контейнеру.
-2. Используйте Makefile для сборки и запуска:
-   ```bash
-   make docker_run
-   ```
+```bash
+python fetch_repositories.py --help
+python fetch_repositories.py --url https://gitlab.com --token <token> --group <group>
+python fetch_repositories.py --dry-run --url https://gitlab.com --token <token> --group <group>
+python fetch_repositories.py --update --url https://gitlab.com --token <token> --group <group>
+```
 
-## Как получить токен GitLab
-1. Войдите в аккаунт GitLab.
-2. Откройте **Settings** → **Access Tokens** или перейдите по [ссылке](https://gitlab.com/-/profile/personal_access_tokens).
-3. Укажите имя токена, срок действия (опционально) и отметьте права:
-   - `read_api` — чтение через API.
-   - `read_repository` — доступ к репозиториям.
-4. Нажмите **Create personal access token** и сохраните токен.
+## Docker
+```bash
+docker build -t fetch-repositories .
+docker run --rm \
+  -e GITLAB_URL=https://gitlab.com \
+  -e GITLAB_TOKEN=<token> \
+  -e GITLAB_GROUP=<group> \
+  -e CLONE_PATH=/app/repositories \
+  -v $(pwd)/repositories:/app/repositories \
+  fetch-repositories --dry-run
+```
 
-## Основные файлы
-- `fetch_repositories.py`: основной скрипт для получения и клонирования репозиториев.
-- `Dockerfile`: сборка Docker-образа.
-- `Makefile`: автоматизация сборки и запуска контейнера.
-- `requirements.txt`: список зависимостей.
+## Development
+```bash
+make lint
+make format
+make test
+```
 
 ## Требования
 - Python 3.10+
-- Docker (для контейнерного запуска)
-- Персональный токен GitLab с правами `read_api` и `read_repository`
-
-## Типовые сценарии
-- Клонирование всех репозиториев группы (указать переменные среды и запустить скрипт).
-- Асинхронное клонирование: ускоряет массовое получение проектов.
-- Интеграция в CI/CD: автоматическое обновление локальных копий репозиториев.
-
-## Лицензия
-MIT. Свободное использование и модификация.
+- Git
+- Токен GitLab с правами `read_api` и `read_repository`
