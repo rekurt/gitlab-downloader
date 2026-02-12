@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from pathlib import Path
 from urllib.parse import urlparse
 
 from .constants import (
@@ -64,6 +65,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "INFO"))
     parser.add_argument("--log-file", default=os.getenv("LOG_FILE"))
     parser.add_argument("--report-json", default=os.getenv("REPORT_JSON"))
+    parser.add_argument(
+        "--auth-method",
+        choices=["token", "oauth"],
+        default=os.getenv("AUTH_METHOD", "token"),
+    )
+    parser.add_argument(
+        "--git-auth-mode",
+        choices=["url", "credential_helper"],
+        default=os.getenv("GIT_AUTH_MODE", "url"),
+    )
+    parser.add_argument("--oauth-client-id", default=os.getenv("GITLAB_OAUTH_CLIENT_ID"))
+    parser.add_argument("--oauth-client-secret", default=os.getenv("GITLAB_OAUTH_CLIENT_SECRET"))
+    parser.add_argument(
+        "--oauth-scope",
+        default=os.getenv("GITLAB_OAUTH_SCOPE", "read_api read_repository"),
+    )
+    parser.add_argument(
+        "--oauth-cache-path",
+        default=os.getenv(
+            "GITLAB_OAUTH_CACHE_PATH",
+            str(Path.home() / ".config" / "gitlab-dump" / "oauth_token.json"),
+        ),
+    )
     parser.add_argument("--dry-run", action="store_true", default=env_bool("DRY_RUN", False))
     parser.add_argument("--update", action="store_true", default=env_bool("UPDATE_EXISTING", False))
     parser.add_argument(
@@ -76,7 +100,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
     no_cli_args = len(raw_argv) == 0
-    missing_required = not (args.url and args.token)
+    has_auth = bool(args.token) if args.auth_method == "token" else bool(args.oauth_client_id)
+    missing_required = not (args.url and has_auth)
 
     if args.interactive or (no_cli_args and missing_required):
         args = fill_interactive(args)
@@ -138,10 +163,37 @@ def _prompt_bool(label: str, current: bool) -> bool:
         print("Expected y or n")
 
 
+def _prompt_choice(label: str, current: str, choices: tuple[str, ...]) -> str:
+    allowed = "/".join(choices)
+    while True:
+        raw = input(f"{label} [{allowed}, default={current}]: ").strip().lower()
+        if not raw:
+            return current
+        if raw in choices:
+            return raw
+        print(f"Expected one of: {allowed}")
+
+
 def fill_interactive(args: argparse.Namespace) -> argparse.Namespace:
     print("Interactive mode: fill GitLab downloader settings")
     args.url = _prompt_text("GitLab URL", args.url)
-    args.token = _prompt_text("GitLab token", args.token, secret=True)
+    args.auth_method = _prompt_choice("Auth method", args.auth_method, ("token", "oauth"))
+    if args.auth_method == "token":
+        args.token = _prompt_text("GitLab token", args.token, secret=True)
+    else:
+        args.oauth_client_id = _prompt_text("OAuth client id", args.oauth_client_id)
+        args.oauth_client_secret = _prompt_text(
+            "OAuth client secret (optional)",
+            args.oauth_client_secret,
+            allow_empty=True,
+        )
+        args.oauth_scope = _prompt_text("OAuth scope", args.oauth_scope)
+        args.oauth_cache_path = _prompt_text("OAuth cache path", args.oauth_cache_path)
+    args.git_auth_mode = _prompt_choice(
+        "Git auth mode",
+        args.git_auth_mode,
+        ("url", "credential_helper"),
+    )
     args.group = _prompt_text("Group (id or path, optional)", args.group, allow_empty=True)
     args.clone_path = _prompt_text("Clone path", args.clone_path)
     args.concurrency = _prompt_int(
@@ -160,8 +212,10 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
     missing = []
     if not args.url:
         missing.append("--url / GITLAB_URL")
-    if not args.token:
+    if args.auth_method == "token" and not args.token:
         missing.append("--token / GITLAB_TOKEN")
+    if args.auth_method == "oauth" and not args.oauth_client_id:
+        missing.append("--oauth-client-id / GITLAB_OAUTH_CLIENT_ID")
     if missing:
         parser.error(f"Missing required settings: {', '.join(missing)}")
 
@@ -187,7 +241,7 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
 def config_from_args(args: argparse.Namespace) -> GitlabConfig:
     return GitlabConfig(
         url=args.url.rstrip("/"),
-        token=args.token,
+        token=args.token or None,
         group=args.group or None,
         clone_path=args.clone_path,
         per_page=args.per_page,
@@ -201,4 +255,10 @@ def config_from_args(args: argparse.Namespace) -> GitlabConfig:
         log_file=args.log_file,
         interactive=getattr(args, "interactive", False),
         report_json=getattr(args, "report_json", None),
+        auth_method=args.auth_method,
+        git_auth_mode=args.git_auth_mode,
+        oauth_client_id=args.oauth_client_id,
+        oauth_client_secret=args.oauth_client_secret or None,
+        oauth_scope=args.oauth_scope,
+        oauth_cache_path=args.oauth_cache_path,
     )

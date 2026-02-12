@@ -5,28 +5,61 @@ import logging
 import os
 import shutil
 from typing import Any, cast
+from urllib.parse import urlparse
 
 from .constants import RETRY_BACKOFF_MAX
 from .models import CloneResult, GitlabConfig
 from .utils import build_authenticated_clone_url, is_subpath, sanitize_path_component
 
 logger = logging.getLogger("gitlab_downloader")
+_CREDENTIAL_LOCK = asyncio.Lock()
+_CREDENTIAL_READY_HOSTS: set[str] = set()
 
 
-async def run_git_command(*args: str, env: dict[str, str] | None = None) -> tuple[int, str, str]:
+async def run_git_command(
+    *args: str,
+    env: dict[str, str] | None = None,
+    stdin_text: str | None = None,
+) -> tuple[int, str, str]:
     process = await asyncio.create_subprocess_exec(
         *args,
+        stdin=asyncio.subprocess.PIPE if stdin_text is not None else None,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=env,
     )
-    stdout, stderr = await process.communicate()
+    payload = stdin_text.encode() if stdin_text is not None else None
+    stdout, stderr = await process.communicate(payload)
     return_code = cast(int, process.returncode)
     return (
         return_code,
         stdout.decode(errors="ignore").strip(),
         stderr.decode(errors="ignore").strip(),
     )
+
+
+async def _ensure_credentials_in_helper(repo_url: str, token: str | None) -> None:
+    if not token:
+        raise RuntimeError("Token is required for git credential helper mode")
+    parsed = urlparse(repo_url)
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise RuntimeError("Credential helper mode supports only https repository urls")
+
+    async with _CREDENTIAL_LOCK:
+        if parsed.hostname in _CREDENTIAL_READY_HOSTS:
+            return
+        approve_payload = (
+            f"protocol=https\nhost={parsed.hostname}\nusername=oauth2\npassword={token}\n\n"
+        )
+        code, _, stderr = await run_git_command(
+            "git",
+            "credential",
+            "approve",
+            stdin_text=approve_payload,
+        )
+        if code != 0:
+            raise RuntimeError(f"Unable to store credentials in helper: {stderr[:200]}")
+        _CREDENTIAL_READY_HOSTS.add(parsed.hostname)
 
 
 def build_clone_target(project: dict[str, Any], config: GitlabConfig) -> tuple[str, str]:
@@ -61,6 +94,11 @@ async def clone_repository(
         os.makedirs(os.path.dirname(full_clone_path), exist_ok=True)
 
         if os.path.exists(full_clone_path):
+            if config.git_auth_mode == "credential_helper":
+                try:
+                    await _ensure_credentials_in_helper(str(https_url), config.token)
+                except RuntimeError as exc:
+                    return CloneResult(name=repo_name, status="failed", message=str(exc))
             if not config.update_existing:
                 logger.info("Skipping %s: already cloned", repo_name)
                 return CloneResult(name=repo_name, status="skipped", message="Already cloned")
@@ -78,8 +116,12 @@ async def clone_repository(
             )
 
         try:
-            clone_url = build_authenticated_clone_url(str(https_url), config.token)
-        except ValueError as exc:
+            if config.git_auth_mode == "credential_helper":
+                await _ensure_credentials_in_helper(str(https_url), config.token)
+                clone_url = str(https_url)
+            else:
+                clone_url = build_authenticated_clone_url(str(https_url), config.token or "")
+        except (ValueError, RuntimeError) as exc:
             logger.error("Skipping %s: %s", repo_name, exc)
             return CloneResult(name=repo_name, status="failed", message=str(exc))
 

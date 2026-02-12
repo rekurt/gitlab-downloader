@@ -6,7 +6,7 @@ from dataclasses import dataclass
 @dataclass
 class GitlabConfig:
     url: str
-    token: str
+    token: str | None
     group: str | None
     clone_path: str
     per_page: int
@@ -20,6 +20,12 @@ class GitlabConfig:
     log_file: str | None
     interactive: bool
     report_json: str | None
+    auth_method: str
+    git_auth_mode: str
+    oauth_client_id: str | None
+    oauth_client_secret: str | None
+    oauth_scope: str
+    oauth_cache_path: str
 
 
 @dataclass

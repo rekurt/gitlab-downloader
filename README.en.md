@@ -38,6 +38,27 @@ python fetch_repositories.py --dry-run --url https://gitlab.com --token <token> 
 python fetch_repositories.py --update --url https://gitlab.com --token <token> --group <group>
 ```
 
+### OAuth Device Flow
+```bash
+python fetch_repositories.py \
+  --url https://gitlab.com \
+  --auth-method oauth \
+  --oauth-client-id <client_id> \
+  --git-auth-mode credential_helper
+```
+The CLI prints a browser URL and code, then stores access/refresh tokens in cache (`~/.config/gitlab-dump/oauth_token.json` by default).
+
+### Git Credential Helper
+For `clone/pull` without token in URL:
+```bash
+python fetch_repositories.py \
+  --url https://gitlab.com \
+  --auth-method token \
+  --token <token> \
+  --git-auth-mode credential_helper
+```
+This mode uses `git credential approve` with your configured `credential.helper`.
+
 ## Docker
 ```bash
 docker build -t fetch-repositories .

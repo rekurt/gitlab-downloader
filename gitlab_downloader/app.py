@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
+from dataclasses import replace
 from pathlib import Path
 
 from .config import config_from_args, parse_args
@@ -27,6 +28,7 @@ async def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     from dotenv import load_dotenv
 
+    from .auth import resolve_access_token
     from .client import fetch_group_metadata, get_all_projects, get_user_projects
     from .cloner import build_clone_target, clone_all_repositories
     from .reporting import print_dry_run, print_summary, write_json_report
@@ -34,6 +36,8 @@ async def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     setup_logging(args.log_level, args.log_file)
     config = config_from_args(args)
+    access_token = await resolve_access_token(config)
+    config = replace(config, token=access_token)
 
     Path(config.clone_path).mkdir(parents=True, exist_ok=True)
 

@@ -27,6 +27,12 @@ def make_config(**overrides):
         "log_file": None,
         "interactive": False,
         "report_json": None,
+        "auth_method": "token",
+        "git_auth_mode": "url",
+        "oauth_client_id": None,
+        "oauth_client_secret": None,
+        "oauth_scope": "read_api read_repository",
+        "oauth_cache_path": ".tmp-oauth-cache.json",
     }
     data.update(overrides)
     return fr.GitlabConfig(**data)
@@ -104,6 +110,13 @@ def test_parse_args_missing_required(monkeypatch):
         fr.parse_args(["--url", "https://gitlab.com"])
 
 
+def test_parse_args_oauth_requires_client_id(monkeypatch):
+    monkeypatch.setenv("GITLAB_URL", "https://gitlab.com")
+    monkeypatch.delenv("GITLAB_OAUTH_CLIENT_ID", raising=False)
+    with pytest.raises(SystemExit):
+        fr.parse_args(["--auth-method", "oauth"])
+
+
 @pytest.mark.parametrize(
     ("argv", "error_part"),
     [
@@ -159,6 +172,12 @@ def test_config_from_args():
         log_file="app.log",
         interactive=False,
         report_json=None,
+        auth_method="token",
+        git_auth_mode="url",
+        oauth_client_id=None,
+        oauth_client_secret=None,
+        oauth_scope="read_api read_repository",
+        oauth_cache_path=".tmp-oauth-cache.json",
     )
     cfg = fr.config_from_args(args)
     assert cfg.url == "https://gitlab.com"

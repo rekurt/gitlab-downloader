@@ -27,6 +27,12 @@ def make_config(tmp_path: Path, **overrides) -> GitlabConfig:
         "log_file": None,
         "interactive": False,
         "report_json": None,
+        "auth_method": "token",
+        "git_auth_mode": "url",
+        "oauth_client_id": None,
+        "oauth_client_secret": None,
+        "oauth_scope": "read_api read_repository",
+        "oauth_cache_path": ".tmp-oauth-cache.json",
     }
     data.update(overrides)
     return GitlabConfig(**data)
@@ -36,7 +42,9 @@ def test_parse_args_interactive(monkeypatch):
     answers = iter(
         [
             "https://gitlab.com",
+            "token",
             "token123",
+            "url",
             "team/group",
             "repositories",
             "3",
@@ -67,7 +75,9 @@ def test_parse_args_auto_interactive_without_cli_args(monkeypatch):
     answers = iter(
         [
             "https://gitlab.com",
+            "token",
             "token123",
+            "url",
             "team/group",
             "repositories",
             "3",
@@ -132,3 +142,32 @@ async def test_clone_repository_retries_and_fails(monkeypatch, tmp_path: Path):
 
     assert result.status == "failed"
     assert "Clone failed" in result.message
+
+
+@pytest.mark.asyncio
+async def test_clone_repository_credential_helper(monkeypatch, tmp_path: Path):
+    config = make_config(tmp_path, git_auth_mode="credential_helper")
+    calls: list[tuple[tuple[str, ...], str | None]] = []
+
+    async def fake_run(*args, **kwargs):
+        calls.append((args, kwargs.get("stdin_text")))
+        if args[:3] == ("git", "credential", "approve"):
+            return 0, "", ""
+        if args[:2] == ("git", "clone"):
+            return 0, "", ""
+        return 0, "", ""
+
+    monkeypatch.setattr("gitlab_downloader.cloner.run_git_command", fake_run)
+
+    result = await clone_repository(
+        {"name": "repo", "group_path": "", "http_url_to_repo": "https://gitlab.com/a/repo.git"},
+        config,
+        asyncio.Semaphore(1),
+        asyncio.Event(),
+    )
+
+    assert result.status == "success"
+    assert calls[0][0][:3] == ("git", "credential", "approve")
+    assert "password=token" in (calls[0][1] or "")
+    assert calls[1][0][0:2] == ("git", "clone")
+    assert calls[1][0][2] == "https://gitlab.com/a/repo.git"
