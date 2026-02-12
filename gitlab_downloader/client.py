@@ -147,6 +147,8 @@ async def fetch_paginated(
 
 
 async def fetch_group_metadata(session: aiohttp.ClientSession, config: GitlabConfig) -> dict:
+    if not config.group:
+        raise RuntimeError("Group is not set")
     url = f"{config.url}/api/{GITLAB_API_VERSION}/groups/{config.group}"
     data = await fetch_json(session, url, {}, "group metadata", config)
     if data is None or not isinstance(data, dict):
@@ -159,6 +161,8 @@ async def get_all_projects(
     config: GitlabConfig,
     root_full_path: str,
 ) -> list[dict]:
+    if not config.group:
+        return []
     base_url = f"{config.url}/api/{GITLAB_API_VERSION}/groups"
     projects: list[dict] = []
     to_visit: deque[dict[str, str]] = deque([{"id": config.group, "full_path": root_full_path}])
@@ -194,5 +198,22 @@ async def get_all_projects(
             subgroup_id = str(subgroup["id"])
             subgroup_path = subgroup.get("full_path") or subgroup.get("path") or subgroup_id
             to_visit.append({"id": subgroup_id, "full_path": subgroup_path})
+
+    return projects
+
+
+async def get_user_projects(session: aiohttp.ClientSession, config: GitlabConfig) -> list[dict]:
+    projects = await fetch_paginated(
+        session,
+        f"{config.url}/api/{GITLAB_API_VERSION}/projects",
+        {"membership": "true", "simple": "true"},
+        "projects for current user",
+        config,
+    )
+
+    for project in projects:
+        path_with_namespace = str(project.get("path_with_namespace", ""))
+        parent = path_with_namespace.rsplit("/", 1)[0] if "/" in path_with_namespace else ""
+        project["group_path"] = parent
 
     return projects

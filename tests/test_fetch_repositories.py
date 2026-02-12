@@ -87,6 +87,15 @@ def test_parse_args_cli_overrides_env(monkeypatch):
     assert args.url == "https://example.com"
 
 
+def test_parse_args_group_optional(monkeypatch):
+    monkeypatch.setenv("GITLAB_URL", "https://gitlab.com")
+    monkeypatch.setenv("GITLAB_TOKEN", "env-token")
+    monkeypatch.delenv("GITLAB_GROUP", raising=False)
+
+    args = fr.parse_args(["--url", "https://gitlab.com", "--token", "token"])
+    assert args.group is None
+
+
 def test_parse_args_missing_required(monkeypatch):
     monkeypatch.delenv("GITLAB_URL", raising=False)
     monkeypatch.delenv("GITLAB_TOKEN", raising=False)

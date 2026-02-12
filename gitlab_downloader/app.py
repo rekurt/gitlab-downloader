@@ -27,7 +27,7 @@ async def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     from dotenv import load_dotenv
 
-    from .client import fetch_group_metadata, get_all_projects
+    from .client import fetch_group_metadata, get_all_projects, get_user_projects
     from .cloner import build_clone_target, clone_all_repositories
     from .reporting import print_dry_run, print_summary, write_json_report
 
@@ -47,10 +47,16 @@ async def main(argv: list[str] | None = None) -> int:
 
     try:
         async with aiohttp.ClientSession(headers=headers, connector=connector) as session:
-            group_meta = await fetch_group_metadata(session, config)
-            root_full_path = group_meta.get("full_path", str(group_meta.get("path", config.group)))
             logger.info("Fetching repository list")
-            projects = await get_all_projects(session, config, root_full_path)
+            if config.group:
+                group_meta = await fetch_group_metadata(session, config)
+                root_full_path = group_meta.get(
+                    "full_path",
+                    str(group_meta.get("path", config.group)),
+                )
+                projects = await get_all_projects(session, config, root_full_path)
+            else:
+                projects = await get_user_projects(session, config)
 
         logger.info("Found %s repositories", len(projects))
 

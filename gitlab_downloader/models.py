@@ -7,7 +7,7 @@ from dataclasses import dataclass
 class GitlabConfig:
     url: str
     token: str
-    group: str
+    group: str | None
     clone_path: str
     per_page: int
     request_timeout: int

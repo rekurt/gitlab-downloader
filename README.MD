@@ -28,10 +28,12 @@ make install
 ## Использование
 
 Можно передавать параметры через CLI или через переменные окружения (`GITLAB_URL`, `GITLAB_TOKEN`, `GITLAB_GROUP`, `CLONE_PATH`).
+`GITLAB_GROUP` опционален: если не задан, будут загружены проекты текущего пользователя (membership).
 
 ```bash
 python fetch_repositories.py --help
 python fetch_repositories.py --url https://gitlab.com --token <token> --group <group>
+python fetch_repositories.py --url https://gitlab.com --token <token>
 python fetch_repositories.py --dry-run --url https://gitlab.com --token <token> --group <group>
 python fetch_repositories.py --update --url https://gitlab.com --token <token> --group <group>
 ```

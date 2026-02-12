@@ -76,7 +76,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
     no_cli_args = len(raw_argv) == 0
-    missing_required = not (args.url and args.token and args.group)
+    missing_required = not (args.url and args.token)
 
     if args.interactive or (no_cli_args and missing_required):
         args = fill_interactive(args)
@@ -85,7 +85,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
-def _prompt_text(label: str, current: str | None, secret: bool = False) -> str:
+def _prompt_text(
+    label: str,
+    current: str | None,
+    secret: bool = False,
+    allow_empty: bool = False,
+) -> str:
     default_hint = f" [{current}]" if current else ""
     while True:
         raw = (
@@ -95,6 +100,8 @@ def _prompt_text(label: str, current: str | None, secret: bool = False) -> str:
             return raw
         if current:
             return current
+        if allow_empty:
+            return ""
 
 
 def _prompt_int(
@@ -135,7 +142,7 @@ def fill_interactive(args: argparse.Namespace) -> argparse.Namespace:
     print("Interactive mode: fill GitLab downloader settings")
     args.url = _prompt_text("GitLab URL", args.url)
     args.token = _prompt_text("GitLab token", args.token, secret=True)
-    args.group = _prompt_text("Group (id or path)", args.group)
+    args.group = _prompt_text("Group (id or path, optional)", args.group, allow_empty=True)
     args.clone_path = _prompt_text("Clone path", args.clone_path)
     args.concurrency = _prompt_int(
         "Concurrency", args.concurrency, MIN_CONCURRENCY, MAX_CONCURRENCY
@@ -155,9 +162,6 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
         missing.append("--url / GITLAB_URL")
     if not args.token:
         missing.append("--token / GITLAB_TOKEN")
-    if not args.group:
-        missing.append("--group / GITLAB_GROUP")
-
     if missing:
         parser.error(f"Missing required settings: {', '.join(missing)}")
 
@@ -184,7 +188,7 @@ def config_from_args(args: argparse.Namespace) -> GitlabConfig:
     return GitlabConfig(
         url=args.url.rstrip("/"),
         token=args.token,
-        group=args.group,
+        group=args.group or None,
         clone_path=args.clone_path,
         per_page=args.per_page,
         request_timeout=args.timeout,

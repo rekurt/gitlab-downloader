@@ -28,10 +28,12 @@ make install
 ## Usage
 
 You can use CLI flags or environment variables (`GITLAB_URL`, `GITLAB_TOKEN`, `GITLAB_GROUP`, `CLONE_PATH`).
+`GITLAB_GROUP` is optional: if omitted, the tool fetches current user's membership projects.
 
 ```bash
 python fetch_repositories.py --help
 python fetch_repositories.py --url https://gitlab.com --token <token> --group <group>
+python fetch_repositories.py --url https://gitlab.com --token <token>
 python fetch_repositories.py --dry-run --url https://gitlab.com --token <token> --group <group>
 python fetch_repositories.py --update --url https://gitlab.com --token <token> --group <group>
 ```
