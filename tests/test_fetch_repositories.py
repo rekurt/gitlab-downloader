@@ -25,6 +25,8 @@ def make_config(**overrides):
         "update_existing": False,
         "log_level": "INFO",
         "log_file": None,
+        "interactive": False,
+        "report_json": None,
     }
     data.update(overrides)
     return fr.GitlabConfig(**data)
@@ -90,7 +92,7 @@ def test_parse_args_missing_required(monkeypatch):
     monkeypatch.delenv("GITLAB_TOKEN", raising=False)
     monkeypatch.delenv("GITLAB_GROUP", raising=False)
     with pytest.raises(SystemExit):
-        fr.parse_args([])
+        fr.parse_args(["--url", "https://gitlab.com"])
 
 
 @pytest.mark.parametrize(
@@ -146,6 +148,8 @@ def test_config_from_args():
         update=True,
         log_level="DEBUG",
         log_file="app.log",
+        interactive=False,
+        report_json=None,
     )
     cfg = fr.config_from_args(args)
     assert cfg.url == "https://gitlab.com"
@@ -194,6 +198,28 @@ async def test_fetch_json_retries_on_429_then_success():
             data = await fr.fetch_json(session, url, {}, "group metadata", config)
 
     assert data == {"ok": True}
+
+
+@pytest.mark.asyncio
+async def test_fetch_json_respects_retry_after(monkeypatch):
+    config = make_config(max_retries=2)
+    url = "https://gitlab.com/api/v4/groups/test"
+    slept = []
+
+    async def fake_sleep(delay):
+        slept.append(delay)
+
+    monkeypatch.setattr("gitlab_downloader.client.asyncio.sleep", fake_sleep)
+
+    with aioresponses() as mocked:
+        mocked.get(url, status=429, headers={"Retry-After": "0"})
+        mocked.get(url, payload={"ok": True}, status=200)
+
+        async with aiohttp.ClientSession() as session:
+            data = await fr.fetch_json(session, url, {}, "group metadata", config)
+
+    assert data == {"ok": True}
+    assert slept
 
 
 @pytest.mark.asyncio

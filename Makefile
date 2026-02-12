@@ -1,4 +1,4 @@
-.PHONY: run dry_run install build docker_run venv lint format test
+.PHONY: run dry_run install build docker_run venv lint format test typecheck ci binary binary_onefile binary_clean
 
 IMAGE_NAME=fetch-repositories
 CLONE_PATH?=$(shell pwd)/repositories
@@ -14,6 +14,9 @@ run:
 
 dry_run:
 	@$(VENV_PATH)/bin/python fetch_repositories.py --dry-run
+
+interactive:
+	@$(VENV_PATH)/bin/python fetch_repositories.py --interactive
 
 venv:
 	@[ -d $(VENV_PATH) ] || python3 -m venv $(VENV_PATH)
@@ -31,6 +34,22 @@ format:
 
 test:
 	@$(VENV_PATH)/bin/pytest
+
+typecheck:
+	@$(VENV_PATH)/bin/mypy gitlab_downloader
+
+ci: lint typecheck test
+
+binary:
+	@$(VENV_PATH)/bin/pip install --no-cache-dir pyinstaller
+	@$(VENV_PATH)/bin/pyinstaller --onedir --name gitlab-dump fetch_repositories.py
+
+binary_onefile:
+	@$(VENV_PATH)/bin/pip install --no-cache-dir pyinstaller
+	@$(VENV_PATH)/bin/pyinstaller --onefile --name gitlab-dump fetch_repositories.py
+
+binary_clean:
+	@rm -rf build dist *.spec
 
 build:
 	docker build -t $(IMAGE_NAME) .

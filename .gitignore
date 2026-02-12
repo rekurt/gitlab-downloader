@@ -9,3 +9,6 @@ __pycache__/
 .ruff_cache/
 .DS_Store
 AGENTS.md
+build/
+dist/
+*.spec

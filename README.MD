@@ -55,6 +55,30 @@ make format
 make test
 ```
 
+## Сборка бинарника
+Быстрая локальная сборка (рекомендуется, `onedir`):
+```bash
+make binary
+```
+
+Упакованный единый файл (медленнее старт, `onefile`):
+```bash
+make binary_onefile
+```
+
+Артефакты:
+- `onedir` (быстро): `dist/gitlab-dump/`
+- `onefile` (удобно переносить):
+  - macOS/Linux: `dist/gitlab-dump`
+  - Windows: `dist/gitlab-dump.exe`
+
+Очистка артефактов:
+```bash
+make binary_clean
+```
+
+Важно: `onefile` заметно медленнее на старте из-за распаковки. Для частого запуска используйте `make binary`. Для разных ОС нужно собирать на соответствующей ОС (Linux на Linux, macOS на macOS, Windows на Windows). Для автоматизации используйте CI matrix.
+
 ## Требования
 - Python 3.10+
 - Git

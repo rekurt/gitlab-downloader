@@ -55,6 +55,30 @@ make format
 make test
 ```
 
+## Binary Build
+Fast local build (recommended, `onedir`):
+```bash
+make binary
+```
+
+Single-file build (slower startup, `onefile`):
+```bash
+make binary_onefile
+```
+
+Artifacts:
+- `onedir` (fast): `dist/gitlab-dump/`
+- `onefile` (portable):
+  - macOS/Linux: `dist/gitlab-dump`
+  - Windows: `dist/gitlab-dump.exe`
+
+Clean build artifacts:
+```bash
+make binary_clean
+```
+
+Important: `onefile` starts slower because it unpacks on launch. For frequent runs use `make binary`. Build on each target OS separately (Linux on Linux, macOS on macOS, Windows on Windows). Use a CI matrix for automation.
+
 ## Requirements
 - Python 3.10+
 - Git
