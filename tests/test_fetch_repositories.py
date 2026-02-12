@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 
 import aiohttp
 import pytest
@@ -71,12 +72,13 @@ def test_extract_group_path():
 
 def test_parse_args_env_fallback(monkeypatch):
     monkeypatch.setenv("GITLAB_URL", "https://gitlab.com")
-    monkeypatch.setenv("GITLAB_TOKEN", "env-token")
+    monkeypatch.setenv("GITLAB_OAUTH_CLIENT_ID", "client-id")
     monkeypatch.setenv("GITLAB_GROUP", "env-group")
     args = fr.parse_args([])
 
     assert args.url == "https://gitlab.com"
-    assert args.token == "env-token"
+    assert args.auth_method == "oauth"
+    assert args.oauth_client_id == "client-id"
     assert args.group == "env-group"
 
 
@@ -115,6 +117,30 @@ def test_parse_args_oauth_requires_client_id(monkeypatch):
     monkeypatch.delenv("GITLAB_OAUTH_CLIENT_ID", raising=False)
     with pytest.raises(SystemExit):
         fr.parse_args(["--auth-method", "oauth"])
+
+
+def test_parse_args_oauth_client_id_from_cache(tmp_path):
+    cache_path = tmp_path / "oauth.json"
+    cache_path.write_text(
+        json.dumps(
+            {
+                "instance_url": "https://gitlab.com",
+                "client_id": "cached-client-id",
+            }
+        ),
+        encoding="utf-8",
+    )
+    args = fr.parse_args(
+        [
+            "--url",
+            "https://gitlab.com",
+            "--auth-method",
+            "oauth",
+            "--oauth-cache-path",
+            str(cache_path),
+        ]
+    )
+    assert args.oauth_client_id == "cached-client-id"
 
 
 @pytest.mark.parametrize(

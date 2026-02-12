@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -29,6 +30,22 @@ def env_bool(name: str, default: bool = False) -> bool:
 def validate_gitlab_url(url: str) -> bool:
     parsed = urlparse(url)
     return parsed.scheme in {"http", "https"} and bool(parsed.hostname)
+
+
+def _cached_oauth_client_id(cache_path: str | None, gitlab_url: str | None) -> str | None:
+    if not cache_path or not gitlab_url:
+        return None
+    try:
+        payload = json.loads(Path(cache_path).expanduser().read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    cached_url = str(payload.get("instance_url", "")).rstrip("/")
+    if cached_url != gitlab_url.rstrip("/"):
+        return None
+    client_id = payload.get("client_id")
+    if isinstance(client_id, str) and client_id.strip():
+        return client_id.strip()
+    return None
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -68,7 +85,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--auth-method",
         choices=["token", "oauth"],
-        default=os.getenv("AUTH_METHOD", "token"),
+        default=os.getenv("AUTH_METHOD", "oauth"),
     )
     parser.add_argument(
         "--git-auth-mode",
@@ -99,6 +116,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     args = parser.parse_args(argv)
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
+    auth_method_explicit = "--auth-method" in raw_argv
+
+    if (
+        not auth_method_explicit
+        and args.auth_method == "oauth"
+        and not args.oauth_client_id
+        and args.token
+    ):
+        args.auth_method = "token"
+
+    if args.auth_method == "oauth" and not args.oauth_client_id:
+        args.oauth_client_id = _cached_oauth_client_id(args.oauth_cache_path, args.url)
     no_cli_args = len(raw_argv) == 0
     has_auth = bool(args.token) if args.auth_method == "token" else bool(args.oauth_client_id)
     missing_required = not (args.url and has_auth)
@@ -127,6 +156,7 @@ def _prompt_text(
             return current
         if allow_empty:
             return ""
+        print(f"{label} is required")
 
 
 def _prompt_int(
@@ -181,6 +211,13 @@ def fill_interactive(args: argparse.Namespace) -> argparse.Namespace:
     if args.auth_method == "token":
         args.token = _prompt_text("GitLab token", args.token, secret=True)
     else:
+        if not args.oauth_client_id:
+            apps_url = f"{args.url.rstrip('/')}/-/profile/applications" if args.url else ""
+            print("OAuth Device Flow requires a GitLab OAuth Application client_id")
+            if apps_url:
+                print(f"Open and create app: {apps_url}")
+                print("Copy 'Application ID' and paste it as OAuth client id")
+                print("If app creation is restricted, ask GitLab admin for client_id")
         args.oauth_client_id = _prompt_text("OAuth client id", args.oauth_client_id)
         args.oauth_client_secret = _prompt_text(
             "OAuth client secret (optional)",
