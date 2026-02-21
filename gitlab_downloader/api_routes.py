@@ -38,8 +38,8 @@ _migration_tasks: dict[str, dict[str, Any]] = {}
 _migration_tasks_lock = asyncio.Lock()
 _MIGRATION_TASK_TTL = 3600  # Clean up tasks older than 1 hour
 
-# Lock for author/committer mappings file access to prevent race conditions
-_author_mappings_lock = asyncio.Lock()
+# Lock for config file access to prevent race conditions (used by both /config and /author-mappings)
+_config_file_lock = asyncio.Lock()
 
 
 async def _cleanup_old_migrations() -> None:
@@ -231,7 +231,7 @@ async def list_repositories(clone_path: str = ".") -> RepositoriesListResponse:
 async def get_author_mappings(config_path: str = ".") -> dict[str, AuthorMappingRequest]:
     """Get saved author mappings from disk."""
     try:
-        async with _author_mappings_lock:
+        async with _config_file_lock:
             validated_path = _validate_path(config_path)
             config_file = validated_path / "migration_config.json"
             if not config_file.exists():
@@ -273,7 +273,7 @@ async def save_author_mappings(
     from the request. This allows the UI to support add, edit, and delete operations.
     """
     try:
-        async with _author_mappings_lock:
+        async with _config_file_lock:
             validated_path = _validate_path(config_path)
 
             # Determine which config file format to use
@@ -317,6 +317,17 @@ async def save_author_mappings(
 
             # Replace all mappings (not merge) to support deletion
             mapper.save_mappings(author_mappings, committer_mappings)
+
+            # Validate that the config is still valid after saving mappings
+            try:
+                ConfigFileManager.load_config(str(validated_path))
+            except ValueError as e:
+                logger.error(f"Config became invalid after saving mappings: {e}")
+                raise ValueError(
+                    "Cannot save mappings: config requires source_repos_path, target_hosting_url, "
+                    "and target_token to be set first"
+                ) from e
+
             return {"status": "saved"}
     except ValueError as e:
         logger.error(f"Error saving author mappings: {e}")
@@ -478,37 +489,38 @@ async def get_migration_progress(migration_id: str) -> MigrationProgressResponse
 async def get_config(repo_path: str) -> dict[str, Any]:
     """Get migration config from repository directory."""
     try:
-        validated_path = _validate_path(repo_path)
-        config = ConfigFileManager.load_config(str(validated_path))
-        if not config:
-            return {"found": False, "config": None}
+        async with _config_file_lock:
+            validated_path = _validate_path(repo_path)
+            config = ConfigFileManager.load_config(str(validated_path))
+            if not config:
+                return {"found": False, "config": None}
 
-        return {
-            "found": True,
-            "config": {
-                "source_repos_path": config.source_repos_path,
-                "target_hosting_url": config.target_hosting_url,
-                # NOTE: target_token is never returned for security reasons
-                "author_mappings": {
-                    key: {
-                        "original_name": mapping.original_name,
-                        "original_email": mapping.original_email,
-                        "new_name": mapping.new_name,
-                        "new_email": mapping.new_email,
-                    }
-                    for key, mapping in config.author_mappings.items()
+            return {
+                "found": True,
+                "config": {
+                    "source_repos_path": config.source_repos_path,
+                    "target_hosting_url": config.target_hosting_url,
+                    # NOTE: target_token is never returned for security reasons
+                    "author_mappings": {
+                        key: {
+                            "original_name": mapping.original_name,
+                            "original_email": mapping.original_email,
+                            "new_name": mapping.new_name,
+                            "new_email": mapping.new_email,
+                        }
+                        for key, mapping in config.author_mappings.items()
+                    },
+                    "committer_mappings": {
+                        key: {
+                            "original_name": mapping.original_name,
+                            "original_email": mapping.original_email,
+                            "new_name": mapping.new_name,
+                            "new_email": mapping.new_email,
+                        }
+                        for key, mapping in config.committer_mappings.items()
+                    },
                 },
-                "committer_mappings": {
-                    key: {
-                        "original_name": mapping.original_name,
-                        "original_email": mapping.original_email,
-                        "new_name": mapping.new_name,
-                        "new_email": mapping.new_email,
-                    }
-                    for key, mapping in config.committer_mappings.items()
-                },
-            },
-        }
+            }
     except ValueError as e:
         logger.error(f"Error reading config: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -521,39 +533,40 @@ async def get_config(repo_path: str) -> dict[str, Any]:
 async def save_config(request: ConfigSaveRequest) -> dict[str, str]:
     """Save migration config to repository directory."""
     try:
-        validated_path = _validate_path(request.repo_path)
-        validated_source_path = _validate_path(request.source_repos_path)
+        async with _config_file_lock:
+            validated_path = _validate_path(request.repo_path)
+            validated_source_path = _validate_path(request.source_repos_path)
 
-        # Convert API requests to internal format
-        author_map = {}
-        for key, author_req in request.author_mappings.items():
-            author_map[key] = AuthorMapping(
-                original_name=author_req.original_name,
-                original_email=author_req.original_email,
-                new_name=author_req.new_name,
-                new_email=author_req.new_email,
+            # Convert API requests to internal format
+            author_map = {}
+            for key, author_req in request.author_mappings.items():
+                author_map[key] = AuthorMapping(
+                    original_name=author_req.original_name,
+                    original_email=author_req.original_email,
+                    new_name=author_req.new_name,
+                    new_email=author_req.new_email,
+                )
+
+            committer_map = {}
+            for key, committer_req in request.committer_mappings.items():
+                committer_map[key] = CommitterMapping(
+                    original_name=committer_req.original_name,
+                    original_email=committer_req.original_email,
+                    new_name=committer_req.new_name,
+                    new_email=committer_req.new_email,
+                )
+
+            # Create config and save
+            config = MigrationConfig(
+                source_repos_path=str(validated_source_path),
+                target_hosting_url=request.target_hosting_url,
+                target_token=request.target_token,
+                author_mappings=author_map,
+                committer_mappings=committer_map,
             )
 
-        committer_map = {}
-        for key, committer_req in request.committer_mappings.items():
-            committer_map[key] = CommitterMapping(
-                original_name=committer_req.original_name,
-                original_email=committer_req.original_email,
-                new_name=committer_req.new_name,
-                new_email=committer_req.new_email,
-            )
-
-        # Create config and save
-        config = MigrationConfig(
-            source_repos_path=str(validated_source_path),
-            target_hosting_url=request.target_hosting_url,
-            target_token=request.target_token,
-            author_mappings=author_map,
-            committer_mappings=committer_map,
-        )
-
-        ConfigFileManager.save_config(str(validated_path), config, format=request.format)
-        return {"status": "saved"}
+            ConfigFileManager.save_config(str(validated_path), config, format=request.format)
+            return {"status": "saved"}
     except ValueError as e:
         logger.error(f"Error saving config: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e

@@ -14,7 +14,7 @@ The application consists of three main layers:
 
 1. **Main Process** (`main.js`): Electron main process that manages windows, handles IPC communication, and spawns the Python backend process
 2. **Renderer Process** (`src/`): React application UI that runs in a Chromium window
-3. **Python Backend**: CLI tool exposing REST API on port 5000
+3. **Python Backend**: CLI tool exposing REST API on port 8000
 
 ### Communication Flow
 
@@ -23,7 +23,7 @@ Renderer (React UI)
         ↓ (IPC & HTTP)
 Main Process (Electron)
         ↓ (spawns)
-Python Backend (Flask API)
+Python Backend (FastAPI)
 ```
 
 The renderer process communicates with the main process via IPC (Inter-Process Communication), which in turn manages the Python API backend and exposes endpoints to the renderer via the preload script.
@@ -218,7 +218,7 @@ Browsable list of available repositories from the GitLab instance with filtering
 
 ## REST API Endpoints
 
-The application expects the Python backend to provide the following endpoints on `http://127.0.0.1:5000`:
+The application expects the Python backend to provide the following endpoints on `http://127.0.0.1:8000`:
 
 - `GET /api/status` - Backend health check
 - `GET /api/repos` - List available repositories
@@ -307,9 +307,9 @@ npm run webpack-dev
 - Clear Electron cache: `rm -rf ~/.config/GitLab\ Dump/`
 
 **Backend not connecting**
-- Verify Python backend is running on port 5000
+- Verify Python backend is running on port 8000
 - Check main.js logs for Python process startup errors
-- Test API manually: `curl http://127.0.0.1:5000/api/status`
+- Test API manually: `curl http://127.0.0.1:8000/api/status`
 
 **High CPU usage after build**
 - This is typically the embedded Python binary indexing files on first run
@@ -320,10 +320,10 @@ npm run webpack-dev
 - Check system architecture matches build target (x64 vs ia32)
 - On Linux, verify AppImage dependencies: `ldd GitLab\ Dump-*.AppImage`
 
-**Port 5000 already in use**
+**Port 8000 already in use**
 ```bash
-# Find process using port 5000
-lsof -i :5000
+# Find process using port 8000
+lsof -i :8000
 # Kill process if needed
 kill -9 <PID>
 ```

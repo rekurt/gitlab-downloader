@@ -133,10 +133,15 @@ class TestAuthorMappingsEndpoint:
         assert data["john"]["original_name"] == "John Doe"
         assert data["john"]["new_name"] == "Jane Doe"
 
+    @mock.patch("gitlab_downloader.api_routes.ConfigFileManager")
     @mock.patch("gitlab_downloader.api_routes.Path")
     @mock.patch("gitlab_downloader.api_routes.AuthorMapper")
     def test_save_author_mappings(
-        self, mock_mapper_class: mock.MagicMock, mock_path_class: mock.MagicMock, client: TestClient
+        self,
+        mock_mapper_class: mock.MagicMock,
+        mock_path_class: mock.MagicMock,
+        mock_config_manager_class: mock.MagicMock,
+        client: TestClient,
     ) -> None:
         """Test saving author mappings."""
         mock_mapper = mock.MagicMock()
@@ -144,6 +149,10 @@ class TestAuthorMappingsEndpoint:
 
         mock_path = mock.MagicMock()
         mock_path_class.return_value = mock_path
+
+        # Mock ConfigFileManager.load_config to return valid config
+        mock_config_manager = mock.MagicMock()
+        mock_config_manager_class.load_config.return_value = mock_config_manager
 
         request_body = {
             "author_mappings": {
@@ -166,6 +175,47 @@ class TestAuthorMappingsEndpoint:
         data = response.json()
         assert data["status"] == "saved"
         mock_mapper.save_mappings.assert_called_once()
+
+    @mock.patch("gitlab_downloader.api_routes.ConfigFileManager")
+    @mock.patch("gitlab_downloader.api_routes.Path")
+    @mock.patch("gitlab_downloader.api_routes.AuthorMapper")
+    def test_save_author_mappings_invalid_config(
+        self,
+        mock_mapper_class: mock.MagicMock,
+        mock_path_class: mock.MagicMock,
+        mock_config_manager_class: mock.MagicMock,
+        client: TestClient,
+    ) -> None:
+        """Test saving author mappings fails if config becomes invalid."""
+        mock_mapper = mock.MagicMock()
+        mock_mapper_class.return_value = mock_mapper
+
+        mock_path = mock.MagicMock()
+        mock_path_class.return_value = mock_path
+
+        # Mock ConfigFileManager.load_config to raise ValueError (invalid config)
+        mock_config_manager_class.load_config.side_effect = ValueError(
+            "Missing required field: source_repos_path"
+        )
+
+        request_body = {
+            "author_mappings": {
+                "john": {
+                    "original_name": "John Doe",
+                    "original_email": "john@example.com",
+                    "new_name": "Jane Doe",
+                    "new_email": "jane@example.com",
+                }
+            },
+            "committer_mappings": {},
+        }
+
+        response = client.post(
+            "/api/author-mappings", json=request_body, params={"config_path": "."}
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert "Cannot save mappings" in data["detail"]
 
 
 class TestMigrationEndpoint:

@@ -158,7 +158,7 @@ Container configuration for running the application in Docker.
 
 ## REST API Endpoints
 
-The API server runs on the configured host/port (default: localhost:8080) and provides the following endpoints:
+The API server runs on the configured host/port (default: localhost:8000) and provides the following endpoints:
 
 ### Status and Configuration
 - `GET /api/status` - Get application status and version

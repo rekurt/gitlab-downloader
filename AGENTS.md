@@ -48,7 +48,7 @@ The Electron GUI communicates with the Python backend via these REST API endpoin
 - `POST /api/migrate`: Starts a background migration task. Accepts repository path, author mappings, and committer mappings. Returns `migration_id`.
 - `GET /api/migration-progress/{migration_id}`: Polls for migration progress. Returns status, progress percentage, current task, messages, and any errors.
 
-**API Base URL**: `http://localhost:5000` (default) or `http://127.0.0.1:5000`.
+**API Base URL**: `http://localhost:8000` (default) or `http://127.0.0.1:8000`.
 **CORS**: Configured for localhost origins (http://localhost:3000, http://127.0.0.1:3000) to allow Electron frontend communication.
 
 ### Infrastructure
