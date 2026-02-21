@@ -36,3 +36,31 @@ class CloneResult:
     name: str
     status: CloneStatus
     message: str
+
+
+@dataclass
+class AuthorMapping:
+    """Represents mapping from one author to another"""
+    original_name: str
+    original_email: str
+    new_name: str
+    new_email: str
+
+
+@dataclass
+class CommitterMapping:
+    """Represents mapping from one committer to another"""
+    original_name: str
+    original_email: str
+    new_name: str
+    new_email: str
+
+
+@dataclass
+class MigrationConfig:
+    """Configuration for git migration task"""
+    source_repos_path: str
+    target_hosting_url: str
+    target_token: str
+    author_mappings: dict[str, AuthorMapping]
+    committer_mappings: dict[str, CommitterMapping]
