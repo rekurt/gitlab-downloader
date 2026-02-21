@@ -163,10 +163,10 @@
 
 ### Task 10: Verify acceptance criteria
 
-- [ ] Запустить полный test suite (`make test`)
-- [ ] Запустить linter (`make lint`)
-- [ ] Запустить type checker (`make typecheck`)
-- [ ] Проверить покрытие тестами основных модулей (auth, client, reporting теперь покрыты)
+- [x] Запустить полный test suite (`make test`)
+- [x] Запустить linter (`make lint`)
+- [x] Запустить type checker (`make typecheck`)
+- [x] Проверить покрытие тестами основных модулей (auth, client, reporting теперь покрыты)
 
 ### Task 11: Update documentation
 
