@@ -103,11 +103,11 @@
 **Files:**
 - Create: `tests/test_client.py`
 
-- [ ] Написать тесты для `fetch_json` (success, retry on 429/500, failure on 4xx)
-- [ ] Написать тесты для `fetch_paginated` (multi-page, empty result)
-- [ ] Написать тесты для `maybe_rate_limit_delay`
-- [ ] Написать тесты для `get_all_projects` и `get_user_projects`
-- [ ] Запустить тесты
+- [x] Написать тесты для `fetch_json` (success, retry on 429/500, failure on 4xx)
+- [x] Написать тесты для `fetch_paginated` (multi-page, empty result)
+- [x] Написать тесты для `maybe_rate_limit_delay`
+- [x] Написать тесты для `get_all_projects` и `get_user_projects`
+- [x] Запустить тесты
 
 ### Task 5: Добавить тесты для auth.py
 
