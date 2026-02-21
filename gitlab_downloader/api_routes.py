@@ -315,18 +315,21 @@ async def save_author_mappings(
                 for key, req in request.committer_mappings.items()
             }
 
-            # Replace all mappings (not merge) to support deletion
-            mapper.save_mappings(author_mappings, committer_mappings)
-
-            # Validate that the config is still valid after saving mappings
+            # Validate that the config will be valid before saving mappings
+            # This prevents writing an invalid file if required fields are missing
             try:
-                ConfigFileManager.load_config(str(validated_path))
+                loaded_config = ConfigFileManager.load_config(str(validated_path))
+                if loaded_config is None:
+                    raise ValueError("No migration config found")
             except ValueError as e:
-                logger.error(f"Config became invalid after saving mappings: {e}")
+                logger.error(f"Cannot save mappings: config is missing required fields: {e}")
                 raise ValueError(
                     "Cannot save mappings: config requires source_repos_path, target_hosting_url, "
                     "and target_token to be set first"
                 ) from e
+
+            # Replace all mappings (not merge) to support deletion
+            mapper.save_mappings(author_mappings, committer_mappings)
 
             return {"status": "saved"}
     except ValueError as e:

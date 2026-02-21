@@ -217,6 +217,81 @@ class TestAuthorMappingsEndpoint:
         data = response.json()
         assert "Cannot save mappings" in data["detail"]
 
+    def test_save_author_mappings_integration_invalid_config(
+        self, tmp_path, client: TestClient
+    ) -> None:
+        """Integration test: ensure no file is written if config is invalid."""
+        import json
+
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+
+        # Create a minimal invalid config (missing required fields)
+        config_file = config_dir / "migration_config.json"
+        config_file.write_text(json.dumps({"author_mappings": {}, "committer_mappings": {}}))
+
+        request_body = {
+            "author_mappings": {
+                "john": {
+                    "original_name": "John Doe",
+                    "original_email": "john@example.com",
+                    "new_name": "Jane Doe",
+                    "new_email": "jane@example.com",
+                }
+            },
+            "committer_mappings": {},
+        }
+
+        # Try to save mappings with invalid config
+        response = client.post(
+            "/api/author-mappings", json=request_body, params={"config_path": str(config_dir)}
+        )
+
+        # Should fail with 400
+        assert response.status_code == 400
+        data = response.json()
+        assert "Cannot save mappings" in data["detail"]
+
+        # Verify config file still has only the original content (no mappings were added)
+        config_content = json.loads(config_file.read_text())
+        assert "author_mappings" in config_content
+        assert config_content["author_mappings"] == {}  # Should not have new mappings
+
+    def test_save_author_mappings_integration_missing_config(
+        self, tmp_path, client: TestClient
+    ) -> None:
+        """Integration test: ensure error when config file is missing completely."""
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        # Don't create any config file
+
+        request_body = {
+            "author_mappings": {
+                "john": {
+                    "original_name": "John Doe",
+                    "original_email": "john@example.com",
+                    "new_name": "Jane Doe",
+                    "new_email": "jane@example.com",
+                }
+            },
+            "committer_mappings": {},
+        }
+
+        # Try to save mappings without any config file
+        response = client.post(
+            "/api/author-mappings", json=request_body, params={"config_path": str(config_dir)}
+        )
+
+        # Should fail with 400
+        assert response.status_code == 400
+        data = response.json()
+        assert "Cannot save mappings" in data["detail"]
+
+        # Verify no config file was created
+        assert not (config_dir / "migration_config.json").exists()
+        assert not (config_dir / "migration_config.yaml").exists()
+        assert not (config_dir / "migration_config.yml").exists()
+
 
 class TestMigrationEndpoint:
     """Tests for /api/migrate endpoint."""
@@ -319,15 +394,21 @@ class TestErrorHandling:
         response = client.get("/api/author-mappings", params={"config_path": "."})
         assert response.status_code == 500
 
+    @mock.patch("gitlab_downloader.api_routes.ConfigFileManager")
     @mock.patch("gitlab_downloader.api_routes.AuthorMapper")
     def test_author_mappings_write_error(
-        self, mock_mapper_class: mock.MagicMock, client: TestClient
+        self,
+        mock_mapper_class: mock.MagicMock,
+        mock_config_manager: mock.MagicMock,
+        client: TestClient,
     ) -> None:
         """Test error handling when saving author mappings fails."""
         mock_mapper = mock.MagicMock()
         mock_mapper_class.return_value = mock_mapper
         mock_mapper.load_mappings.side_effect = FileNotFoundError()
         mock_mapper.save_mappings.side_effect = OSError("Permission denied")
+        # Mock ConfigFileManager.load_config to return a valid config
+        mock_config_manager.load_config.return_value = mock.MagicMock()
 
         request_body = {
             "author_mappings": {
