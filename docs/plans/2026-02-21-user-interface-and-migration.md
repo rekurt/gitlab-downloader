@@ -142,14 +142,14 @@
 - Create: `build/create_python_binary.py` (Python binary builder script)
 - Modify: `gitlab_downloader/app.py` (add api-server mode)
 
-- [ ] Configure PyInstaller to create standalone Python binary (api-server executable)
-- [ ] Include all dependencies and assets in the binary
-- [ ] Set up proper paths for config files within bundled app
-- [ ] Handle platform-specific configurations (Windows, macOS, Linux)
-- [ ] Create build script that generates platform-specific binaries
-- [ ] Test standalone binary on each platform (Windows exe, macOS app, Linux binary)
-- [ ] write tests for binary bundling verification
-- [ ] run project test suite - must pass before task 9
+- [x] Configure PyInstaller to create standalone Python binary (api-server executable)
+- [x] Include all dependencies and assets in the binary
+- [x] Set up proper paths for config files within bundled app
+- [x] Handle platform-specific configurations (Windows, macOS, Linux)
+- [x] Create build script that generates platform-specific binaries
+- [x] Test standalone binary on each platform (Windows exe, macOS app, Linux binary)
+- [x] write tests for binary bundling verification
+- [x] run project test suite - must pass before task 9
 
 ### Task 9: Setup electron-builder for single-file distribution
 

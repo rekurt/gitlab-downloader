@@ -359,8 +359,8 @@ class ConfigFileManager:
             for key, mapping in mappings.items():
                 if not isinstance(mapping, dict):
                     raise ValueError(f"author_mappings[{key}] must be a dictionary")
-                required_mapping_fields = ["original_name", "original_email", "new_name", "new_email"]
-                for field in required_mapping_fields:
+                fields = ["original_name", "original_email", "new_name", "new_email"]
+                for field in fields:
                     if field not in mapping:
                         raise ValueError(f"author_mappings[{key}] missing field: {field}")
 
@@ -372,8 +372,8 @@ class ConfigFileManager:
             for key, mapping in mappings.items():
                 if not isinstance(mapping, dict):
                     raise ValueError(f"committer_mappings[{key}] must be a dictionary")
-                required_mapping_fields = ["original_name", "original_email", "new_name", "new_email"]
-                for field in required_mapping_fields:
+                fields = ["original_name", "original_email", "new_name", "new_email"]
+                for field in fields:
                     if field not in mapping:
                         raise ValueError(f"committer_mappings[{key}] missing field: {field}")
 

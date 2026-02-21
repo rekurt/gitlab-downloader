@@ -28,6 +28,9 @@ dev = [
   "ruff>=0.8.0",
   "mypy>=1.11.0",
   "httpx>=0.24.0",
+  "pyinstaller>=5.0.0",
+  "types-PyYAML>=6.0.0",
+  "types-PyInstaller>=6.0.0",
 ]
 
 [tool.pytest.ini_options]
