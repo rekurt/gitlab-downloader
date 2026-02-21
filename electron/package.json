@@ -13,7 +13,7 @@
     "electron-dev": "wait-on http://localhost:8080 && electron . --remote-debugging-port=9222",
     "build": "webpack --mode production",
     "build-python": "python ../build/create_python_binary.py",
-    "embed-python": "node ../build/embed_python_binary.js",
+    "embed-python": "NODE_PATH=./node_modules node ../build/embed_python_binary.js",
     "prebuild-portable": "npm run build && npm run embed-python",
     "pack": "electron-builder --dir",
     "dist": "npm run prebuild-portable && electron-builder",
