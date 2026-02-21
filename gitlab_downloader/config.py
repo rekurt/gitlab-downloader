@@ -126,7 +126,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     args = parser.parse_args(argv)
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
-    auth_method_explicit = "--auth-method" in raw_argv
+    auth_method_explicit = (
+        any(arg == "--auth-method" or arg.startswith("--auth-method=") for arg in raw_argv)
+        or os.getenv("AUTH_METHOD") is not None
+    )
 
     if (
         not auth_method_explicit

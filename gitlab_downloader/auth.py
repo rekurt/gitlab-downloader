@@ -153,7 +153,10 @@ def _normalize_oauth_payload(
     config: GitlabConfig,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    expires_in = int(payload.get("expires_in", 3600))
+    try:
+        expires_in = int(payload.get("expires_in", 3600))
+    except (ValueError, TypeError):
+        expires_in = 3600
     return {
         "instance_url": config.url,
         "client_id": config.oauth_client_id,
