@@ -41,6 +41,51 @@ function getPythonExecutablePath() {
 }
 
 /**
+ * Extract embedded Python binary on first run
+ * Creates a persistent copy in app data directory
+ */
+function extractEmbeddedBinary() {
+  const platform = os.platform();
+  const appDataPath = path.join(app.getPath('appData'), 'gitlab-dump');
+  let binaryName = 'python';
+  if (platform === 'win32') {
+    binaryName = 'python.exe';
+  }
+
+  const extractedPath = path.join(appDataPath, 'bin', binaryName);
+
+  // If already extracted, use it
+  if (fs.existsSync(extractedPath)) {
+    return extractedPath;
+  }
+
+  try {
+    fs.ensureDirSync(path.dirname(extractedPath));
+
+    // Get embedded binary from resources
+    const embeddedPath = path.join(process.resourcesPath, 'python', binaryName);
+    if (!fs.existsSync(embeddedPath)) {
+      console.warn(`Embedded binary not found at ${embeddedPath}`);
+      return null;
+    }
+
+    // Copy to app data directory
+    fs.copyFileSync(embeddedPath, extractedPath);
+
+    // Make executable on Unix-like systems
+    if (platform !== 'win32') {
+      fs.chmodSync(extractedPath, '0755');
+    }
+
+    console.log(`Extracted embedded binary to ${extractedPath}`);
+    return extractedPath;
+  } catch (error) {
+    console.error('Failed to extract embedded binary:', error);
+    return null;
+  }
+}
+
+/**
  * Wait for API to be ready with health checks
  */
 async function waitForApiReady(maxRetries = 10) {

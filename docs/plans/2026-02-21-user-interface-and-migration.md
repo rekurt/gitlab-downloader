@@ -159,15 +159,15 @@
 - Modify: `electron/main.js` (use bundled Python binary)
 - Modify: `electron/package.json` (build scripts and dependencies)
 
-- [ ] Configure electron-builder for single-file output (portable exe, dmg, AppImage)
-- [ ] Set up logic to embed compiled Python binary into Electron bundle
-- [ ] Configure for Windows portable exe (single .exe file)
-- [ ] Configure for macOS app bundle (single .app file)
-- [ ] Configure for Linux AppImage (single .AppImage file)
-- [ ] Update main.js to extract and launch embedded Python binary on first run
-- [ ] Configure code signing for macOS (optional but recommended)
-- [ ] write tests for bundling verification
-- [ ] run project test suite - must pass before task 10
+- [x] Configure electron-builder for single-file output (portable exe, dmg, AppImage)
+- [x] Set up logic to embed compiled Python binary into Electron bundle
+- [x] Configure for Windows portable exe (single .exe file)
+- [x] Configure for macOS app bundle (single .app file)
+- [x] Configure for Linux AppImage (single .AppImage file)
+- [x] Update main.js to extract and launch embedded Python binary on first run
+- [x] Configure code signing for macOS (optional but recommended)
+- [x] write tests for bundling verification
+- [x] run project test suite - must pass before task 10
 
 ### Task 10: Verify acceptance criteria
 

@@ -12,11 +12,14 @@
     "webpack-dev": "webpack serve --mode development",
     "electron-dev": "wait-on http://localhost:8080 && electron . --remote-debugging-port=9222",
     "build": "webpack --mode production",
+    "build-python": "python ../build/create_python_binary.py",
+    "embed-python": "node ../build/embed_python_binary.js",
+    "prebuild-portable": "npm run build && npm run embed-python",
     "pack": "electron-builder --dir",
-    "dist": "npm run build && electron-builder",
-    "dist-win": "npm run build && electron-builder --win",
-    "dist-mac": "npm run build && electron-builder --mac",
-    "dist-linux": "npm run build && electron-builder --linux",
+    "dist": "npm run prebuild-portable && electron-builder",
+    "dist-win": "npm run prebuild-portable && electron-builder --win",
+    "dist-mac": "npm run prebuild-portable && electron-builder --mac",
+    "dist-linux": "npm run prebuild-portable && electron-builder --linux",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
@@ -34,59 +37,12 @@
     "css-loader": "^6.8.0",
     "electron": "^27.0.0",
     "electron-builder": "^24.6.0",
+    "fs-extra": "^11.1.0",
     "html-webpack-plugin": "^5.5.0",
     "style-loader": "^3.3.0",
     "wait-on": "^7.0.0",
     "webpack": "^5.89.0",
     "webpack-cli": "^5.1.0",
     "webpack-dev-server": "^4.15.0"
-  },
-  "build": {
-    "appId": "com.gitlabdump.app",
-    "productName": "GitLab Dump",
-    "files": [
-      "main.js",
-      "preload.js",
-      "dist/**/*",
-      "node_modules/**/*"
-    ],
-    "directories": {
-      "buildResources": "assets"
-    },
-    "win": {
-      "target": [
-        {
-          "target": "portable",
-          "arch": [
-            "x64",
-            "ia32"
-          ]
-        },
-        {
-          "target": "nsis",
-          "arch": [
-            "x64",
-            "ia32"
-          ]
-        }
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    },
-    "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "category": "public.app-category.utilities"
-    },
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ]
-    }
   }
 }
