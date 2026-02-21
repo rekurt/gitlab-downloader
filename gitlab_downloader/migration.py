@@ -230,7 +230,9 @@ class MigrationExecutor:
             new_name = shlex.quote(mapping.new_name)
             new_email = shlex.quote(mapping.new_email)
 
+            original_name = shlex.quote(mapping.original_name)
             conditions.append(
+                f'[ "$GIT_AUTHOR_NAME" = {original_name} ] && '
                 f'[ "$GIT_AUTHOR_EMAIL" = {original_email} ] && '
                 f"export GIT_AUTHOR_NAME={new_name} && "
                 f"export GIT_AUTHOR_EMAIL={new_email}"
@@ -256,11 +258,13 @@ class MigrationExecutor:
         conditions = []
         for mapping in mappings.values():
             # Properly escape all values to prevent shell injection
+            original_name = shlex.quote(mapping.original_name)
             original_email = shlex.quote(mapping.original_email)
             new_name = shlex.quote(mapping.new_name)
             new_email = shlex.quote(mapping.new_email)
 
             conditions.append(
+                f'[ "$GIT_COMMITTER_NAME" = {original_name} ] && '
                 f'[ "$GIT_COMMITTER_EMAIL" = {original_email} ] && '
                 f"export GIT_COMMITTER_NAME={new_name} && "
                 f"export GIT_COMMITTER_EMAIL={new_email}"

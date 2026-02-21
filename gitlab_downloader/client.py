@@ -6,6 +6,7 @@ import random
 import time
 from collections import deque
 from typing import Any, cast
+from urllib.parse import quote
 
 import aiohttp
 
@@ -149,7 +150,8 @@ async def fetch_paginated(
 async def fetch_group_metadata(session: aiohttp.ClientSession, config: GitlabConfig) -> dict:
     if not config.group:
         raise RuntimeError("Group is not set")
-    url = f"{config.url}/api/{GITLAB_API_VERSION}/groups/{config.group}"
+    encoded_group = quote(config.group, safe="")
+    url = f"{config.url}/api/{GITLAB_API_VERSION}/groups/{encoded_group}"
     data = await fetch_json(session, url, {}, "group metadata", config)
     if data is None or not isinstance(data, dict):
         raise RuntimeError("Unable to fetch group metadata. Check group and token permissions")
@@ -173,9 +175,12 @@ async def get_all_projects(
         group_path = current["full_path"]
         logger.info("Fetching projects for group %s (%s)", group_path, group_id)
 
+        # Encode group ID if it's a path-based identifier (contains /)
+        encoded_group_id = quote(str(group_id), safe="")
+
         project_items = await fetch_paginated(
             session,
-            f"{base_url}/{group_id}/projects",
+            f"{base_url}/{encoded_group_id}/projects",
             {"include_subgroups": "false"},
             f"projects for group {group_path}",
             config,
@@ -188,7 +193,7 @@ async def get_all_projects(
 
         subgroups = await fetch_paginated(
             session,
-            f"{base_url}/{group_id}/subgroups",
+            f"{base_url}/{encoded_group_id}/subgroups",
             {},
             f"subgroups for group {group_path}",
             config,

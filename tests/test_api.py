@@ -145,18 +145,23 @@ class TestAuthorMappingsEndpoint:
         mock_path = mock.MagicMock()
         mock_path_class.return_value = mock_path
 
-        mappings = {
-            "john": {
-                "original_name": "John Doe",
-                "original_email": "john@example.com",
-                "new_name": "Jane Doe",
-                "new_email": "jane@example.com",
-            }
+        request_body = {
+            "author_mappings": {
+                "john": {
+                    "original_name": "John Doe",
+                    "original_email": "john@example.com",
+                    "new_name": "Jane Doe",
+                    "new_email": "jane@example.com",
+                }
+            },
+            "committer_mappings": {},
         }
 
         mock_mapper.load_mappings.return_value = ({}, {})
 
-        response = client.post("/api/author-mappings", json=mappings, params={"config_path": "."})
+        response = client.post(
+            "/api/author-mappings", json=request_body, params={"config_path": "."}
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "saved"
@@ -274,16 +279,21 @@ class TestErrorHandling:
         mock_mapper.load_mappings.side_effect = FileNotFoundError()
         mock_mapper.save_mappings.side_effect = OSError("Permission denied")
 
-        mappings = {
-            "john": {
-                "original_name": "John Doe",
-                "original_email": "john@example.com",
-                "new_name": "Jane Doe",
-                "new_email": "jane@example.com",
-            }
+        request_body = {
+            "author_mappings": {
+                "john": {
+                    "original_name": "John Doe",
+                    "original_email": "john@example.com",
+                    "new_name": "Jane Doe",
+                    "new_email": "jane@example.com",
+                }
+            },
+            "committer_mappings": {},
         }
 
-        response = client.post("/api/author-mappings", json=mappings, params={"config_path": "."})
+        response = client.post(
+            "/api/author-mappings", json=request_body, params={"config_path": "."}
+        )
         assert response.status_code == 500
 
 

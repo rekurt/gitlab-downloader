@@ -21,6 +21,30 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+OPENAPI_TAGS = [
+    {
+        "name": "health",
+        "description": "Service health and version endpoints.",
+    },
+    {
+        "name": "repositories",
+        "description": "Operations with local cloned repositories.",
+    },
+    {
+        "name": "mappings",
+        "description": "Author and committer mapping management.",
+    },
+    {
+        "name": "migration",
+        "description": "Repository migration workflow endpoints.",
+    },
+    {
+        "name": "config",
+        "description": "Read and write migration configuration files.",
+    },
+]
+
+
 def create_app() -> FastAPI:
     """Create and configure FastAPI application.
 
@@ -50,8 +74,19 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="GitLab Dump API",
-        description="API for Electron desktop application",
+        description=(
+            "REST API for GitLab Dump desktop and CLI flows. "
+            "Use `/api/status` for health checks, `/api/repos` to inspect local repositories, "
+            "and migration endpoints to run history rewrite tasks."
+        ),
         version="0.1.0",
+        summary="GitLab Dump backend API",
+        contact={"name": "GitLab Dump Team"},
+        license_info={"name": "MIT"},
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+        openapi_tags=OPENAPI_TAGS,
         lifespan=lifespan,
     )
 
@@ -64,6 +99,8 @@ def create_app() -> FastAPI:
             "http://127.0.0.1",
             "http://localhost:3000",
             "http://127.0.0.1:3000",
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
         ],
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "DELETE"],
@@ -74,6 +111,27 @@ def create_app() -> FastAPI:
     app.include_router(router)
 
     return app
+
+
+async def run_api_server_async(host: str = "127.0.0.1", port: int = 8000) -> None:
+    """Run the API server asynchronously from within an event loop.
+
+    Args:
+        host: Host to bind to
+        port: Port to bind to
+    """
+    import uvicorn
+
+    app = create_app()
+
+    config = uvicorn.Config(app, host=host, port=port, log_level="info")
+    server = uvicorn.Server(config)
+
+    logger.info(f"Starting API server on {host}:{port}")
+    try:
+        await server.serve()
+    except Exception as e:  # pylint: disable=broad-except
+        logger.error(f"Server error: {e}", exc_info=True)
 
 
 def run_api_server(host: str = "127.0.0.1", port: int = 8000) -> None:

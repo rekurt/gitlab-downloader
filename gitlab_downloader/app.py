@@ -35,10 +35,10 @@ async def main(argv: list[str] | None = None) -> int:
 
     # Handle API server mode
     if config.api_server:
-        from .api import run_api_server
+        from .api import run_api_server_async
 
         logger.info(f"Starting API server on {config.api_host}:{config.api_port}")
-        run_api_server(host=config.api_host, port=config.api_port)
+        await run_api_server_async(host=config.api_host, port=config.api_port)
         return 0
 
     from .auth import resolve_access_token

@@ -143,7 +143,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--api-port",
         type=int,
-        default=int(os.getenv("API_PORT", 5000)),
+        default=int(os.getenv("API_PORT", 8000)),
         help="Port for API server",
     )
 
@@ -276,7 +276,7 @@ def fill_interactive(args: argparse.Namespace) -> argparse.Namespace:
     )
     args.timeout = _prompt_int("Request timeout (sec)", args.timeout, 1)
     args.per_page = _prompt_int("Per page", args.per_page, 1)
-    args.api_retries = _prompt_int("API retries", args.api_retries, 0)
+    args.api_retries = _prompt_int("API retries", args.api_retries, 1)
     args.clone_retries = _prompt_int("Clone retries", args.clone_retries, 0)
     args.update = _prompt_bool("Update existing repositories", args.update)
     args.dry_run = _prompt_bool("Dry run", args.dry_run)
@@ -306,8 +306,8 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
     if args.per_page <= 0:
         parser.error("--per-page must be greater than 0")
 
-    if args.api_retries < 0:
-        parser.error("--api-retries must be >= 0")
+    if args.api_retries < 1:
+        parser.error("--api-retries must be >= 1")
 
     if args.clone_retries < 0:
         parser.error("--clone-retries must be >= 0")

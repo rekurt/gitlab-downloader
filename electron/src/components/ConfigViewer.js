@@ -20,7 +20,7 @@ const ConfigViewer = ({ repoPath, onClose }) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`http://localhost:5000/api/config?repo_path=${encodeURIComponent(repoPath)}`);
+      const response = await fetch(`${apiEndpoint}/api/config?repo_path=${encodeURIComponent(repoPath)}`);
       const data = await response.json();
       if (data.found) {
         setConfig(data.config);
@@ -42,7 +42,7 @@ const ConfigViewer = ({ repoPath, onClose }) => {
       setSuccess(null);
 
       const response = await fetch(
-        `http://localhost:5000/api/config?repo_path=${encodeURIComponent(repoPath)}`,
+        `${apiEndpoint}/api/config?repo_path=${encodeURIComponent(repoPath)}`,
         {
           method: 'POST',
           headers: {

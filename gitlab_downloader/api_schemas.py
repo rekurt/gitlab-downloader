@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -46,6 +48,17 @@ class CommitterMappingRequest(BaseModel):
     new_email: str = Field(..., description="New committer email")
 
 
+class AuthorMappingsSaveRequest(BaseModel):
+    """Request to save author and committer mappings."""
+
+    author_mappings: dict[str, AuthorMappingRequest] = Field(
+        default_factory=dict, description="Author mappings to save"
+    )
+    committer_mappings: dict[str, CommitterMappingRequest] = Field(
+        default_factory=dict, description="Committer mappings to save"
+    )
+
+
 class MigrationStartRequest(BaseModel):
     """Request to start a migration."""
 
@@ -69,8 +82,65 @@ class MigrationProgressResponse(BaseModel):
     error: str | None = Field(None, description="Error message if migration failed")
 
 
-class ErrorResponse(BaseModel):
-    """Standard error response."""
+class SaveResponse(BaseModel):
+    """Standard save response."""
 
-    error: str = Field(..., description="Error message")
-    detail: str | None = Field(None, description="Additional error details")
+    status: Literal["saved"] = Field(..., description="Operation result")
+
+
+class MigrationStartResponse(BaseModel):
+    """Response for migration start endpoint."""
+
+    migration_id: str = Field(..., description="Created migration task identifier")
+
+
+class ConfigContentResponse(BaseModel):
+    """Serialized migration config returned by API."""
+
+    source_repos_path: str = Field(..., description="Path with source repositories")
+    target_hosting_url: str = Field(..., description="Destination Git hosting URL")
+    author_mappings: dict[str, AuthorMappingRequest] = Field(
+        default_factory=dict, description="Author mapping rules"
+    )
+    committer_mappings: dict[str, CommitterMappingRequest] = Field(
+        default_factory=dict, description="Committer mapping rules"
+    )
+
+
+class ConfigSaveRequest(BaseModel):
+    """Request to save migration config."""
+
+    repo_path: str = Field(..., description="Repository directory path")
+    source_repos_path: str = Field(..., description="Path with source repositories")
+    target_hosting_url: str = Field(..., description="Destination Git hosting URL")
+    target_token: str = Field(..., description="Token for target Git hosting")
+    author_mappings: dict[str, AuthorMappingRequest] = Field(
+        default_factory=dict, description="Author mapping rules"
+    )
+    committer_mappings: dict[str, CommitterMappingRequest] = Field(
+        default_factory=dict, description="Committer mapping rules"
+    )
+    format: Literal["json", "yaml"] = Field(
+        default="json", description="Config file format"
+    )
+
+
+class ConfigGetResponse(BaseModel):
+    """Response for config read endpoint."""
+
+    found: bool = Field(..., description="Whether config file exists in repository directory")
+    config: ConfigContentResponse | None = Field(
+        None, description="Migration configuration content when found=true"
+    )
+
+
+class ValidationErrorResponse(BaseModel):
+    """Validation or bad request response."""
+
+    detail: str = Field(..., description="Validation error details")
+
+
+class ServerErrorResponse(BaseModel):
+    """Unexpected server error response."""
+
+    detail: str | dict[str, Any] = Field(..., description="Server-side error details")

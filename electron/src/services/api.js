@@ -160,20 +160,17 @@ class APIClient {
     committerMappings = {},
     format = "json"
   ) {
-    const params = new URLSearchParams({
+    const body = {
       repo_path: repoPath,
       source_repos_path: sourceReposPath,
       target_hosting_url: targetHostingUrl,
       target_token: targetToken,
-      format: format,
-    });
-
-    const body = {
       author_mappings: authorMappings,
       committer_mappings: committerMappings,
+      format: format,
     };
 
-    return this.fetch(`/api/config?${params}`, {
+    return this.fetch("/api/config", {
       method: "POST",
       body: JSON.stringify(body),
     });
