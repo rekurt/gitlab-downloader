@@ -38,10 +38,12 @@ def _read_cache(path: str) -> dict[str, Any] | None:
 
 def _write_cache(path: str, payload: dict[str, Any]) -> None:
     cache = Path(path).expanduser()
-    cache.parent.mkdir(parents=True, exist_ok=True)
+    # Create parent directory with secure permissions (0o700 = rwx------)
+    cache.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # Ensure existing parent directory has secure permissions
+    cache.parent.chmod(0o700)
     fd = os.open(str(cache), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     try:
-        os.fchmod(fd, 0o600)
         os.write(fd, json.dumps(payload, ensure_ascii=True, indent=2).encode("utf-8"))
     finally:
         os.close(fd)

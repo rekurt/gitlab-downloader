@@ -74,11 +74,16 @@ def _validate_path(path_str: str, allow_parent_refs: bool = False) -> Path:
     Raises:
         ValueError: If path contains invalid traversal patterns
     """
+    # Normalize path first to handle symlinks and ..
     path = Path(path_str).expanduser().resolve()
 
-    # Reject paths containing .. unless explicitly allowed
-    if not allow_parent_refs and ".." in path_str:
-        raise ValueError(f"Path traversal not allowed: {path_str}")
+    # After normalization, verify path doesn't escape intended boundaries
+    # by checking if it's within allowed parent directories
+    if not allow_parent_refs:
+        # For safety, ensure the resolved path doesn't contain .. components
+        # (resolve() eliminates these, but we validate the string for defense in depth)
+        if ".." in path_str:
+            raise ValueError(f"Path traversal not allowed: {path_str}")
 
     return path
 

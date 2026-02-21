@@ -33,19 +33,35 @@ class RepositoriesListResponse(BaseModel):
 class AuthorMappingRequest(BaseModel):
     """Request model for author mapping."""
 
-    original_name: str = Field(..., description="Original author name")
-    original_email: str = Field(..., description="Original author email")
-    new_name: str = Field(..., description="New author name")
-    new_email: str = Field(..., description="New author email")
+    original_name: str = Field(
+        ..., min_length=1, max_length=512, description="Original author name"
+    )
+    original_email: str = Field(
+        ..., min_length=1, max_length=512, description="Original author email"
+    )
+    new_name: str = Field(
+        ..., min_length=1, max_length=512, description="New author name"
+    )
+    new_email: str = Field(
+        ..., min_length=1, max_length=512, description="New author email"
+    )
 
 
 class CommitterMappingRequest(BaseModel):
     """Request model for committer mapping."""
 
-    original_name: str = Field(..., description="Original committer name")
-    original_email: str = Field(..., description="Original committer email")
-    new_name: str = Field(..., description="New committer name")
-    new_email: str = Field(..., description="New committer email")
+    original_name: str = Field(
+        ..., min_length=1, max_length=512, description="Original committer name"
+    )
+    original_email: str = Field(
+        ..., min_length=1, max_length=512, description="Original committer email"
+    )
+    new_name: str = Field(
+        ..., min_length=1, max_length=512, description="New committer name"
+    )
+    new_email: str = Field(
+        ..., min_length=1, max_length=512, description="New committer email"
+    )
 
 
 class AuthorMappingsSaveRequest(BaseModel):
