@@ -31,14 +31,15 @@ Supports personal access tokens (PAT) and OAuth 2.0 device flow for authenticati
 
 ## Authentication
 Two auth methods are supported (selected via `--auth-method` or interactive prompt):
-1. **token** (default): uses `GITLAB_TOKEN` env var or `--token` argument.
-2. **oauth**: OAuth 2.0 device authorization flow.
+1. **token**: uses `GITLAB_TOKEN` env var or `--token` argument.
+2. **oauth** (default): OAuth 2.0 device authorization flow.
    - Requires `--oauth-client-id` (or `GITLAB_OAUTH_CLIENT_ID`).
-   - Tokens are cached to `~/.gitlab-dump/oauth_cache.json` (configurable).
+   - Tokens are cached to `~/.config/gitlab-dump/oauth_token.json` (configurable via `--oauth-cache-path`).
    - Expired tokens are refreshed automatically; if refresh fails, device flow restarts.
+   - When no `--auth-method` is explicitly set and no OAuth client ID is available but a token exists, falls back to token auth automatically.
 
 ### Git Auth Modes
-- `url_inject` (default): embeds token into clone URL as `oauth2:<token>@host`.
+- `url` (default): embeds token into clone URL as `oauth2:<token>@host`.
 - `credential_helper`: stores credentials via `git credential approve` for the host.
 
 ## Build, Test, and Development Commands

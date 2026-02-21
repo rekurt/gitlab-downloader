@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from gitlab_downloader import cloner as _cloner_mod
 from gitlab_downloader.cloner import clone_repository
 from gitlab_downloader.config import get_version, parse_args
 from gitlab_downloader.models import GitlabConfig
@@ -36,6 +37,13 @@ def make_config(tmp_path: Path, **overrides) -> GitlabConfig:
     }
     data.update(overrides)
     return GitlabConfig(**data)
+
+
+@pytest.fixture(autouse=True)
+def _clear_credential_hosts():
+    _cloner_mod._CREDENTIAL_READY_HOSTS.clear()
+    yield
+    _cloner_mod._CREDENTIAL_READY_HOSTS.clear()
 
 
 def test_version_flag(capsys):

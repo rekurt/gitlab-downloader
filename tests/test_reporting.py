@@ -208,7 +208,7 @@ class TestPrintDryRun:
             print_dry_run(projects, config, fake_build)
 
         log_text = "\n".join(r.message for r in caplog.records)
-        assert "3" in log_text
+        assert "Projects to process: 3" in log_text
 
     def test_empty_projects(self, tmp_path, caplog):
         config = make_config(tmp_path)
@@ -220,7 +220,7 @@ class TestPrintDryRun:
             print_dry_run([], config, fake_build)
 
         log_text = "\n".join(r.message for r in caplog.records)
-        assert "0" in log_text
+        assert "Projects to process: 0" in log_text
 
     def test_truncates_long_values(self, tmp_path, caplog):
         config = make_config(tmp_path)
@@ -241,8 +241,10 @@ class TestPrintDryRun:
         with caplog.at_level("INFO", logger="gitlab_downloader"):
             print_dry_run(projects, config, fake_build)
 
-        # The function truncates name to 30 chars and url to 45 chars
         log_text = "\n".join(r.message for r in caplog.records)
-        # Full long_name should not appear in log (it's truncated to 30)
+        # Full long values should not appear (truncated to 30/45 chars)
         assert long_name not in log_text
         assert long_url not in log_text
+        # Truncated prefix and project ID should appear
+        assert "x" * 30 in log_text
+        assert "99" in log_text

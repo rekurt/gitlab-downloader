@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -25,14 +26,8 @@ def _safe_scope(scope: str) -> str:
     return " ".join(part for part in scope.split() if part)
 
 
-def _cache_file(path: str) -> Path:
-    cache = Path(path).expanduser()
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    return cache
-
-
 def _read_cache(path: str) -> dict[str, Any] | None:
-    cache = _cache_file(path)
+    cache = Path(path).expanduser()
     if not cache.exists():
         return None
     try:
@@ -42,8 +37,13 @@ def _read_cache(path: str) -> dict[str, Any] | None:
 
 
 def _write_cache(path: str, payload: dict[str, Any]) -> None:
-    cache = _cache_file(path)
-    cache.write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
+    cache = Path(path).expanduser()
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(cache), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.write(fd, json.dumps(payload, ensure_ascii=True, indent=2).encode("utf-8"))
+    finally:
+        os.close(fd)
 
 
 def _token_valid(payload: dict[str, Any], min_ttl: int = 60) -> bool:

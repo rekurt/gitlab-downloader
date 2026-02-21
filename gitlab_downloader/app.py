@@ -25,15 +25,16 @@ def install_signal_handlers(loop: asyncio.AbstractEventLoop, shutdown_event: asy
 
 
 async def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
     from dotenv import load_dotenv
+
+    load_dotenv()
+    args = parse_args(argv)
 
     from .auth import resolve_access_token
     from .client import fetch_group_metadata, get_all_projects, get_user_projects
     from .cloner import build_clone_target, clone_all_repositories
     from .reporting import print_dry_run, print_summary, write_json_report
 
-    load_dotenv()
     setup_logging(args.log_level, args.log_file)
     config = config_from_args(args)
     access_token = await resolve_access_token(config)

@@ -596,12 +596,25 @@ class TestResolveOauthWithClientSecret:
             "expires_in": 7200,
         }
 
+        captured_body: dict[str, str] = {}
+
+        def capture_callback(url, **kwargs):
+            data = kwargs.get("data", {})
+            captured_body.update(data)
+            return aioresponses_module.CallbackResult(
+                payload=refresh_response,
+            )
+
+        import aioresponses as aioresponses_module
+
         with aioresponses() as mocked:
             mocked.post(
                 "https://gitlab.com/oauth/token",
-                payload=refresh_response,
+                callback=capture_callback,
             )
 
             token = await resolve_access_token(cfg)
 
         assert token == "refreshed-token"
+        assert captured_body.get("client_secret") == "secret123"
+        assert captured_body.get("grant_type") == "refresh_token"
