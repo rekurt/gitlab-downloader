@@ -12,3 +12,6 @@ AGENTS.md
 build/
 dist/
 *.spec
+
+# ralphex progress logs
+.ralphex/progress/
