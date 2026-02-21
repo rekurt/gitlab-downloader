@@ -41,6 +41,7 @@ def _write_cache(path: str, payload: dict[str, Any]) -> None:
     cache.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(str(cache), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     try:
+        os.fchmod(fd, 0o600)
         os.write(fd, json.dumps(payload, ensure_ascii=True, indent=2).encode("utf-8"))
     finally:
         os.close(fd)

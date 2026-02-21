@@ -94,14 +94,14 @@ async def clone_repository(
         os.makedirs(os.path.dirname(full_clone_path), exist_ok=True)
 
         if os.path.exists(full_clone_path):
+            if not config.update_existing:
+                logger.info("Skipping %s: already cloned", repo_name)
+                return CloneResult(name=repo_name, status="skipped", message="Already cloned")
             if config.git_auth_mode == "credential_helper":
                 try:
                     await _ensure_credentials_in_helper(str(https_url), config.token)
                 except RuntimeError as exc:
                     return CloneResult(name=repo_name, status="failed", message=str(exc))
-            if not config.update_existing:
-                logger.info("Skipping %s: already cloned", repo_name)
-                return CloneResult(name=repo_name, status="skipped", message="Already cloned")
 
             logger.info("Updating %s with git pull --ff-only", repo_name)
             code, _, stderr = await run_git_command(
