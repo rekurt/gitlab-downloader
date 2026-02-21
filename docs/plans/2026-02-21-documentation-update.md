@@ -83,11 +83,11 @@ CLAUDE.md с информацией о проекте для агентов.
 **Files:**
 - Modify: `AGENTS.md`
 
-- [ ] Add section describing Electron frontend structure and location
-- [ ] Document REST API endpoints available to frontend
-- [ ] Add GUI entry point information (`gitlab_downloader.gui.main`)
-- [ ] Update project structure section to include `gitlab_downloader/gui/` directory
-- [ ] Reference electron-builder configuration
+- [x] Add section describing Electron frontend structure and location
+- [x] Document REST API endpoints available to frontend
+- [x] Add GUI entry point information (`gitlab_downloader.gui.main`)
+- [x] Update project structure section to include `gitlab_downloader/gui/` directory
+- [x] Reference electron-builder configuration
 
 ### Task 7: Add Local Development section to README
 

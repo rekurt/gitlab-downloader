@@ -22,12 +22,43 @@ Supports personal access tokens (PAT) and OAuth 2.0 device flow for authenticati
 - `constants.py`: Default values and limits (concurrency, retries, timeouts, per_page).
 - `logging_config.py`: Logging setup (stdout + optional file handler).
 
+### Electron GUI Frontend (`electron/`)
+- **Purpose**: Cross-platform desktop GUI for repository migration and management.
+- **Framework**: Electron + React (Node.js frontend, communicates with Python REST API).
+- **Entry point**: `electron/src/index.js` loads React root component.
+- **Key components**:
+  - `MigrationWizard.js`: Guides users through repository selection and configuration (author/committer mapping).
+  - `RepoList.js`: Displays cloned repositories and their status.
+  - `ConfigViewer.js`: Displays and edits migration configuration.
+  - `AuthorMapper.js`: UI for mapping original to new author information.
+  - `ProgressIndicator.js`: Shows real-time migration progress.
+- **API communication**: Uses `services/api.js` to call Python REST API endpoints (see "REST API Endpoints" below).
+- **Styling**: CSS modules in `styles/` for component styling.
+- **Build & Distribution**: Uses `electron-builder` for creating platform-specific binaries (.exe, .dmg, .AppImage).
+
+### REST API Endpoints (Python FastAPI backend)
+The Electron GUI communicates with the Python backend via these REST API endpoints:
+
+- `GET /api/status`: Returns API status and application version.
+- `GET /api/repos?clone_path=.`: Lists repositories in specified directory. Returns array of repository objects with name, path, and URL.
+- `GET /api/config?repo_path=.`: Retrieves migration configuration from disk (JSON/YAML format).
+- `POST /api/config`: Saves migration configuration to disk with author/committer mappings and target hosting details.
+- `GET /api/author-mappings?config_path=.`: Loads saved author mappings from configuration file.
+- `POST /api/author-mappings`: Saves author mappings to configuration file.
+- `POST /api/migrate`: Starts a background migration task. Accepts repository path, author mappings, and committer mappings. Returns `migration_id`.
+- `GET /api/migration-progress/{migration_id}`: Polls for migration progress. Returns status, progress percentage, current task, messages, and any errors.
+
+**API Base URL**: `http://localhost:5000` (default) or `http://127.0.0.1:5000`.
+**CORS**: Configured for localhost origins (http://localhost:3000, http://127.0.0.1:3000) to allow Electron frontend communication.
+
 ### Infrastructure
-- `Makefile`: `make install`, `make run`, `make test`, `make lint`, `make typecheck`, `make ci`, `make binary`.
+- `Makefile`: `make install`, `make run`, `make test`, `make lint`, `make typecheck`, `make ci`, `make binary`, `make electron-build`, `make coverage`, `make clean`, `make help`.
 - `Dockerfile`: builds image using `pip install .` from `pyproject.toml`. Entry point: `gitlab-dump`.
 - `.github/workflows/ci.yml`: runs ruff, mypy, and pytest on push/PR (Python 3.10).
 - `.env.example`: sample env vars for local runs.
 - `repositories/`: default clone target (created at runtime). Avoid committing its contents.
+- `electron/`: Electron GUI frontend directory. Contains Node.js/React application for desktop GUI. See "Electron GUI Frontend" section above.
+- `electron-builder.yml`: Configuration file for electron-builder, defines build targets for different platforms (Windows, macOS, Linux).
 
 ## Authentication
 Two auth methods are supported (selected via `--auth-method` or interactive prompt):
