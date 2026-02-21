@@ -72,11 +72,11 @@ CLAUDE.md с информацией о проекте для агентов.
 **Files:**
 - Modify: `Makefile`
 
-- [ ] Add `make help` target displaying all available targets with descriptions
-- [ ] Add `make clean` target to remove venv and build artifacts
-- [ ] Add `make electron-build` target for building GUI binary
-- [ ] Add `make coverage` target for running tests with coverage report
-- [ ] Verify all existing targets still work correctly
+- [x] Add `make help` target displaying all available targets with descriptions
+- [x] Add `make clean` target to remove venv and build artifacts
+- [x] Add `make electron-build` target for building GUI binary
+- [x] Add `make coverage` target for running tests with coverage report
+- [x] Verify all existing targets still work correctly
 
 ### Task 6: Update AGENTS.md with Electron information
 

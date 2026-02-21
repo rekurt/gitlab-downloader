@@ -1,4 +1,4 @@
-.PHONY: run dry_run install build docker_run venv lint format test typecheck ci binary binary_onefile binary_clean
+.PHONY: run dry_run install build docker_run venv lint format test typecheck ci binary binary_onefile binary_clean help clean electron-build coverage
 
 IMAGE_NAME=fetch-repositories
 CLONE_PATH?=$(shell pwd)/repositories
@@ -61,3 +61,41 @@ docker_run: build
 		--env CLONE_PATH=/app/repositories \
 		-v $(CLONE_PATH):/app/repositories \
 		$(IMAGE_NAME)
+
+help:
+	@echo "Available targets:"
+	@echo "  make install           - Create virtual environment and install dependencies"
+	@echo "  make run               - Run the CLI application"
+	@echo "  make dry_run           - Run CLI with --dry-run flag"
+	@echo "  make interactive       - Run CLI in interactive mode"
+	@echo "  make test              - Run test suite with pytest"
+	@echo "  make coverage          - Run tests with coverage report"
+	@echo "  make lint              - Check code style with ruff"
+	@echo "  make format            - Format code with ruff"
+	@echo "  make typecheck         - Run type checking with mypy"
+	@echo "  make ci                - Run linting, type checking, and tests (CI pipeline)"
+	@echo "  make binary            - Build standalone binary with PyInstaller (onedir)"
+	@echo "  make binary_onefile    - Build single-file binary with PyInstaller"
+	@echo "  make binary_clean      - Remove binary build artifacts"
+	@echo "  make clean             - Remove venv and build artifacts"
+	@echo "  make electron-build    - Build Electron GUI application binary"
+	@echo "  make build             - Build Docker image"
+	@echo "  make docker_run        - Run application in Docker container"
+	@echo "  make help              - Show this help message"
+
+clean:
+	@rm -rf $(VENV_PATH)
+	@rm -rf build dist *.spec
+	@rm -rf node_modules
+	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.pyc" -delete
+	@echo "Cleaned: venv, build artifacts, and cache files"
+
+electron-build:
+	@cd electron && npm run dist
+	@echo "Electron binary built successfully in electron/dist"
+
+coverage:
+	@$(VENV_PATH)/bin/pip install --no-cache-dir pytest-cov
+	@$(VENV_PATH)/bin/pytest --cov=gitlab_downloader --cov-report=html --cov-report=term
+	@echo "Coverage report generated in htmlcov/index.html"
