@@ -6,16 +6,16 @@ import asyncio
 import logging
 import signal
 import sys
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api_routes import router
+from .api_routes import _cleanup_old_migrations, router
 
 # Configure logging for API server
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 logger = logging.getLogger(__name__)
@@ -27,10 +27,32 @@ def create_app() -> FastAPI:
     Returns:
         Configured FastAPI application instance
     """
+    cleanup_task: asyncio.Task[None] | None = None
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Handle startup and shutdown of the application."""
+        nonlocal cleanup_task
+        # Startup
+        logger.info("API server starting up")
+        cleanup_task = asyncio.create_task(_cleanup_old_migrations())
+        try:
+            yield
+        finally:
+            # Shutdown
+            logger.info("API server shutting down")
+            if cleanup_task and not cleanup_task.done():
+                cleanup_task.cancel()
+                try:
+                    await cleanup_task
+                except asyncio.CancelledError:
+                    pass
+
     app = FastAPI(
         title="GitLab Dump API",
         description="API for Electron desktop application",
         version="0.1.0",
+        lifespan=lifespan,
     )
 
     # Add CORS middleware for Electron communication
@@ -50,29 +72,6 @@ def create_app() -> FastAPI:
 
     # Include API routes
     app.include_router(router)
-
-    cleanup_task: object = None
-
-    @app.on_event("startup")
-    async def startup_event() -> None:
-        """Log startup event and start cleanup task."""
-        nonlocal cleanup_task
-        logger.info("API server starting up")
-        # Start background cleanup task
-        from .api_routes import _cleanup_old_migrations
-        cleanup_task = asyncio.create_task(_cleanup_old_migrations())
-
-    @app.on_event("shutdown")
-    async def shutdown_event() -> None:
-        """Log shutdown event and cancel cleanup task."""
-        nonlocal cleanup_task
-        logger.info("API server shutting down")
-        if cleanup_task and isinstance(cleanup_task, asyncio.Task):
-            cleanup_task.cancel()
-            try:
-                await cleanup_task
-            except asyncio.CancelledError:
-                pass
 
     return app
 

@@ -131,16 +131,15 @@ async def list_repositories(clone_path: str = ".") -> RepositoriesListResponse:
 
     except Exception as e:
         logger.error(f"Error listing repositories: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error listing repositories: {e}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Error listing repositories: {e}") from e
 
 
 @router.get("/author-mappings")
 async def get_author_mappings(config_path: str = ".") -> dict[str, AuthorMappingRequest]:
     """Get saved author mappings from disk."""
     try:
-        config_file = Path(config_path) / "migration_config.json"
+        validated_path = _validate_path(config_path)
+        config_file = validated_path / "migration_config.json"
         if not config_file.exists():
             config_file = Path(config_path) / "migration_config.yaml"
 
@@ -162,9 +161,7 @@ async def get_author_mappings(config_path: str = ".") -> dict[str, AuthorMapping
         return result
     except Exception as e:
         logger.error(f"Error reading author mappings: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error reading author mappings: {e}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Error reading author mappings: {e}") from e
 
 
 @router.post("/author-mappings")
@@ -173,7 +170,8 @@ async def save_author_mappings(
 ) -> dict[str, str]:
     """Save author mappings to disk."""
     try:
-        config_file = Path(config_path) / "migration_config.json"
+        validated_path = _validate_path(config_path)
+        config_file = validated_path / "migration_config.json"
 
         mapper = AuthorMapper(str(config_file))
 
@@ -290,7 +288,11 @@ async def _run_migration(
         )
 
         executor = MigrationExecutor(config)
-        task_info["progress"] = 50
+
+        # Update progress with lock protection
+        async with _migration_tasks_lock:
+            if task_info:
+                task_info["progress"] = 50
 
         # Run migration in thread pool to avoid blocking event loop
         success = await asyncio.to_thread(
