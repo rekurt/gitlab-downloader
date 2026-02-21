@@ -141,6 +141,45 @@ class APIClient {
   }
 
   /**
+   * Get migration config from repository
+   */
+  async getConfig(repoPath) {
+    const params = new URLSearchParams({ repo_path: repoPath });
+    return this.fetch(`/api/config?${params}`);
+  }
+
+  /**
+   * Save migration config to repository
+   */
+  async saveConfig(
+    repoPath,
+    sourceReposPath,
+    targetHostingUrl,
+    targetToken,
+    authorMappings = {},
+    committerMappings = {},
+    format = "json"
+  ) {
+    const params = new URLSearchParams({
+      repo_path: repoPath,
+      source_repos_path: sourceReposPath,
+      target_hosting_url: targetHostingUrl,
+      target_token: targetToken,
+      format: format,
+    });
+
+    const body = {
+      author_mappings: authorMappings,
+      committer_mappings: committerMappings,
+    };
+
+    return this.fetch(`/api/config?${params}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  /**
    * Utility method for delays
    */
   delay(ms) {

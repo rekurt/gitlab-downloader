@@ -98,7 +98,7 @@ async def get_status() -> StatusResponse:
 async def list_repositories(clone_path: str = ".") -> RepositoriesListResponse:
     """List cloned repositories in the specified path."""
     try:
-        repo_path = Path(clone_path)
+        repo_path = _validate_path(clone_path)
         if not repo_path.exists():
             return RepositoriesListResponse(total=0, repositories=[])
 
@@ -119,8 +119,10 @@ async def list_repositories(clone_path: str = ".") -> RepositoriesListResponse:
                     config_text = config_path.read_text()
                     for line in config_text.split("\n"):
                         if "url =" in line:
-                            url = line.split("=", 1)[1].strip()
-                            break
+                            parts = line.split("=", 1)
+                            if len(parts) == 2:
+                                url = parts[1].strip()
+                                break
             except Exception as e:
                 logger.warning(f"Could not read git config for {item.name}: {e}")
 
@@ -267,15 +269,22 @@ async def _run_migration(
     committer_mappings: dict[str, CommitterMapping],
 ) -> None:
     """Run migration task in background."""
+    task_info: dict[str, Any] | None = None
     try:
         async with _migration_tasks_lock:
-            task_info = _migration_tasks[migration_id]
+            task_info = _migration_tasks.get(migration_id)
+            if not task_info:
+                logger.error(f"Migration task {migration_id} not found")
+                return
             task_info["status"] = "running"
             task_info["progress"] = 25
 
+        # Closure to safely update progress in thread
+        updates_queue: list[str] = []
+
         def progress_callback(msg: str) -> None:
-            task_info["messages"].append(msg)
-            task_info["current_task"] = msg
+            if task_info:
+                updates_queue.append(msg)
 
         # Create migration config
         config = MigrationConfig(
@@ -289,27 +298,37 @@ async def _run_migration(
         executor = MigrationExecutor(config)
         task_info["progress"] = 50
 
-        # Run migration
-        success = executor.migrate_repository(
+        # Run migration in thread pool to avoid blocking event loop
+        success = await asyncio.to_thread(
+            executor.migrate_repository,
             repo_path,
-            author_mappings=author_mappings,
-            committer_mappings=committer_mappings,
-            progress_callback=progress_callback,
+            author_mappings,
+            committer_mappings,
+            progress_callback,
         )
 
-        if success:
-            task_info["status"] = "completed"
-            task_info["progress"] = 100
-        else:
-            task_info["status"] = "failed"
-            task_info["error"] = "Migration failed"
+        # Process queued updates
+        async with _migration_tasks_lock:
+            if task_info:
+                for msg in updates_queue:
+                    task_info["messages"].append(msg)
+                if updates_queue:
+                    task_info["current_task"] = updates_queue[-1]
+
+                if success:
+                    task_info["status"] = "completed"
+                    task_info["progress"] = 100
+                else:
+                    task_info["status"] = "failed"
+                    task_info["error"] = "Migration failed"
 
     except Exception as e:
         logger.error(f"Error during migration {migration_id}: {e}")
-        task = _migration_tasks.get(migration_id)
-        if task:
-            task["status"] = "failed"
-            task["error"] = str(e)
+        async with _migration_tasks_lock:
+            task = _migration_tasks.get(migration_id)
+            if task:
+                task["status"] = "failed"
+                task["error"] = str(e)
 
 
 @router.get("/migration-progress/{migration_id}", response_model=MigrationProgressResponse)
@@ -334,7 +353,8 @@ async def get_migration_progress(migration_id: str) -> MigrationProgressResponse
 async def get_config(repo_path: str) -> dict[str, Any]:
     """Get migration config from repository directory."""
     try:
-        config = ConfigFileManager.load_config(repo_path)
+        validated_path = _validate_path(repo_path)
+        config = ConfigFileManager.load_config(str(validated_path))
         if not config:
             return {"found": False, "config": None}
 
@@ -384,6 +404,8 @@ async def save_config(
 ) -> dict[str, str]:
     """Save migration config to repository directory."""
     try:
+        validated_path = _validate_path(repo_path)
+
         # Convert API requests to internal format
         author_map = {}
         if author_mappings:
@@ -414,7 +436,7 @@ async def save_config(
             committer_mappings=committer_map,
         )
 
-        ConfigFileManager.save_config(repo_path, config, format=format)
+        ConfigFileManager.save_config(str(validated_path), config, format=format)
         return {"status": "saved"}
     except ValueError as e:
         logger.error(f"Error saving config: {e}")
