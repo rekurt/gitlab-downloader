@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
+
+import yaml
 
 from .models import AuthorMapping, CommitterMapping, MigrationConfig
 
@@ -257,3 +260,198 @@ class MigrationExecutor:
 
         script = " || ".join(conditions) if conditions else "true"
         return script
+
+
+class ConfigFileManager:
+    """Manages loading and saving migration configuration from/to files."""
+
+    CONFIG_FILENAMES = ["migration_config.json", "migration_config.yaml", "migration_config.yml"]
+
+    @staticmethod
+    def load_config(repo_path: str | Path) -> MigrationConfig | None:
+        """Load migration config from repository directory.
+
+        Args:
+            repo_path: Path to the repository
+
+        Returns:
+            MigrationConfig instance if found, None otherwise
+
+        Raises:
+            ValueError: If config file is invalid
+        """
+        repo_path = Path(repo_path)
+
+        for filename in ConfigFileManager.CONFIG_FILENAMES:
+            config_file = repo_path / filename
+            if not config_file.exists():
+                continue
+
+            try:
+                with open(config_file) as f:
+                    data = yaml.safe_load(f) if filename.endswith(("yaml", "yml")) else json.load(f)
+
+                if not isinstance(data, dict):
+                    raise ValueError(f"Config file must be a dictionary, got {type(data).__name__}")
+
+                return ConfigFileManager._validate_and_create_config(data)
+            except Exception as e:
+                raise ValueError(f"Failed to load config from {config_file}: {e}") from e
+
+        return None
+
+    @staticmethod
+    def save_config(repo_path: str | Path, config: MigrationConfig, format: str = "json") -> None:
+        """Save migration config to repository directory.
+
+        Args:
+            repo_path: Path to the repository
+            config: MigrationConfig instance to save
+            format: File format ('json' or 'yaml')
+
+        Raises:
+            ValueError: If format is invalid
+        """
+        if format not in ("json", "yaml"):
+            raise ValueError(f"Format must be 'json' or 'yaml', got {format}")
+
+        repo_path = Path(repo_path)
+        filename = f"migration_config.{format}"
+        config_file = repo_path / filename
+
+        try:
+            data = ConfigFileManager._config_to_dict(config)
+
+            if format == "json":
+                with open(config_file, "w") as f:
+                    json.dump(data, f, indent=2)
+            else:
+                with open(config_file, "w") as f:
+                    yaml.dump(data, f, default_flow_style=False)
+
+            logger.info(f"Config saved to {config_file}")
+        except Exception as e:
+            raise ValueError(f"Failed to save config to {config_file}: {e}") from e
+
+    @staticmethod
+    def validate_config(data: dict) -> dict:
+        """Validate config file schema.
+
+        Args:
+            data: Dictionary from config file
+
+        Returns:
+            Validated config dictionary
+
+        Raises:
+            ValueError: If validation fails
+        """
+        required_fields = ["source_repos_path", "target_hosting_url", "target_token"]
+        for field in required_fields:
+            if field not in data:
+                raise ValueError(f"Missing required field: {field}")
+
+        # Validate author mappings structure
+        if "author_mappings" in data:
+            mappings = data["author_mappings"]
+            if not isinstance(mappings, dict):
+                raise ValueError("author_mappings must be a dictionary")
+            for key, mapping in mappings.items():
+                if not isinstance(mapping, dict):
+                    raise ValueError(f"author_mappings[{key}] must be a dictionary")
+                required_mapping_fields = ["original_name", "original_email", "new_name", "new_email"]
+                for field in required_mapping_fields:
+                    if field not in mapping:
+                        raise ValueError(f"author_mappings[{key}] missing field: {field}")
+
+        # Validate committer mappings structure
+        if "committer_mappings" in data:
+            mappings = data["committer_mappings"]
+            if not isinstance(mappings, dict):
+                raise ValueError("committer_mappings must be a dictionary")
+            for key, mapping in mappings.items():
+                if not isinstance(mapping, dict):
+                    raise ValueError(f"committer_mappings[{key}] must be a dictionary")
+                required_mapping_fields = ["original_name", "original_email", "new_name", "new_email"]
+                for field in required_mapping_fields:
+                    if field not in mapping:
+                        raise ValueError(f"committer_mappings[{key}] missing field: {field}")
+
+        return data
+
+    @staticmethod
+    def _validate_and_create_config(data: dict) -> MigrationConfig:
+        """Validate config dict and create MigrationConfig instance.
+
+        Args:
+            data: Dictionary from config file
+
+        Returns:
+            MigrationConfig instance
+
+        Raises:
+            ValueError: If validation fails
+        """
+        validated = ConfigFileManager.validate_config(data)
+
+        # Parse author mappings
+        author_mappings: dict[str, AuthorMapping] = {}
+        for key, mapping in validated.get("author_mappings", {}).items():
+            author_mappings[key] = AuthorMapping(
+                original_name=mapping["original_name"],
+                original_email=mapping["original_email"],
+                new_name=mapping["new_name"],
+                new_email=mapping["new_email"],
+            )
+
+        # Parse committer mappings
+        committer_mappings: dict[str, CommitterMapping] = {}
+        for key, mapping in validated.get("committer_mappings", {}).items():
+            committer_mappings[key] = CommitterMapping(
+                original_name=mapping["original_name"],
+                original_email=mapping["original_email"],
+                new_name=mapping["new_name"],
+                new_email=mapping["new_email"],
+            )
+
+        return MigrationConfig(
+            source_repos_path=validated["source_repos_path"],
+            target_hosting_url=validated["target_hosting_url"],
+            target_token=validated["target_token"],
+            author_mappings=author_mappings,
+            committer_mappings=committer_mappings,
+        )
+
+    @staticmethod
+    def _config_to_dict(config: MigrationConfig) -> dict:
+        """Convert MigrationConfig to dictionary for serialization.
+
+        Args:
+            config: MigrationConfig instance
+
+        Returns:
+            Dictionary representation of config
+        """
+        return {
+            "source_repos_path": config.source_repos_path,
+            "target_hosting_url": config.target_hosting_url,
+            "target_token": config.target_token,
+            "author_mappings": {
+                key: {
+                    "original_name": mapping.original_name,
+                    "original_email": mapping.original_email,
+                    "new_name": mapping.new_name,
+                    "new_email": mapping.new_email,
+                }
+                for key, mapping in config.author_mappings.items()
+            },
+            "committer_mappings": {
+                key: {
+                    "original_name": mapping.original_name,
+                    "original_email": mapping.original_email,
+                    "new_name": mapping.new_name,
+                    "new_email": mapping.new_email,
+                }
+                for key, mapping in config.committer_mappings.items()
+            },
+        }

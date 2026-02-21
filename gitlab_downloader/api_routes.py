@@ -21,7 +21,7 @@ from .api_schemas import (
 )
 from .author_mapper import AuthorMapper
 from .config import get_version
-from .migration import MigrationExecutor
+from .migration import ConfigFileManager, MigrationExecutor
 from .models import (
     AuthorMapping,
     CommitterMapping,
@@ -302,3 +302,97 @@ async def get_migration_progress(migration_id: str) -> MigrationProgressResponse
         messages=task_info["messages"],
         error=task_info["error"],
     )
+
+
+@router.get("/config")
+async def get_config(repo_path: str) -> dict[str, Any]:
+    """Get migration config from repository directory."""
+    try:
+        config = ConfigFileManager.load_config(repo_path)
+        if not config:
+            return {"found": False, "config": None}
+
+        return {
+            "found": True,
+            "config": {
+                "source_repos_path": config.source_repos_path,
+                "target_hosting_url": config.target_hosting_url,
+                "target_token": config.target_token,
+                "author_mappings": {
+                    key: {
+                        "original_name": mapping.original_name,
+                        "original_email": mapping.original_email,
+                        "new_name": mapping.new_name,
+                        "new_email": mapping.new_email,
+                    }
+                    for key, mapping in config.author_mappings.items()
+                },
+                "committer_mappings": {
+                    key: {
+                        "original_name": mapping.original_name,
+                        "original_email": mapping.original_email,
+                        "new_name": mapping.new_name,
+                        "new_email": mapping.new_email,
+                    }
+                    for key, mapping in config.committer_mappings.items()
+                },
+            },
+        }
+    except ValueError as e:
+        logger.error(f"Error reading config: {e}")
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f"Error reading config: {e}")
+        raise HTTPException(status_code=500, detail=f"Error reading config: {e}") from e
+
+
+@router.post("/config")
+async def save_config(
+    repo_path: str,
+    source_repos_path: str,
+    target_hosting_url: str,
+    target_token: str,
+    author_mappings: dict[str, AuthorMappingRequest] | None = None,
+    committer_mappings: dict[str, CommitterMappingRequest] | None = None,
+    format: str = "json",
+) -> dict[str, str]:
+    """Save migration config to repository directory."""
+    try:
+        # Convert API requests to internal format
+        author_map = {}
+        if author_mappings:
+            for key, author_req in author_mappings.items():
+                author_map[key] = AuthorMapping(
+                    original_name=author_req.original_name,
+                    original_email=author_req.original_email,
+                    new_name=author_req.new_name,
+                    new_email=author_req.new_email,
+                )
+
+        committer_map = {}
+        if committer_mappings:
+            for key, committer_req in committer_mappings.items():
+                committer_map[key] = CommitterMapping(
+                    original_name=committer_req.original_name,
+                    original_email=committer_req.original_email,
+                    new_name=committer_req.new_name,
+                    new_email=committer_req.new_email,
+                )
+
+        # Create config and save
+        config = MigrationConfig(
+            source_repos_path=source_repos_path,
+            target_hosting_url=target_hosting_url,
+            target_token=target_token,
+            author_mappings=author_map,
+            committer_mappings=committer_map,
+        )
+
+        ConfigFileManager.save_config(repo_path, config, format=format)
+        return {"status": "saved"}
+    except ValueError as e:
+        logger.error(f"Error saving config: {e}")
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f"Error saving config: {e}")
+        raise HTTPException(status_code=500, detail=f"Error saving config: {e}") from e

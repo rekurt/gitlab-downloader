@@ -128,12 +128,12 @@
 - Modify: `gitlab_downloader/config.py`
 - Modify: `electron/src/services/api.js`
 
-- [ ] Support loading migration config from JSON/YAML in clone directory
-- [ ] Implement schema validation for config files
-- [ ] Add Electron UI features to view/edit config files
-- [ ] Add ability to save config from UI back to disk
-- [ ] write tests for config file handling
-- [ ] run project test suite - must pass before task 8
+- [x] Support loading migration config from JSON/YAML in clone directory
+- [x] Implement schema validation for config files
+- [x] Add Electron UI features to view/edit config files
+- [x] Add ability to save config from UI back to disk
+- [x] write tests for config file handling
+- [x] run project test suite - must pass before task 8
 
 ### Task 8: Setup PyInstaller for Python backend bundling
 
