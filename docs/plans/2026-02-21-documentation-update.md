@@ -37,10 +37,10 @@ CLAUDE.md с информацией о проекте для агентов.
 **Files:**
 - Modify: `README.en.md`
 
-- [ ] Mirror changes from Task 1 in English
-- [ ] Add "Graphical User Interface (GUI)" section with Electron description
-- [ ] Include GUI bundling instructions paralleling Russian version
-- [ ] Ensure consistency with Russian version structure and completeness
+- [x] Mirror changes from Task 1 in English
+- [x] Add "Graphical User Interface (GUI)" section with Electron description
+- [x] Include GUI bundling instructions paralleling Russian version
+- [x] Ensure consistency with Russian version structure and completeness
 
 ### Task 3: Create electron/README.md for Electron application
 

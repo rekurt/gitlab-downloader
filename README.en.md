@@ -59,6 +59,55 @@ gitlab-dump \
 ```
 This mode uses `git credential approve` with your configured `credential.helper`.
 
+## Graphical User Interface (GUI)
+
+`Gitlab Downloader` includes a cross-platform graphical user interface based on Electron and React for managing repository downloads and data migration.
+
+### GUI Features
+- Visual management of GitLab connection configuration
+- Repository browsing and selection for cloning
+- Real-time download progress tracking
+- Repository migration between GitLab instances
+- Author mapping during migration
+- View logs and operation reports
+
+### Running GUI
+
+Run the application in development mode:
+```bash
+cd electron
+npm install
+npm run dev
+```
+
+Run the built application:
+```bash
+cd electron
+npm start
+```
+
+### Building GUI
+
+Create a portable application for your platform:
+```bash
+cd electron
+npm run dist
+```
+
+Build for a specific platform:
+```bash
+npm run dist-mac      # for macOS
+npm run dist-win      # for Windows
+npm run dist-linux    # for Linux
+```
+
+Compiled applications will be in the `electron/dist/` directory.
+
+Build requirements:
+- Node.js 16+
+- npm or yarn
+- Python 3.10+ (for embedded Python backend)
+
 ## Docker
 ```bash
 docker build -t fetch-repositories .
@@ -106,3 +155,7 @@ Important: `onefile` starts slower because it unpacks on launch. For frequent ru
 - Python 3.10+
 - Git
 - GitLab token with `read_api` and `read_repository` scopes
+
+For using the GUI (graphical interface):
+- Node.js 16+
+- npm or yarn
