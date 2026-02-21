@@ -143,7 +143,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--api-port",
         type=int,
-        default=int(os.getenv("API_PORT", 8000)),
+        default=int(os.getenv("API_PORT", 5000)),
         help="Port for API server",
     )
 

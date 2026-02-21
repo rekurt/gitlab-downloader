@@ -33,6 +33,29 @@ router = APIRouter(prefix="/api", tags=["api"])
 
 # In-memory storage for migration progress
 _migration_tasks: dict[str, dict[str, Any]] = {}
+_migration_tasks_lock = asyncio.Lock()
+
+
+def _validate_path(path_str: str, allow_parent_refs: bool = False) -> Path:
+    """Validate and normalize a path to prevent directory traversal attacks.
+
+    Args:
+        path_str: Path string from user input
+        allow_parent_refs: Whether to allow .. in paths (should be False for user input)
+
+    Returns:
+        Validated Path object
+
+    Raises:
+        ValueError: If path contains invalid traversal patterns
+    """
+    path = Path(path_str).resolve()
+
+    # Reject paths containing .. unless explicitly allowed
+    if not allow_parent_refs and ".." in path_str:
+        raise ValueError(f"Path traversal not allowed: {path_str}")
+
+    return path
 
 
 def _request_to_author_mapping(
@@ -211,14 +234,15 @@ async def start_migration(request: MigrationStartRequest) -> dict[str, str]:
             for key, req in request.committer_mappings.items()
         }
 
-        # Store task info
-        _migration_tasks[migration_id] = {
-            "status": "pending",
-            "progress": 0,
-            "current_task": None,
-            "messages": [],
-            "error": None,
-        }
+        # Store task info (thread-safe)
+        async with _migration_tasks_lock:
+            _migration_tasks[migration_id] = {
+                "status": "pending",
+                "progress": 0,
+                "current_task": None,
+                "messages": [],
+                "error": None,
+            }
 
         # Start migration in background
         asyncio.create_task(
@@ -244,9 +268,10 @@ async def _run_migration(
 ) -> None:
     """Run migration task in background."""
     try:
-        task_info = _migration_tasks[migration_id]
-        task_info["status"] = "running"
-        task_info["progress"] = 25
+        async with _migration_tasks_lock:
+            task_info = _migration_tasks[migration_id]
+            task_info["status"] = "running"
+            task_info["progress"] = 25
 
         def progress_callback(msg: str) -> None:
             task_info["messages"].append(msg)
@@ -290,18 +315,19 @@ async def _run_migration(
 @router.get("/migration-progress/{migration_id}", response_model=MigrationProgressResponse)
 async def get_migration_progress(migration_id: str) -> MigrationProgressResponse:
     """Get migration progress."""
-    if migration_id not in _migration_tasks:
-        raise HTTPException(status_code=404, detail="Migration not found")
+    async with _migration_tasks_lock:
+        if migration_id not in _migration_tasks:
+            raise HTTPException(status_code=404, detail="Migration not found")
 
-    task_info = _migration_tasks[migration_id]
-    return MigrationProgressResponse(
-        migration_id=migration_id,
-        status=task_info["status"],
-        progress=task_info["progress"],
-        current_task=task_info["current_task"],
-        messages=task_info["messages"],
-        error=task_info["error"],
-    )
+        task_info = _migration_tasks[migration_id]
+        return MigrationProgressResponse(
+            migration_id=migration_id,
+            status=task_info["status"],
+            progress=task_info["progress"],
+            current_task=task_info["current_task"],
+            messages=task_info["messages"],
+            error=task_info["error"],
+        )
 
 
 @router.get("/config")
@@ -317,7 +343,7 @@ async def get_config(repo_path: str) -> dict[str, Any]:
             "config": {
                 "source_repos_path": config.source_repos_path,
                 "target_hosting_url": config.target_hosting_url,
-                "target_token": config.target_token,
+                # NOTE: target_token is never returned for security reasons
                 "author_mappings": {
                     key: {
                         "original_name": mapping.original_name,

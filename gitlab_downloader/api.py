@@ -33,12 +33,18 @@ def create_app() -> FastAPI:
     )
 
     # Add CORS middleware for Electron communication
+    # Restrict to localhost only since this is for the local Electron app
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Allow all origins for Electron app
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=[
+            "http://localhost",
+            "http://127.0.0.1",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ],
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["Content-Type"],
     )
 
     # Include API routes
@@ -91,7 +97,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="GitLab Dump API Server")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
-    parser.add_argument("--port", type=int, default=5000, help="Port to bind to")
+    parser.add_argument("--port", type=int, default=5000, help="Port to bind to (default: 5000)")
     args = parser.parse_args()
 
     run_api_server(host=args.host, port=args.port)

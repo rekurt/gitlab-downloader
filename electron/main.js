@@ -60,7 +60,11 @@ function extractEmbeddedBinary() {
   }
 
   try {
-    fs.ensureDirSync(path.dirname(extractedPath));
+    // Create directory if it doesn't exist (fs-extra's ensureDirSync equivalent)
+    const dirPath = path.dirname(extractedPath);
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
 
     // Get embedded binary from resources
     const embeddedPath = path.join(process.resourcesPath, 'python', binaryName);
