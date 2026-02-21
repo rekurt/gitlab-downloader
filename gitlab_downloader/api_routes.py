@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,28 @@ router = APIRouter(prefix="/api", tags=["api"])
 # In-memory storage for migration progress
 _migration_tasks: dict[str, dict[str, Any]] = {}
 _migration_tasks_lock = asyncio.Lock()
+_MIGRATION_TASK_TTL = 3600  # Clean up tasks older than 1 hour
+
+
+async def _cleanup_old_migrations() -> None:
+    """Remove migration tasks older than TTL."""
+    while True:
+        try:
+            await asyncio.sleep(300)  # Check every 5 minutes
+            async with _migration_tasks_lock:
+                current_time = time.time()
+                to_remove = [
+                    task_id
+                    for task_id, task in list(_migration_tasks.items())
+                    if current_time - task.get("created_at", current_time) > _MIGRATION_TASK_TTL
+                ]
+                for task_id in to_remove:
+                    logger.info(f"Cleaning up old migration task {task_id}")
+                    del _migration_tasks[task_id]
+        except asyncio.CancelledError:
+            break
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error(f"Error during migration cleanup: {e}")
 
 
 def _validate_path(path_str: str, allow_parent_refs: bool = False) -> Path:
@@ -244,6 +267,7 @@ async def start_migration(request: MigrationStartRequest) -> dict[str, str]:
                 "current_task": None,
                 "messages": [],
                 "error": None,
+                "created_at": time.time(),
             }
 
         # Start migration in background

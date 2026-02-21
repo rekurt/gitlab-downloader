@@ -50,15 +50,28 @@ def create_app() -> FastAPI:
     # Include API routes
     app.include_router(router)
 
+    cleanup_task: object = None
+
     @app.on_event("startup")
     async def startup_event() -> None:
-        """Log startup event."""
+        """Log startup event and start cleanup task."""
+        nonlocal cleanup_task
         logger.info("API server starting up")
+        # Start background cleanup task
+        from .api_routes import _cleanup_old_migrations
+        cleanup_task = asyncio.create_task(_cleanup_old_migrations())
 
     @app.on_event("shutdown")
     async def shutdown_event() -> None:
-        """Log shutdown event."""
+        """Log shutdown event and cancel cleanup task."""
+        nonlocal cleanup_task
         logger.info("API server shutting down")
+        if cleanup_task and isinstance(cleanup_task, asyncio.Task):
+            cleanup_task.cancel()
+            try:
+                await cleanup_task
+            except asyncio.CancelledError:
+                pass
 
     return app
 
@@ -97,7 +110,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="GitLab Dump API Server")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
-    parser.add_argument("--port", type=int, default=5000, help="Port to bind to (default: 5000)")
+    parser.add_argument("--port", type=int, default=8000, help="Port to bind to (default: 8000)")
     args = parser.parse_args()
 
     run_api_server(host=args.host, port=args.port)
