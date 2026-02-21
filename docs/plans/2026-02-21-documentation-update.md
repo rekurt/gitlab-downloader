@@ -47,14 +47,14 @@ CLAUDE.md с информацией о проекте для агентов.
 **Files:**
 - Create: `electron/README.md`
 
-- [ ] Add comprehensive guide for Electron application structure and setup
-- [ ] Document how to run Electron app in development mode
-- [ ] Include build instructions for creating distributable binaries
-- [ ] Document available UI components and their purpose
-- [ ] Add architecture overview (communication with Python backend via REST API)
-- [ ] Include development requirements (Node.js version, npm packages)
-- [ ] Add troubleshooting section for common Electron setup issues
-- [ ] Include configuration options for electron-builder
+- [x] Add comprehensive guide for Electron application structure and setup
+- [x] Document how to run Electron app in development mode
+- [x] Include build instructions for creating distributable binaries
+- [x] Document available UI components and their purpose
+- [x] Add architecture overview (communication with Python backend via REST API)
+- [x] Include development requirements (Node.js version, npm packages)
+- [x] Add troubleshooting section for common Electron setup issues
+- [x] Include configuration options for electron-builder
 
 ### Task 4: Expand examples section in both READMEs
 
