@@ -81,36 +81,6 @@ def _validate_path(path_str: str, allow_parent_refs: bool = False) -> Path:
     return path
 
 
-def _request_to_author_mapping(
-    key: str, req: AuthorMappingRequest
-) -> tuple[str, AuthorMapping]:
-    """Convert API request to AuthorMapping."""
-    return (
-        key,
-        AuthorMapping(
-            original_name=req.original_name,
-            original_email=req.original_email,
-            new_name=req.new_name,
-            new_email=req.new_email,
-        ),
-    )
-
-
-def _request_to_committer_mapping(
-    key: str, req: CommitterMappingRequest
-) -> tuple[str, CommitterMapping]:
-    """Convert API request to CommitterMapping."""
-    return (
-        key,
-        CommitterMapping(
-            original_name=req.original_name,
-            original_email=req.original_email,
-            new_name=req.new_name,
-            new_email=req.new_email,
-        ),
-    )
-
-
 @router.get("/status", response_model=StatusResponse)
 async def get_status() -> StatusResponse:
     """Get API status and version."""
