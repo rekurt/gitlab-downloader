@@ -45,6 +45,9 @@ def make_config(tmp_path: Path, **overrides) -> GitlabConfig:
         "oauth_client_secret": None,
         "oauth_scope": "read_api read_repository",
         "oauth_cache_path": str(tmp_path / "oauth.json"),
+        "api_server": False,
+        "api_host": "127.0.0.1",
+        "api_port": 8000,
     }
     data.update(overrides)
     return GitlabConfig(**data)

@@ -11,7 +11,6 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
-from rich.text import Text
 
 from .author_mapper import AuthorMapper
 from .models import AuthorMapping, CommitterMapping, MigrationConfig
@@ -230,8 +229,8 @@ class CLIMenu:
             table.add_column("Original Email", style="yellow")
             table.add_column("New Email", style="cyan")
 
-            for mapping in committer_mappings.values():
-                table.add_row(mapping.original_email, mapping.new_email)
+            for cm in committer_mappings.values():
+                table.add_row(cm.original_email, cm.new_email)
 
             self.console.print(table)
 

@@ -1,0 +1,304 @@
+"""API routes for Electron frontend communication."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import uuid
+from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, HTTPException
+
+from .api_schemas import (
+    AuthorMappingRequest,
+    CommitterMappingRequest,
+    MigrationProgressResponse,
+    MigrationStartRequest,
+    RepositoriesListResponse,
+    RepositoryInfo,
+    StatusResponse,
+)
+from .author_mapper import AuthorMapper
+from .config import get_version
+from .migration import MigrationExecutor
+from .models import (
+    AuthorMapping,
+    CommitterMapping,
+    MigrationConfig,
+)
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api", tags=["api"])
+
+# In-memory storage for migration progress
+_migration_tasks: dict[str, dict[str, Any]] = {}
+
+
+def _request_to_author_mapping(
+    key: str, req: AuthorMappingRequest
+) -> tuple[str, AuthorMapping]:
+    """Convert API request to AuthorMapping."""
+    return (
+        key,
+        AuthorMapping(
+            original_name=req.original_name,
+            original_email=req.original_email,
+            new_name=req.new_name,
+            new_email=req.new_email,
+        ),
+    )
+
+
+def _request_to_committer_mapping(
+    key: str, req: CommitterMappingRequest
+) -> tuple[str, CommitterMapping]:
+    """Convert API request to CommitterMapping."""
+    return (
+        key,
+        CommitterMapping(
+            original_name=req.original_name,
+            original_email=req.original_email,
+            new_name=req.new_name,
+            new_email=req.new_email,
+        ),
+    )
+
+
+@router.get("/status", response_model=StatusResponse)
+async def get_status() -> StatusResponse:
+    """Get API status and version."""
+    return StatusResponse(status="running", version=get_version())
+
+
+@router.get("/repos", response_model=RepositoriesListResponse)
+async def list_repositories(clone_path: str = ".") -> RepositoriesListResponse:
+    """List cloned repositories in the specified path."""
+    try:
+        repo_path = Path(clone_path)
+        if not repo_path.exists():
+            return RepositoriesListResponse(total=0, repositories=[])
+
+        repositories = []
+        for item in repo_path.iterdir():
+            if not item.is_dir():
+                continue
+
+            git_dir = item / ".git"
+            if not git_dir.exists():
+                continue
+
+            # Try to read git config to get the remote URL
+            url = ""
+            try:
+                config_path = git_dir / "config"
+                if config_path.exists():
+                    config_text = config_path.read_text()
+                    for line in config_text.split("\n"):
+                        if "url =" in line:
+                            url = line.split("=", 1)[1].strip()
+                            break
+            except Exception as e:
+                logger.warning(f"Could not read git config for {item.name}: {e}")
+
+            repo_info = RepositoryInfo(
+                name=item.name,
+                path=str(item.absolute()),
+                url=url,
+                last_updated=None,
+            )
+            repositories.append(repo_info)
+
+        return RepositoriesListResponse(total=len(repositories), repositories=repositories)
+
+    except Exception as e:
+        logger.error(f"Error listing repositories: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error listing repositories: {e}"
+        ) from e
+
+
+@router.get("/author-mappings")
+async def get_author_mappings(config_path: str = ".") -> dict[str, AuthorMappingRequest]:
+    """Get saved author mappings from disk."""
+    try:
+        config_file = Path(config_path) / "migration_config.json"
+        if not config_file.exists():
+            config_file = Path(config_path) / "migration_config.yaml"
+
+        if not config_file.exists():
+            return {}
+
+        mapper = AuthorMapper(str(config_file))
+        author_mappings, _ = mapper.load_mappings()
+
+        # Convert to API response format
+        result = {}
+        for key, mapping in author_mappings.items():
+            result[key] = AuthorMappingRequest(
+                original_name=mapping.original_name,
+                original_email=mapping.original_email,
+                new_name=mapping.new_name,
+                new_email=mapping.new_email,
+            )
+        return result
+    except Exception as e:
+        logger.error(f"Error reading author mappings: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error reading author mappings: {e}"
+        ) from e
+
+
+@router.post("/author-mappings")
+async def save_author_mappings(
+    mappings: dict[str, AuthorMappingRequest], config_path: str = "."
+) -> dict[str, str]:
+    """Save author mappings to disk."""
+    try:
+        config_file = Path(config_path) / "migration_config.json"
+
+        mapper = AuthorMapper(str(config_file))
+
+        # Convert from API format to internal format
+        author_mappings = {
+            key: AuthorMapping(
+                original_name=req.original_name,
+                original_email=req.original_email,
+                new_name=req.new_name,
+                new_email=req.new_email,
+            )
+            for key, req in mappings.items()
+        }
+
+        # Load existing committer mappings or create empty ones
+        committer_mappings: dict[str, CommitterMapping] = {}
+        try:
+            _, committer_mappings = mapper.load_mappings()
+        except FileNotFoundError:
+            pass
+
+        mapper.save_mappings(author_mappings, committer_mappings)
+        return {"status": "saved"}
+    except Exception as e:
+        logger.error(f"Error saving author mappings: {e}")
+        raise HTTPException(status_code=500, detail=f"Error saving mappings: {e}") from e
+
+
+@router.post("/migrate")
+async def start_migration(request: MigrationStartRequest) -> dict[str, str]:
+    """Start a migration task for a repository."""
+    try:
+        migration_id = str(uuid.uuid4())
+
+        # Convert request to internal format
+        author_mappings = {
+            key: AuthorMapping(
+                original_name=req.original_name,
+                original_email=req.original_email,
+                new_name=req.new_name,
+                new_email=req.new_email,
+            )
+            for key, req in request.author_mappings.items()
+        }
+
+        committer_mappings = {
+            key: CommitterMapping(
+                original_name=req.original_name,
+                original_email=req.original_email,
+                new_name=req.new_name,
+                new_email=req.new_email,
+            )
+            for key, req in request.committer_mappings.items()
+        }
+
+        # Store task info
+        _migration_tasks[migration_id] = {
+            "status": "pending",
+            "progress": 0,
+            "current_task": None,
+            "messages": [],
+            "error": None,
+        }
+
+        # Start migration in background
+        asyncio.create_task(
+            _run_migration(
+                migration_id,
+                request.repo_path,
+                author_mappings,
+                committer_mappings,
+            )
+        )
+
+        return {"migration_id": migration_id}
+    except Exception as e:
+        logger.error(f"Error starting migration: {e}")
+        raise HTTPException(status_code=500, detail=f"Error starting migration: {e}") from e
+
+
+async def _run_migration(
+    migration_id: str,
+    repo_path: str,
+    author_mappings: dict[str, AuthorMapping],
+    committer_mappings: dict[str, CommitterMapping],
+) -> None:
+    """Run migration task in background."""
+    try:
+        task_info = _migration_tasks[migration_id]
+        task_info["status"] = "running"
+        task_info["progress"] = 25
+
+        def progress_callback(msg: str) -> None:
+            task_info["messages"].append(msg)
+            task_info["current_task"] = msg
+
+        # Create migration config
+        config = MigrationConfig(
+            source_repos_path=repo_path,
+            target_hosting_url="",
+            target_token="",
+            author_mappings=author_mappings,
+            committer_mappings=committer_mappings,
+        )
+
+        executor = MigrationExecutor(config)
+        task_info["progress"] = 50
+
+        # Run migration
+        success = executor.migrate_repository(
+            repo_path,
+            author_mappings=author_mappings,
+            committer_mappings=committer_mappings,
+            progress_callback=progress_callback,
+        )
+
+        if success:
+            task_info["status"] = "completed"
+            task_info["progress"] = 100
+        else:
+            task_info["status"] = "failed"
+            task_info["error"] = "Migration failed"
+
+    except Exception as e:
+        logger.error(f"Error during migration {migration_id}: {e}")
+        task = _migration_tasks.get(migration_id)
+        if task:
+            task["status"] = "failed"
+            task["error"] = str(e)
+
+
+@router.get("/migration-progress/{migration_id}", response_model=MigrationProgressResponse)
+async def get_migration_progress(migration_id: str) -> MigrationProgressResponse:
+    """Get migration progress."""
+    if migration_id not in _migration_tasks:
+        raise HTTPException(status_code=404, detail="Migration not found")
+
+    task_info = _migration_tasks[migration_id]
+    return MigrationProgressResponse(
+        migration_id=migration_id,
+        status=task_info["status"],
+        progress=task_info["progress"],
+        current_task=task_info["current_task"],
+        messages=task_info["messages"],
+        error=task_info["error"],
+    )

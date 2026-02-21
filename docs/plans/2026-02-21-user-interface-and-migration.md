@@ -61,14 +61,14 @@
 - Create: `gitlab_downloader/api_schemas.py` (Pydantic models)
 - Modify: `gitlab_downloader/app.py` (add API server launch option)
 
-- [ ] Set up FastAPI application with proper CORS settings for Electron
-- [ ] Create endpoints: GET /api/status, GET /api/repos (list cloned repos), POST /api/migrate (start migration)
-- [ ] Create endpoint for author mapping: GET /api/author-mappings, POST /api/author-mappings
-- [ ] Create endpoint for migration progress: GET /api/migration-progress/{repo_id}
-- [ ] Implement async handling for long-running migration tasks
-- [ ] Add proper error handling and logging
-- [ ] write tests for API routes and schemas
-- [ ] run project test suite - must pass before task 4
+- [x] Set up FastAPI application with proper CORS settings for Electron
+- [x] Create endpoints: GET /api/status, GET /api/repos (list cloned repos), POST /api/migrate (start migration)
+- [x] Create endpoint for author mapping: GET /api/author-mappings, POST /api/author-mappings
+- [x] Create endpoint for migration progress: GET /api/migration-progress/{repo_id}
+- [x] Implement async handling for long-running migration tasks
+- [x] Add proper error handling and logging
+- [x] write tests for API routes and schemas
+- [x] run project test suite - must pass before task 4
 
 ### Task 4: Create Electron application structure
 

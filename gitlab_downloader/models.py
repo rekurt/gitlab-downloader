@@ -30,6 +30,9 @@ class GitlabConfig:
     oauth_client_secret: str | None
     oauth_scope: str
     oauth_cache_path: str
+    api_server: bool
+    api_host: str
+    api_port: int
 
 
 @dataclass

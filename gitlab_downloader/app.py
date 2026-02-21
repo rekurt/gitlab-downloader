@@ -30,13 +30,22 @@ async def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     args = parse_args(argv)
 
+    setup_logging(args.log_level, args.log_file)
+    config = config_from_args(args)
+
+    # Handle API server mode
+    if config.api_server:
+        from .api import run_api_server
+
+        logger.info(f"Starting API server on {config.api_host}:{config.api_port}")
+        run_api_server(host=config.api_host, port=config.api_port)
+        return 0
+
     from .auth import resolve_access_token
     from .client import fetch_group_metadata, get_all_projects, get_user_projects
     from .cloner import build_clone_target, clone_all_repositories
     from .reporting import print_dry_run, print_summary, write_json_report
 
-    setup_logging(args.log_level, args.log_file)
-    config = config_from_args(args)
     access_token = await resolve_access_token(config)
     config = replace(config, token=access_token)
 

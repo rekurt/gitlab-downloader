@@ -129,6 +129,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=env_bool("INTERACTIVE_MENU", False),
         help="Launch interactive menu for clone/migrate operations",
     )
+    parser.add_argument(
+        "--api-server",
+        action="store_true",
+        default=env_bool("API_SERVER", False),
+        help="Launch as REST API server for Electron app",
+    )
+    parser.add_argument(
+        "--api-host",
+        default=os.getenv("API_HOST", "127.0.0.1"),
+        help="Host for API server",
+    )
+    parser.add_argument(
+        "--api-port",
+        type=int,
+        default=int(os.getenv("API_PORT", 8000)),
+        help="Port for API server",
+    )
 
     args = parser.parse_args(argv)
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
@@ -320,4 +337,7 @@ def config_from_args(args: argparse.Namespace) -> GitlabConfig:
         oauth_client_secret=args.oauth_client_secret or None,
         oauth_scope=args.oauth_scope,
         oauth_cache_path=args.oauth_cache_path,
+        api_server=getattr(args, "api_server", False),
+        api_host=getattr(args, "api_host", "127.0.0.1"),
+        api_port=getattr(args, "api_port", 8000),
     )

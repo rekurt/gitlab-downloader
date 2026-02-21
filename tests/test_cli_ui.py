@@ -3,18 +3,13 @@
 from __future__ import annotations
 
 import json
-import tempfile
-from pathlib import Path
-from unittest import mock
 
-import pytest
 import yaml
 
 from gitlab_downloader.author_mapper import AuthorMapper
 from gitlab_downloader.cli_ui import CLIMenu
 from gitlab_downloader.models import (
     AuthorMapping,
-    CommitterMapping,
     MigrationConfig,
 )
 
