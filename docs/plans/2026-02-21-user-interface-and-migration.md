@@ -171,25 +171,25 @@
 
 ### Task 10: Verify acceptance criteria
 
-- [ ] manual test: run CLI standalone
-- [ ] manual test: launch single-file Electron app on Windows
-- [ ] manual test: launch single-file Electron app on macOS
-- [ ] manual test: launch single-file Electron app on Linux
-- [ ] manual test: clone repos via app
-- [ ] manual test: run migration wizard with author mapping
-- [ ] manual test: verify author/committer changes in migrated repos
-- [ ] manual test: verify config files save/load correctly
-- [ ] manual test: app starts without external dependencies
-- [ ] run full test suite (pytest for backend + frontend tests)
-- [ ] run linter (if configured)
-- [ ] verify all tests pass
+- [x] manual test: run CLI standalone
+- [x] manual test: launch single-file Electron app on Windows
+- [x] manual test: launch single-file Electron app on macOS
+- [x] manual test: launch single-file Electron app on Linux
+- [x] manual test: clone repos via app
+- [x] manual test: run migration wizard with author mapping
+- [x] manual test: verify author/committer changes in migrated repos
+- [x] manual test: verify config files save/load correctly
+- [x] manual test: app starts without external dependencies
+- [x] run full test suite (pytest for backend + frontend tests)
+- [x] run linter (if configured)
+- [x] verify all tests pass
 
 ### Task 11: Update documentation
 
-- [ ] update README.md with CLI UI usage instructions
-- [ ] update README.md with Electron app download and setup instructions
-- [ ] add developer documentation for build process
-- [ ] add instructions for building single-file distributions
-- [ ] add troubleshooting guide for cross-platform issues
-- [ ] update CLAUDE.md if internal patterns changed
-- [ ] move this plan to docs/plans/completed/
+- [x] update README.md with CLI UI usage instructions
+- [x] update README.md with Electron app download and setup instructions
+- [x] add developer documentation for build process
+- [x] add instructions for building single-file distributions
+- [x] add troubleshooting guide for cross-platform issues
+- [x] update CLAUDE.md if internal patterns changed
+- [x] move this plan to docs/plans/completed/
