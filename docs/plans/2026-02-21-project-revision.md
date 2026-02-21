@@ -114,11 +114,11 @@
 **Files:**
 - Create: `tests/test_auth.py`
 
-- [ ] Написать тесты для `resolve_access_token` (token mode)
-- [ ] Написать тесты для OAuth cache read/write/validation
-- [ ] Написать тесты для token refresh flow (mock aiohttp)
-- [ ] Написать тесты для device flow polling (mock)
-- [ ] Запустить тесты
+- [x] Написать тесты для `resolve_access_token` (token mode)
+- [x] Написать тесты для OAuth cache read/write/validation
+- [x] Написать тесты для token refresh flow (mock aiohttp)
+- [x] Написать тесты для device flow polling (mock)
+- [x] Запустить тесты
 
 ### Task 6: Добавить тесты для reporting.py
 
