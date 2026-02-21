@@ -137,9 +137,9 @@
 - Modify: `gitlab_downloader/cloner.py` (если нужно)
 - Modify: `gitlab_downloader/reporting.py` (если нужно)
 
-- [ ] Добавить `Literal["success", "updated", "skipped", "failed"]` для status в CloneResult
-- [ ] Убедиться что mypy проходит
-- [ ] Запустить тесты
+- [x] Добавить `Literal["success", "updated", "skipped", "failed"]` для status в CloneResult
+- [x] Убедиться что mypy проходит
+- [x] Запустить тесты
 
 ### Task 8: Обновить AGENTS.md
 

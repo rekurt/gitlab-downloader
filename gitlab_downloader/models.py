@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
+
+CloneStatus = Literal["success", "updated", "skipped", "failed"]
 
 
 @dataclass
@@ -31,5 +34,5 @@ class GitlabConfig:
 @dataclass
 class CloneResult:
     name: str
-    status: str
+    status: CloneStatus
     message: str
