@@ -27,6 +27,7 @@ def make_config(**overrides):
         "log_level": "INFO",
         "log_file": None,
         "interactive": False,
+        "interactive_menu": False,
         "report_json": None,
         "auth_method": "token",
         "git_auth_mode": "url",

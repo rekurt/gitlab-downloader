@@ -22,6 +22,7 @@ class GitlabConfig:
     log_level: str
     log_file: str | None
     interactive: bool
+    interactive_menu: bool
     report_json: str | None
     auth_method: str
     git_auth_mode: str

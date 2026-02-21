@@ -46,12 +46,12 @@
 - Modify: `gitlab_downloader/app.py` (integrate new CLI flow)
 - Modify: `gitlab_downloader/config.py` (add migration options)
 
-- [ ] Create interactive menu with Rich (clone, migrate, view history)
-- [ ] Add migration flow: select repos, configure author mappings (interactive form), preview changes
-- [ ] Add ability to save/load migration configuration from JSON/YAML
-- [ ] Integrate with existing clone functionality
-- [ ] write tests for CLI UI interactions
-- [ ] run project test suite - must pass before task 3
+- [x] Create interactive menu with Rich (clone, migrate, view history)
+- [x] Add migration flow: select repos, configure author mappings (interactive form), preview changes
+- [x] Add ability to save/load migration configuration from JSON/YAML
+- [x] Integrate with existing clone functionality
+- [x] write tests for CLI UI interactions
+- [x] run project test suite - must pass before task 3
 
 ### Task 3: Create Python REST API backend for Electron
 

@@ -123,6 +123,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=env_bool("INTERACTIVE", False),
         help="Prompt interactively for missing settings",
     )
+    parser.add_argument(
+        "--interactive-menu",
+        action="store_true",
+        default=env_bool("INTERACTIVE_MENU", False),
+        help="Launch interactive menu for clone/migrate operations",
+    )
 
     args = parser.parse_args(argv)
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
@@ -306,6 +312,7 @@ def config_from_args(args: argparse.Namespace) -> GitlabConfig:
         log_level=args.log_level,
         log_file=args.log_file,
         interactive=getattr(args, "interactive", False),
+        interactive_menu=getattr(args, "interactive_menu", False),
         report_json=getattr(args, "report_json", None),
         auth_method=args.auth_method,
         git_auth_mode=args.git_auth_mode,
