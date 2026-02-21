@@ -59,6 +59,145 @@ gitlab-dump \
 ```
 This mode uses `git credential approve` with your configured `credential.helper`.
 
+## Examples
+
+### Dry-run before cloning
+Preview which repositories will be cloned without actually downloading them:
+
+```bash
+gitlab-dump \
+  --url https://gitlab.com \
+  --token <token> \
+  --group my-group \
+  --dry-run
+```
+
+The output will show all repositories to be cloned, including their size and last commit info.
+
+### Update existing repositories
+If repositories are already cloned, use `--update` to fetch the latest changes:
+
+```bash
+gitlab-dump \
+  --url https://gitlab.com \
+  --token <token> \
+  --group my-group \
+  --update \
+  --clone-path ./repositories
+```
+
+This runs `git pull --ff-only` for each repository instead of re-cloning.
+
+### Sync from private GitLab instance
+Clone repositories from a private GitLab server (e.g., corporate instance):
+
+```bash
+gitlab-dump \
+  --url https://gitlab.internal.company.com \
+  --token <private-token> \
+  --group engineering \
+  --clone-path ./internal-repos
+```
+
+### Export current user's projects
+If you don't need a group, export only projects you have access to:
+
+```bash
+gitlab-dump \
+  --url https://gitlab.com \
+  --token <token> \
+  --clone-path ./my-projects
+```
+
+### OAuth with Git credential helper
+Modern approach without explicit token in arguments:
+
+```bash
+# First run — prompts for browser login
+gitlab-dump \
+  --url https://gitlab.com \
+  --auth-method oauth \
+  --oauth-client-id <client_id> \
+  --git-auth-mode credential_helper \
+  --group frontend-team
+
+# Subsequent runs use cached token
+gitlab-dump \
+  --url https://gitlab.com \
+  --git-auth-mode credential_helper \
+  --group frontend-team \
+  --update
+```
+
+### Configuration via environment variables
+If you regularly clone the same group, use environment variables:
+
+```bash
+export GITLAB_URL=https://gitlab.com
+export GITLAB_TOKEN=glpat-xxxxxxxxxxxx
+export GITLAB_GROUP=my-organization
+export CLONE_PATH=/data/repositories
+
+gitlab-dump --dry-run
+gitlab-dump --update
+```
+
+### .env configuration file
+Create a `.env` file in your project directory:
+
+```bash
+# .env
+GITLAB_URL=https://gitlab.com
+GITLAB_TOKEN=glpat-your-token-here
+GITLAB_GROUP=my-group
+CLONE_PATH=./repositories
+```
+
+Then in your script:
+
+```bash
+#!/bin/bash
+source .env
+gitlab-dump --update
+```
+
+### Batch processing with logging
+For automated processes, save logs and reports:
+
+```bash
+mkdir -p logs/$(date +%Y-%m-%d)
+gitlab-dump \
+  --url https://gitlab.com \
+  --token <token> \
+  --group production \
+  --update \
+  --clone-path ./production-repos \
+  > logs/$(date +%Y-%m-%d)/sync.log 2>&1
+
+echo "Sync completed at $(date)" >> logs/sync_history.txt
+```
+
+### Migration between GitLab instances
+Clone from one GitLab instance and prepare for push to another:
+
+```bash
+# Step 1: Clone from source repositories
+gitlab-dump \
+  --url https://old-gitlab.company.com \
+  --token <old-token> \
+  --group team \
+  --clone-path ./migration-backup
+
+# Step 2: For each repository, change remote and push
+for repo in migration-backup/*/; do
+  cd "$repo"
+  git remote set-url origin https://new-gitlab.company.com/group/$(basename "$repo")
+  git push --all origin
+  git push --tags origin
+  cd - > /dev/null
+done
+```
+
 ## Graphical User Interface (GUI)
 
 `Gitlab Downloader` includes a cross-platform graphical user interface based on Electron and React for managing repository downloads and data migration.

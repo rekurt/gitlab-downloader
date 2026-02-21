@@ -59,6 +59,145 @@ gitlab-dump \
 ```
 В этом режиме используются `git credential approve` и настроенный `credential.helper`.
 
+## Примеры использования
+
+### Сухой запуск перед клонированием
+Проверить, какие репозитории будут загружены без реального клонирования:
+
+```bash
+gitlab-dump \
+  --url https://gitlab.com \
+  --token <token> \
+  --group my-group \
+  --dry-run
+```
+
+Вывод покажет список всех репозиториев, которые будут клонированы, включая размер и последний commit.
+
+### Обновление существующих репозиториев
+Если репозитории уже клонированы ранее, используйте `--update` для получения последних изменений:
+
+```bash
+gitlab-dump \
+  --url https://gitlab.com \
+  --token <token> \
+  --group my-group \
+  --update \
+  --clone-path ./repositories
+```
+
+Это выполнит `git pull --ff-only` для каждого репозитория вместо повторного клонирования.
+
+### Синхронизация с приватного GitLab сервера
+Клонирование репозиториев с приватного GitLab инстанса (например, корпоративный сервер):
+
+```bash
+gitlab-dump \
+  --url https://gitlab.internal.company.com \
+  --token <private-token> \
+  --group engineering \
+  --clone-path ./internal-repos
+```
+
+### Экспорт проектов текущего пользователя
+Если вам не нужна группа, экспортируйте только проекты, к которым вы имеете доступ:
+
+```bash
+gitlab-dump \
+  --url https://gitlab.com \
+  --token <token> \
+  --clone-path ./my-projects
+```
+
+### OAuth с Git credential helper
+Современный способ без явного токена в аргументах:
+
+```bash
+# Первый запуск — будет предложен вход через браузер
+gitlab-dump \
+  --url https://gitlab.com \
+  --auth-method oauth \
+  --oauth-client-id <client_id> \
+  --git-auth-mode credential_helper \
+  --group frontend-team
+
+# Последующие запуски используют сохранённый token
+gitlab-dump \
+  --url https://gitlab.com \
+  --git-auth-mode credential_helper \
+  --group frontend-team \
+  --update
+```
+
+### Настройка через переменные окружения
+Если вы часто клонируете одну и ту же группу, используйте переменные окружения:
+
+```bash
+export GITLAB_URL=https://gitlab.com
+export GITLAB_TOKEN=glpat-xxxxxxxxxxxx
+export GITLAB_GROUP=my-organization
+export CLONE_PATH=/data/repositories
+
+gitlab-dump --dry-run
+gitlab-dump --update
+```
+
+### Файл .env конфигурации
+Создайте `.env` файл в директории проекта:
+
+```bash
+# .env
+GITLAB_URL=https://gitlab.com
+GITLAB_TOKEN=glpat-your-token-here
+GITLAB_GROUP=my-group
+CLONE_PATH=./repositories
+```
+
+Затем в скрипте:
+
+```bash
+#!/bin/bash
+source .env
+gitlab-dump --update
+```
+
+### Batch обработка с логированием
+Для automated процессов сохраняйте logs и отчёты:
+
+```bash
+mkdir -p logs/$(date +%Y-%m-%d)
+gitlab-dump \
+  --url https://gitlab.com \
+  --token <token> \
+  --group production \
+  --update \
+  --clone-path ./production-repos \
+  > logs/$(date +%Y-%m-%d)/sync.log 2>&1
+
+echo "Sync completed at $(date)" >> logs/sync_history.txt
+```
+
+### Миграция между GitLab инстансами
+Клонирование из одного GitLab и подготовка к push в другой:
+
+```bash
+# Шаг 1: Клонировать исходные репозитории
+gitlab-dump \
+  --url https://old-gitlab.company.com \
+  --token <old-token> \
+  --group team \
+  --clone-path ./migration-backup
+
+# Шаг 2: Для каждого репозитория изменить remote и push
+for repo in migration-backup/*/; do
+  cd "$repo"
+  git remote set-url origin https://new-gitlab.company.com/group/$(basename "$repo")
+  git push --all origin
+  git push --tags origin
+  cd - > /dev/null
+done
+```
+
 ## Графический интерфейс (GUI)
 
 `Gitlab Downloader` поставляется с кроссплатформенным графическим интерфейсом на базе Electron и React для управления загрузкой репозиториев и миграцией данных.

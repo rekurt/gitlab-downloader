@@ -61,11 +61,11 @@ CLAUDE.md с информацией о проекте для агентов.
 **Files:**
 - Modify: `README.MD`, `README.en.md`
 
-- [ ] Add "Примеры использования" (Examples) section in Russian README
-- [ ] Include: OAuth with credential helper, dry-run mode, update mode examples
-- [ ] Add real-world usage scenarios (syncing from private GitLab instance, specific project export)
-- [ ] Mirror examples section in English README with parallel structure
-- [ ] Include .env configuration examples
+- [x] Add "Примеры использования" (Examples) section in Russian README
+- [x] Include: OAuth with credential helper, dry-run mode, update mode examples
+- [x] Add real-world usage scenarios (syncing from private GitLab instance, specific project export)
+- [x] Mirror examples section in English README with parallel structure
+- [x] Include .env configuration examples
 
 ### Task 5: Enhance Makefile with new targets
 
