@@ -146,10 +146,10 @@
 **Files:**
 - Modify: `AGENTS.md`
 
-- [ ] Описать текущую модульную архитектуру
-- [ ] Обновить секцию Testing Guidelines (pytest, make test, CI)
-- [ ] Упомянуть OAuth и credential helper
-- [ ] Убрать устаревшую информацию
+- [x] Описать текущую модульную архитектуру
+- [x] Обновить секцию Testing Guidelines (pytest, make test, CI)
+- [x] Упомянуть OAuth и credential helper
+- [x] Убрать устаревшую информацию
 
 ### Task 9: Добавить --version флаг
 
