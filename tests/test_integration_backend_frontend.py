@@ -27,11 +27,7 @@ class TestAPIServerInitialization:
     def test_api_server_routes_registered(self) -> None:
         """Test that all required routes are registered."""
         app = create_app()
-        routes = {
-            str(getattr(route, "path", ""))
-            for route in app.routes
-            if hasattr(route, "path")
-        }
+        routes = {str(getattr(route, "path", "")) for route in app.routes if hasattr(route, "path")}
         required_routes = {
             "/api/status",
             "/api/repos",
@@ -65,9 +61,7 @@ class TestBackendProcessManagement:
     """Test backend process spawning and lifecycle."""
 
     @patch("subprocess.Popen")
-    def test_spawn_python_backend_with_correct_args(
-        self, mock_popen: Mock
-    ) -> None:
+    def test_spawn_python_backend_with_correct_args(self, mock_popen: Mock) -> None:
         """Test that Python backend is spawned with correct arguments."""
         mock_process = MagicMock()
         mock_popen.return_value = mock_process

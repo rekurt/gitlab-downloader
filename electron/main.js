@@ -7,7 +7,7 @@ const fs = require('fs');
 
 let mainWindow;
 let apiProcess = null;
-const API_PORT = 5000;
+const API_PORT = Number.parseInt(process.env.API_PORT || '8000', 10);
 const API_HOST = '127.0.0.1';
 
 /**

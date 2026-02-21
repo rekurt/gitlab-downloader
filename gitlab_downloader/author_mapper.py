@@ -50,12 +50,8 @@ class AuthorMapper:
         if not isinstance(data, dict):
             raise ValueError("Config must be a dictionary")
 
-        author_mappings = self._parse_author_mappings(
-            data.get("author_mappings", {})
-        )
-        committer_mappings = self._parse_committer_mappings(
-            data.get("committer_mappings", {})
-        )
+        author_mappings = self._parse_author_mappings(data.get("author_mappings", {}))
+        committer_mappings = self._parse_committer_mappings(data.get("committer_mappings", {}))
 
         return author_mappings, committer_mappings
 
@@ -122,12 +118,8 @@ class AuthorMapper:
         if missing:
             raise ValueError(f"Missing required config fields: {missing}")
 
-        author_mappings = self._parse_author_mappings(
-            data.get("author_mappings", {})
-        )
-        committer_mappings = self._parse_committer_mappings(
-            data.get("committer_mappings", {})
-        )
+        author_mappings = self._parse_author_mappings(data.get("author_mappings", {}))
+        committer_mappings = self._parse_committer_mappings(data.get("committer_mappings", {}))
 
         return MigrationConfig(
             source_repos_path=data["source_repos_path"],
@@ -150,9 +142,7 @@ class AuthorMapper:
             "target_hosting_url": config.target_hosting_url,
             "target_token": config.target_token,
             "author_mappings": self._serialize_mappings(config.author_mappings),
-            "committer_mappings": self._serialize_mappings(
-                config.committer_mappings
-            ),
+            "committer_mappings": self._serialize_mappings(config.committer_mappings),
         }
 
         if self.config_path.suffix in {".yaml", ".yml"}:

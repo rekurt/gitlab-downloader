@@ -25,9 +25,7 @@ class RepositoriesListResponse(BaseModel):
     """Response for /api/repos endpoint."""
 
     total: int = Field(..., description="Total number of repositories")
-    repositories: list[RepositoryInfo] = Field(
-        ..., description="List of repository information"
-    )
+    repositories: list[RepositoryInfo] = Field(..., description="List of repository information")
 
 
 class AuthorMappingRequest(BaseModel):
@@ -64,9 +62,7 @@ class MigrationProgressResponse(BaseModel):
     """Response for migration progress endpoint."""
 
     migration_id: str = Field(..., description="Unique migration identifier")
-    status: str = Field(
-        ..., description="Migration status: pending, running, completed, failed"
-    )
+    status: str = Field(..., description="Migration status: pending, running, completed, failed")
     progress: int = Field(..., description="Progress percentage (0-100)")
     current_task: str | None = Field(None, description="Current task being executed")
     messages: list[str] = Field(default_factory=list, description="Progress messages")

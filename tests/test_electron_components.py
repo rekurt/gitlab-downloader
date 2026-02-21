@@ -5,24 +5,12 @@ from pathlib import Path
 
 def _get_component_path(component_name):
     """Get path to component file."""
-    return (
-        Path(__file__).parent.parent
-        / "electron"
-        / "src"
-        / "components"
-        / f"{component_name}.js"
-    )
+    return Path(__file__).parent.parent / "electron" / "src" / "components" / f"{component_name}.js"
 
 
 def _get_style_path(style_name):
     """Get path to style file."""
-    return (
-        Path(__file__).parent.parent
-        / "electron"
-        / "src"
-        / "styles"
-        / f"{style_name}.css"
-    )
+    return Path(__file__).parent.parent / "electron" / "src" / "styles" / f"{style_name}.css"
 
 
 class TestElectronComponents:

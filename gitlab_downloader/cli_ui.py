@@ -46,9 +46,7 @@ class CLIMenu:
 
         while True:
             try:
-                selection = self.console.input(
-                    "\n[cyan]Select an option[/cyan] (1-4): "
-                ).strip()
+                selection = self.console.input("\n[cyan]Select an option[/cyan] (1-4): ").strip()
                 idx = int(selection) - 1
                 if 0 <= idx < len(choices):
                     mapping = ["clone", "migrate", "history", "exit"]
@@ -91,16 +89,12 @@ class CLIMenu:
         # Step 1: Select source repos
         source_path = Prompt.ask("[cyan]Source repositories path[/cyan]")
         if not Path(source_path).exists():
-            self.console.print(
-                f"[red]Path does not exist: {source_path}[/red]"
-            )
+            self.console.print(f"[red]Path does not exist: {source_path}[/red]")
             return None
 
         # Step 2: Select target hosting
         target_url = Prompt.ask("[cyan]Target GitLab/Git hosting URL[/cyan]")
-        target_token = _getpass_module.getpass(
-            "[cyan]Target hosting token (hidden)[/cyan]: "
-        )
+        target_token = _getpass_module.getpass("[cyan]Target hosting token (hidden)[/cyan]: ")
 
         # Step 3: Configure author mappings
         author_mappings = self._configure_author_mappings()
@@ -109,9 +103,7 @@ class CLIMenu:
         committer_mappings = self._configure_committer_mappings()
 
         # Step 5: Preview configuration
-        self._preview_migration_config(
-            source_path, target_url, author_mappings, committer_mappings
-        )
+        self._preview_migration_config(source_path, target_url, author_mappings, committer_mappings)
 
         if not Confirm.ask("\n[cyan]Proceed with this configuration?[/cyan]"):
             self.console.print("[yellow]Migration cancelled.[/yellow]")
@@ -136,9 +128,7 @@ class CLIMenu:
         mapping_num = 1
 
         while True:
-            if not Confirm.ask(
-                f"\n[cyan]Add author mapping #{mapping_num}?[/cyan]", default=True
-            ):
+            if not Confirm.ask(f"\n[cyan]Add author mapping #{mapping_num}?[/cyan]", default=True):
                 break
 
             orig_email = Prompt.ask("[cyan]Original email[/cyan]")
@@ -242,31 +232,21 @@ class CLIMenu:
         """
         self.console.print("\n[bold cyan]View Migration History[/bold cyan]")
 
-        config_path = Prompt.ask(
-            "[cyan]Migration config file path (JSON/YAML)[/cyan]"
-        )
+        config_path = Prompt.ask("[cyan]Migration config file path (JSON/YAML)[/cyan]")
 
         try:
             mapper = AuthorMapper(config_path)
             config = mapper.load_migration_config()
 
             self.console.print("\n[bold cyan]Loaded Migration Configuration[/bold cyan]")
-            self.console.print(
-                f"[cyan]Source:[/cyan] {config.source_repos_path}"
-            )
+            self.console.print(f"[cyan]Source:[/cyan] {config.source_repos_path}")
             self.console.print(f"[cyan]Target:[/cyan] {config.target_hosting_url}")
-            self.console.print(
-                f"[cyan]Author Mappings:[/cyan] {len(config.author_mappings)}"
-            )
-            self.console.print(
-                f"[cyan]Committer Mappings:[/cyan] {len(config.committer_mappings)}"
-            )
+            self.console.print(f"[cyan]Author Mappings:[/cyan] {len(config.author_mappings)}")
+            self.console.print(f"[cyan]Committer Mappings:[/cyan] {len(config.committer_mappings)}")
 
             return config_path
         except FileNotFoundError:
-            self.console.print(
-                f"[red]Config file not found: {config_path}[/red]"
-            )
+            self.console.print(f"[red]Config file not found: {config_path}[/red]")
         except ValueError as e:
             self.console.print(f"[red]Invalid config: {e}[/red]")
 
@@ -307,14 +287,10 @@ class CLIMenu:
         try:
             mapper = AuthorMapper(config_path)
             mapper.save_migration_config(config)
-            self.console.print(
-                f"[green]✓ Configuration saved to {config_path}[/green]"
-            )
+            self.console.print(f"[green]✓ Configuration saved to {config_path}[/green]")
             return config_path
         except Exception as e:
-            self.console.print(
-                f"[red]Error saving configuration: {e}[/red]"
-            )
+            self.console.print(f"[red]Error saving configuration: {e}[/red]")
 
         return None
 

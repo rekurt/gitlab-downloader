@@ -24,36 +24,28 @@ class TestCLIMenu:
 
     def test_show_main_menu_clone(self, monkeypatch):
         """Test main menu returns 'clone' option."""
-        monkeypatch.setattr(
-            "builtins.input", lambda *_: "1"
-        )
+        monkeypatch.setattr("builtins.input", lambda *_: "1")
         menu = CLIMenu()
         result = menu.show_main_menu()
         assert result == "clone"
 
     def test_show_main_menu_migrate(self, monkeypatch):
         """Test main menu returns 'migrate' option."""
-        monkeypatch.setattr(
-            "builtins.input", lambda *_: "2"
-        )
+        monkeypatch.setattr("builtins.input", lambda *_: "2")
         menu = CLIMenu()
         result = menu.show_main_menu()
         assert result == "migrate"
 
     def test_show_main_menu_history(self, monkeypatch):
         """Test main menu returns 'history' option."""
-        monkeypatch.setattr(
-            "builtins.input", lambda *_: "3"
-        )
+        monkeypatch.setattr("builtins.input", lambda *_: "3")
         menu = CLIMenu()
         result = menu.show_main_menu()
         assert result == "history"
 
     def test_show_main_menu_exit(self, monkeypatch):
         """Test main menu returns 'exit' option."""
-        monkeypatch.setattr(
-            "builtins.input", lambda *_: "4"
-        )
+        monkeypatch.setattr("builtins.input", lambda *_: "4")
         menu = CLIMenu()
         result = menu.show_main_menu()
         assert result == "exit"
@@ -61,28 +53,27 @@ class TestCLIMenu:
     def test_show_main_menu_invalid_then_valid(self, monkeypatch):
         """Test main menu handles invalid input then valid."""
         inputs = iter(["invalid", "1"])
-        monkeypatch.setattr(
-            "builtins.input", lambda *_: next(inputs)
-        )
+        monkeypatch.setattr("builtins.input", lambda *_: next(inputs))
         menu = CLIMenu()
         result = menu.show_main_menu()
         assert result == "clone"
 
     def test_show_clone_menu(self, monkeypatch):
         """Test clone menu returns configuration."""
-        inputs = iter([
-            "https://gitlab.com",
-            "my-group",
-            "/home/user/repos",
-        ])
+        inputs = iter(
+            [
+                "https://gitlab.com",
+                "my-group",
+                "/home/user/repos",
+            ]
+        )
 
         def mock_input(*_, **__):
             return next(inputs)
 
         monkeypatch.setattr("builtins.input", mock_input)
         monkeypatch.setattr(
-            "gitlab_downloader.cli_ui._getpass_module.getpass",
-            lambda *_, **__: "token123"
+            "gitlab_downloader.cli_ui._getpass_module.getpass", lambda *_, **__: "token123"
         )
 
         menu = CLIMenu()
@@ -95,19 +86,20 @@ class TestCLIMenu:
 
     def test_show_clone_menu_empty_group(self, monkeypatch):
         """Test clone menu with empty group."""
-        inputs = iter([
-            "https://gitlab.com",
-            "",
-            "/home/user/repos",
-        ])
+        inputs = iter(
+            [
+                "https://gitlab.com",
+                "",
+                "/home/user/repos",
+            ]
+        )
 
         def mock_input(*_, **__):
             return next(inputs)
 
         monkeypatch.setattr("builtins.input", mock_input)
         monkeypatch.setattr(
-            "gitlab_downloader.cli_ui._getpass_module.getpass",
-            lambda *_, **__: "token123"
+            "gitlab_downloader.cli_ui._getpass_module.getpass", lambda *_, **__: "token123"
         )
 
         menu = CLIMenu()
@@ -117,14 +109,16 @@ class TestCLIMenu:
 
     def test_configure_author_mappings_single(self, monkeypatch):
         """Test author mappings configuration."""
-        inputs = iter([
-            "y",  # Add mapping
-            "john@example.com",  # Original email
-            "John Doe",  # Original name
-            "jane@example.com",  # New email
-            "Jane Doe",  # New name
-            "n",  # Add another
-        ])
+        inputs = iter(
+            [
+                "y",  # Add mapping
+                "john@example.com",  # Original email
+                "John Doe",  # Original name
+                "jane@example.com",  # New email
+                "Jane Doe",  # New name
+                "n",  # Add another
+            ]
+        )
         monkeypatch.setattr(
             "builtins.input",
             lambda *_, **__: next(inputs),
@@ -143,19 +137,21 @@ class TestCLIMenu:
 
     def test_configure_author_mappings_multiple(self, monkeypatch):
         """Test multiple author mappings."""
-        inputs = iter([
-            "y",  # Add mapping 1
-            "john@example.com",
-            "John",
-            "jane@example.com",
-            "Jane",
-            "y",  # Add mapping 2
-            "bob@example.com",
-            "Bob",
-            "alice@example.com",
-            "Alice",
-            "n",  # Stop
-        ])
+        inputs = iter(
+            [
+                "y",  # Add mapping 1
+                "john@example.com",
+                "John",
+                "jane@example.com",
+                "Jane",
+                "y",  # Add mapping 2
+                "bob@example.com",
+                "Bob",
+                "alice@example.com",
+                "Alice",
+                "n",  # Stop
+            ]
+        )
         monkeypatch.setattr(
             "builtins.input",
             lambda *_, **__: next(inputs),
@@ -170,14 +166,16 @@ class TestCLIMenu:
 
     def test_configure_committer_mappings(self, monkeypatch):
         """Test committer mappings configuration."""
-        inputs = iter([
-            "y",  # Add mapping
-            "committer@example.com",
-            "Original Committer",
-            "new_committer@example.com",
-            "New Committer",
-            "n",  # Stop
-        ])
+        inputs = iter(
+            [
+                "y",  # Add mapping
+                "committer@example.com",
+                "Original Committer",
+                "new_committer@example.com",
+                "New Committer",
+                "n",  # Stop
+            ]
+        )
         monkeypatch.setattr(
             "builtins.input",
             lambda *_, **__: next(inputs),
@@ -194,21 +192,22 @@ class TestCLIMenu:
         test_repo_path = tmp_path / "repos"
         test_repo_path.mkdir()
 
-        inputs = iter([
-            str(test_repo_path),  # Source path
-            "https://target.com",  # Target URL
-            "n",  # No author mappings
-            "n",  # No committer mappings
-            "y",  # Proceed
-        ])
+        inputs = iter(
+            [
+                str(test_repo_path),  # Source path
+                "https://target.com",  # Target URL
+                "n",  # No author mappings
+                "n",  # No committer mappings
+                "y",  # Proceed
+            ]
+        )
 
         def mock_input(*_, **__):
             return next(inputs)
 
         monkeypatch.setattr("builtins.input", mock_input)
         monkeypatch.setattr(
-            "gitlab_downloader.cli_ui._getpass_module.getpass",
-            lambda *_, **__: "target_token"
+            "gitlab_downloader.cli_ui._getpass_module.getpass", lambda *_, **__: "target_token"
         )
 
         menu = CLIMenu()
@@ -221,9 +220,11 @@ class TestCLIMenu:
 
     def test_show_migration_wizard_invalid_path(self, monkeypatch):
         """Test migration wizard with invalid path."""
-        inputs = iter([
-            "/nonexistent/path",
-        ])
+        inputs = iter(
+            [
+                "/nonexistent/path",
+            ]
+        )
         monkeypatch.setattr(
             "builtins.input",
             lambda *_, **__: next(inputs),
@@ -239,21 +240,22 @@ class TestCLIMenu:
         test_repo_path = tmp_path / "repos"
         test_repo_path.mkdir()
 
-        inputs = iter([
-            str(test_repo_path),
-            "https://target.com",
-            "n",
-            "n",
-            "n",  # Don't proceed
-        ])
+        inputs = iter(
+            [
+                str(test_repo_path),
+                "https://target.com",
+                "n",
+                "n",
+                "n",  # Don't proceed
+            ]
+        )
 
         def mock_input(*_, **__):
             return next(inputs)
 
         monkeypatch.setattr("builtins.input", mock_input)
         monkeypatch.setattr(
-            "gitlab_downloader.cli_ui._getpass_module.getpass",
-            lambda *_, **__: "token"
+            "gitlab_downloader.cli_ui._getpass_module.getpass", lambda *_, **__: "token"
         )
 
         menu = CLIMenu()
@@ -273,10 +275,12 @@ class TestCLIMenu:
 
         output_file = tmp_path / "config.json"
 
-        inputs = iter([
-            "json",  # Format
-            str(output_file),  # Path
-        ])
+        inputs = iter(
+            [
+                "json",  # Format
+                str(output_file),  # Path
+            ]
+        )
         monkeypatch.setattr(
             "builtins.input",
             lambda *_, **__: next(inputs),
@@ -304,10 +308,12 @@ class TestCLIMenu:
 
         output_file = tmp_path / "config.yaml"
 
-        inputs = iter([
-            "yaml",  # Format
-            str(output_file),  # Path
-        ])
+        inputs = iter(
+            [
+                "yaml",  # Format
+                str(output_file),  # Path
+            ]
+        )
         monkeypatch.setattr(
             "builtins.input",
             lambda *_, **__: next(inputs),

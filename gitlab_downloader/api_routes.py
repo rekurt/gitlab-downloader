@@ -141,7 +141,7 @@ async def get_author_mappings(config_path: str = ".") -> dict[str, AuthorMapping
         validated_path = _validate_path(config_path)
         config_file = validated_path / "migration_config.json"
         if not config_file.exists():
-            config_file = Path(config_path) / "migration_config.yaml"
+            config_file = validated_path / "migration_config.yaml"
 
         if not config_file.exists():
             return {}
@@ -159,6 +159,9 @@ async def get_author_mappings(config_path: str = ".") -> dict[str, AuthorMapping
                 new_email=mapping.new_email,
             )
         return result
+    except ValueError as e:
+        logger.error(f"Error reading author mappings: {e}")
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error reading author mappings: {e}")
         raise HTTPException(status_code=500, detail=f"Error reading author mappings: {e}") from e
@@ -195,6 +198,9 @@ async def save_author_mappings(
 
         mapper.save_mappings(author_mappings, committer_mappings)
         return {"status": "saved"}
+    except ValueError as e:
+        logger.error(f"Error saving author mappings: {e}")
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error saving author mappings: {e}")
         raise HTTPException(status_code=500, detail=f"Error saving mappings: {e}") from e
@@ -204,6 +210,9 @@ async def save_author_mappings(
 async def start_migration(request: MigrationStartRequest) -> dict[str, str]:
     """Start a migration task for a repository."""
     try:
+        # Validate repo path
+        _validate_path(request.repo_path)
+
         migration_id = str(uuid.uuid4())
 
         # Convert request to internal format
@@ -401,6 +410,7 @@ async def save_config(
     """Save migration config to repository directory."""
     try:
         validated_path = _validate_path(repo_path)
+        validated_source_path = _validate_path(source_repos_path)
 
         # Convert API requests to internal format
         author_map = {}
@@ -425,7 +435,7 @@ async def save_config(
 
         # Create config and save
         config = MigrationConfig(
-            source_repos_path=source_repos_path,
+            source_repos_path=str(validated_source_path),
             target_hosting_url=target_hosting_url,
             target_token=target_token,
             author_mappings=author_map,

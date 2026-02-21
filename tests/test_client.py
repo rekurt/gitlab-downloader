@@ -321,9 +321,7 @@ class TestGetAllProjects:
                 return []
             return []
 
-        with patch(
-            "gitlab_downloader.client.fetch_paginated", side_effect=fake_fetch_paginated
-        ):
+        with patch("gitlab_downloader.client.fetch_paginated", side_effect=fake_fetch_paginated):
             async with aiohttp.ClientSession() as session:
                 result = await get_all_projects(session, config, "root-group")
 
@@ -357,9 +355,7 @@ class TestGetUserProjects:
         async def fake_fetch_paginated(_session, _url, _params, _desc, _cfg):
             return projects
 
-        with patch(
-            "gitlab_downloader.client.fetch_paginated", side_effect=fake_fetch_paginated
-        ):
+        with patch("gitlab_downloader.client.fetch_paginated", side_effect=fake_fetch_paginated):
             async with aiohttp.ClientSession() as session:
                 result = await get_user_projects(session, config)
 
@@ -375,9 +371,7 @@ class TestGetUserProjects:
         async def fake_fetch_paginated(_session, _url, _params, _desc, _cfg):
             return projects
 
-        with patch(
-            "gitlab_downloader.client.fetch_paginated", side_effect=fake_fetch_paginated
-        ):
+        with patch("gitlab_downloader.client.fetch_paginated", side_effect=fake_fetch_paginated):
             async with aiohttp.ClientSession() as session:
                 result = await get_user_projects(session, config)
 

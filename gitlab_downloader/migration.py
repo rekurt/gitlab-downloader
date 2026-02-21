@@ -82,9 +82,7 @@ class MigrationExecutor:
             )
 
             if result.returncode != 0:
-                logger.error(
-                    f"Author replacement failed in {repo_path}: {result.stderr}"
-                )
+                logger.error(f"Author replacement failed in {repo_path}: {result.stderr}")
                 return False
 
             if progress_callback:
@@ -155,9 +153,7 @@ class MigrationExecutor:
             )
 
             if result.returncode != 0:
-                logger.error(
-                    f"Committer replacement failed in {repo_path}: {result.stderr}"
-                )
+                logger.error(f"Committer replacement failed in {repo_path}: {result.stderr}")
                 return False
 
             if progress_callback:
@@ -205,9 +201,7 @@ class MigrationExecutor:
             return False
 
         # Then replace committers
-        if not self.replace_committers(
-            repo_path, committer_mappings, progress_callback
-        ):
+        if not self.replace_committers(repo_path, committer_mappings, progress_callback):
             return False
 
         if progress_callback:
@@ -238,8 +232,8 @@ class MigrationExecutor:
 
             conditions.append(
                 f'[ "$GIT_AUTHOR_EMAIL" = {original_email} ] && '
-                f'export GIT_AUTHOR_NAME={new_name} && '
-                f'export GIT_AUTHOR_EMAIL={new_email}'
+                f"export GIT_AUTHOR_NAME={new_name} && "
+                f"export GIT_AUTHOR_EMAIL={new_email}"
             )
 
         script = " || ".join(conditions) if conditions else "true"
@@ -268,8 +262,8 @@ class MigrationExecutor:
 
             conditions.append(
                 f'[ "$GIT_COMMITTER_EMAIL" = {original_email} ] && '
-                f'export GIT_COMMITTER_NAME={new_name} && '
-                f'export GIT_COMMITTER_EMAIL={new_email}'
+                f"export GIT_COMMITTER_NAME={new_name} && "
+                f"export GIT_COMMITTER_EMAIL={new_email}"
             )
 
         script = " || ".join(conditions) if conditions else "true"

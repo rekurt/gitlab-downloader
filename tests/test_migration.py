@@ -539,9 +539,7 @@ class TestMigrationExecutor:
                 callback_messages.append(msg)
 
             executor = MigrationExecutor(config)
-            result = executor.migrate_repository(
-                repo_path, progress_callback=progress_callback
-            )
+            result = executor.migrate_repository(repo_path, progress_callback=progress_callback)
 
             assert result is True
             assert len(callback_messages) > 0
@@ -573,8 +571,6 @@ class TestMigrationExecutor:
 
             # Mock subprocess.run to return error
             with mock.patch("subprocess.run") as mock_run:
-                mock_run.return_value = mock.Mock(
-                    returncode=1, stderr="Some error occurred"
-                )
+                mock_run.return_value = mock.Mock(returncode=1, stderr="Some error occurred")
                 result = executor.replace_authors(repo_path)
                 assert result is False
