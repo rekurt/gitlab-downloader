@@ -97,14 +97,14 @@
 - Create: `electron/src/index.html`
 - Create: `electron/src/styles/` (CSS/styling)
 
-- [ ] Create component for displaying cloned repositories
-- [ ] Create migration wizard with step-by-step UI (select repos, map authors, confirm)
-- [ ] Create author mapper UI (interactive table/form for author replacements)
-- [ ] Create progress indicator for migration tasks
-- [ ] Create main application layout with navigation
-- [ ] Implement communication with Python backend via IPC
-- [ ] write tests for components
-- [ ] run project test suite - must pass before task 6
+- [x] Create component for displaying cloned repositories
+- [x] Create migration wizard with step-by-step UI (select repos, map authors, confirm)
+- [x] Create author mapper UI (interactive table/form for author replacements)
+- [x] Create progress indicator for migration tasks
+- [x] Create main application layout with navigation
+- [x] Implement communication with Python backend via IPC
+- [x] write tests for components
+- [x] run project test suite - must pass before task 6
 
 ### Task 6: Integrate Python backend with Electron frontend
 

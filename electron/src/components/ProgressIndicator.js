@@ -1,0 +1,132 @@
+import React, { useState, useEffect } from 'react';
+import '../styles/ProgressIndicator.css';
+
+function ProgressIndicator({
+  apiEndpoint,
+  migrationId,
+  onComplete,
+  onError,
+}) {
+  const [progress, setProgress] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isFinished, setIsFinished] = useState(false);
+
+  useEffect(() => {
+    if (!migrationId) {
+      setLoading(false);
+      return;
+    }
+
+    const pollProgress = async () => {
+      try {
+        const response = await fetch(
+          `${apiEndpoint}/api/migration-progress/${migrationId}`
+        );
+        if (!response.ok) {
+          throw new Error(`Failed to fetch progress: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        setProgress(data);
+
+        if (data.status === 'completed') {
+          setIsFinished(true);
+          setLoading(false);
+          if (onComplete) {
+            onComplete(data);
+          }
+        } else if (data.status === 'failed') {
+          setIsFinished(true);
+          setLoading(false);
+          setError(data.error || 'Migration failed');
+          if (onError) {
+            onError(data.error || 'Migration failed');
+          }
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        setError(err.message);
+        setLoading(false);
+        if (onError) {
+          onError(err.message);
+        }
+      }
+    };
+
+    const interval = setInterval(pollProgress, 1000);
+    pollProgress();
+
+    return () => clearInterval(interval);
+  }, [migrationId, apiEndpoint, onComplete, onError]);
+
+  if (!progress) {
+    return (
+      <div className="progress-container">
+        <div className="progress-loading">Loading progress...</div>
+      </div>
+    );
+  }
+
+  const statusColor = {
+    pending: '#ff9800',
+    running: '#2196f3',
+    completed: '#4caf50',
+    failed: '#f44336',
+  }[progress.status] || '#666';
+
+  return (
+    <div className="progress-container">
+      <div className="progress-header">
+        <h3>Migration Progress</h3>
+        <span className="progress-status" style={{ color: statusColor }}>
+          {progress.status.toUpperCase()}
+        </span>
+      </div>
+
+      {error && <div className="progress-error">{error}</div>}
+
+      <div className="progress-bar-container">
+        <div className="progress-bar">
+          <div
+            className="progress-fill"
+            style={{
+              width: `${progress.progress}%`,
+              backgroundColor: statusColor,
+            }}
+          />
+        </div>
+        <span className="progress-percentage">{progress.progress}%</span>
+      </div>
+
+      {progress.current_task && (
+        <div className="progress-task">
+          <span className="task-label">Current Task:</span>
+          <span className="task-name">{progress.current_task}</span>
+        </div>
+      )}
+
+      {progress.messages && progress.messages.length > 0 && (
+        <div className="progress-messages">
+          <div className="messages-label">Messages:</div>
+          <ul className="messages-list">
+            {progress.messages.map((msg, idx) => (
+              <li key={idx}>{msg}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {isFinished && (
+        <div className={`progress-finish ${progress.status}`}>
+          {progress.status === 'completed'
+            ? '✓ Migration completed successfully'
+            : '✗ Migration failed'}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default ProgressIndicator;
