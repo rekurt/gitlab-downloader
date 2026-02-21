@@ -15,7 +15,6 @@
 ## Установка
 ```bash
 python3 -m venv venv
-venv/bin/pip install -r requirements.txt
 venv/bin/pip install -e .[dev]
 ```
 
@@ -31,16 +30,17 @@ make install
 `GITLAB_GROUP` опционален: если не задан, будут загружены проекты текущего пользователя (membership).
 
 ```bash
-python fetch_repositories.py --help
-python fetch_repositories.py --url https://gitlab.com --token <token> --group <group>
-python fetch_repositories.py --url https://gitlab.com --token <token>
-python fetch_repositories.py --dry-run --url https://gitlab.com --token <token> --group <group>
-python fetch_repositories.py --update --url https://gitlab.com --token <token> --group <group>
+gitlab-dump --help
+gitlab-dump --version
+gitlab-dump --url https://gitlab.com --token <token> --group <group>
+gitlab-dump --url https://gitlab.com --token <token>
+gitlab-dump --dry-run --url https://gitlab.com --token <token> --group <group>
+gitlab-dump --update --url https://gitlab.com --token <token> --group <group>
 ```
 
 ### OAuth Device Flow
 ```bash
-python fetch_repositories.py \
+gitlab-dump \
   --url https://gitlab.com \
   --auth-method oauth \
   --oauth-client-id <client_id> \
@@ -51,7 +51,7 @@ CLI покажет ссылку и код для входа в браузере,
 ### Git Credential Helper
 Для `clone/pull` без токена в URL:
 ```bash
-python fetch_repositories.py \
+gitlab-dump \
   --url https://gitlab.com \
   --auth-method token \
   --token <token> \

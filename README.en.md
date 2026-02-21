@@ -15,7 +15,6 @@ Language: **English (additional)** | [Русский (основной)](README.
 ## Installation
 ```bash
 python3 -m venv venv
-venv/bin/pip install -r requirements.txt
 venv/bin/pip install -e .[dev]
 ```
 
@@ -31,16 +30,17 @@ You can use CLI flags or environment variables (`GITLAB_URL`, `GITLAB_TOKEN`, `G
 `GITLAB_GROUP` is optional: if omitted, the tool fetches current user's membership projects.
 
 ```bash
-python fetch_repositories.py --help
-python fetch_repositories.py --url https://gitlab.com --token <token> --group <group>
-python fetch_repositories.py --url https://gitlab.com --token <token>
-python fetch_repositories.py --dry-run --url https://gitlab.com --token <token> --group <group>
-python fetch_repositories.py --update --url https://gitlab.com --token <token> --group <group>
+gitlab-dump --help
+gitlab-dump --version
+gitlab-dump --url https://gitlab.com --token <token> --group <group>
+gitlab-dump --url https://gitlab.com --token <token>
+gitlab-dump --dry-run --url https://gitlab.com --token <token> --group <group>
+gitlab-dump --update --url https://gitlab.com --token <token> --group <group>
 ```
 
 ### OAuth Device Flow
 ```bash
-python fetch_repositories.py \
+gitlab-dump \
   --url https://gitlab.com \
   --auth-method oauth \
   --oauth-client-id <client_id> \
@@ -51,7 +51,7 @@ The CLI prints a browser URL and code, then stores access/refresh tokens in cach
 ### Git Credential Helper
 For `clone/pull` without token in URL:
 ```bash
-python fetch_repositories.py \
+gitlab-dump \
   --url https://gitlab.com \
   --auth-method token \
   --token <token> \

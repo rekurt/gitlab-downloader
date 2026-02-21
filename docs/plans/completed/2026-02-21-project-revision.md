@@ -170,6 +170,6 @@
 
 ### Task 11: Update documentation
 
-- [ ] Обновить README.md если были user-facing изменения
-- [ ] Обновить AGENTS.md (уже сделано в Task 8)
-- [ ] Переместить план в `docs/plans/completed/`
+- [x] Обновить README.md если были user-facing изменения
+- [x] Обновить AGENTS.md (уже сделано в Task 8)
+- [x] Переместить план в `docs/plans/completed/`
