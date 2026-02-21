@@ -81,9 +81,9 @@
 **Files:**
 - Modify: `gitlab_downloader/config.py`
 
-- [ ] Заменить `input()` на `getpass.getpass()` когда `secret=True` в `_prompt_text`
-- [ ] Обновить тест `test_parse_args_interactive` для mock getpass
-- [ ] Запустить тесты
+- [x] Заменить `input()` на `getpass.getpass()` когда `secret=True` в `_prompt_text`
+- [x] Обновить тест `test_parse_args_interactive` для mock getpass
+- [x] Запустить тесты
 
 ### Task 3: Устранить дублирование зависимостей
 

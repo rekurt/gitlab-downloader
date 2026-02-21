@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
 import sys
@@ -148,7 +149,9 @@ def _prompt_text(
     default_hint = f" [{current}]" if current else ""
     while True:
         raw = (
-            input(f"{label}{default_hint}: ").strip() if not secret else input(f"{label}: ").strip()
+            getpass.getpass(f"{label}: ").strip()
+            if secret
+            else input(f"{label}{default_hint}: ").strip()
         )
         if raw:
             return raw

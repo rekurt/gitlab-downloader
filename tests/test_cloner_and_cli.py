@@ -43,7 +43,6 @@ def test_parse_args_interactive(monkeypatch):
         [
             "https://gitlab.com",
             "token",
-            "token123",
             "url",
             "team/group",
             "repositories",
@@ -57,6 +56,7 @@ def test_parse_args_interactive(monkeypatch):
         ]
     )
     monkeypatch.setattr("builtins.input", lambda *_: next(answers))
+    monkeypatch.setattr("getpass.getpass", lambda *_args, **_kw: "token123")
 
     args = parse_args(["--interactive"])
 
@@ -76,7 +76,6 @@ def test_parse_args_auto_interactive_without_cli_args(monkeypatch):
         [
             "https://gitlab.com",
             "token",
-            "token123",
             "url",
             "team/group",
             "repositories",
@@ -90,6 +89,7 @@ def test_parse_args_auto_interactive_without_cli_args(monkeypatch):
         ]
     )
     monkeypatch.setattr("builtins.input", lambda *_: next(answers))
+    monkeypatch.setattr("getpass.getpass", lambda *_args, **_kw: "token123")
 
     args = parse_args([])
 
