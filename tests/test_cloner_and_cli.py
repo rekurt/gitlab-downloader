@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from gitlab_downloader.cloner import clone_repository
-from gitlab_downloader.config import parse_args
+from gitlab_downloader.config import get_version, parse_args
 from gitlab_downloader.models import GitlabConfig
 
 
@@ -36,6 +36,20 @@ def make_config(tmp_path: Path, **overrides) -> GitlabConfig:
     }
     data.update(overrides)
     return GitlabConfig(**data)
+
+
+def test_version_flag(capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        parse_args(["--version"])
+    assert exc_info.value.code == 0
+    captured = capsys.readouterr()
+    assert get_version() in captured.out
+
+
+def test_get_version_returns_string():
+    v = get_version()
+    assert isinstance(v, str)
+    assert len(v) > 0
 
 
 def test_parse_args_interactive(monkeypatch):

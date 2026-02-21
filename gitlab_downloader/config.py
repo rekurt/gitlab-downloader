@@ -5,6 +5,7 @@ import getpass
 import json
 import os
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -19,6 +20,13 @@ from .constants import (
     MIN_CONCURRENCY,
 )
 from .models import GitlabConfig
+
+
+def get_version() -> str:
+    try:
+        return version("gitlab-downloader")
+    except PackageNotFoundError:
+        return "0.0.0-dev"
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -51,6 +59,7 @@ def _cached_oauth_client_id(cache_path: str | None, gitlab_url: str | None) -> s
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Fetch and clone all projects from a GitLab group")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {get_version()}")
     parser.add_argument("--url", default=os.getenv("GITLAB_URL"))
     parser.add_argument("--token", default=os.getenv("GITLAB_TOKEN"))
     parser.add_argument("--group", default=os.getenv("GITLAB_GROUP"))

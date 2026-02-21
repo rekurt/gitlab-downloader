@@ -157,9 +157,9 @@
 - Modify: `gitlab_downloader/config.py`
 - Modify: `pyproject.toml` (если нужно для dynamic version)
 
-- [ ] Добавить `--version` аргумент в parse_args
-- [ ] Написать тест для `--version`
-- [ ] Запустить тесты
+- [x] Добавить `--version` аргумент в parse_args
+- [x] Написать тест для `--version`
+- [x] Запустить тесты
 
 ### Task 10: Verify acceptance criteria
 
