@@ -247,6 +247,143 @@ Build requirements:
 - npm or yarn
 - Python 3.10+ (for embedded Python backend)
 
+## Local Development
+
+### Development Environment Setup
+
+To develop the complete project with CLI, REST API, and Electron GUI:
+
+1. Install Python dependencies:
+```bash
+make install
+```
+
+2. Install Electron/Node.js dependencies:
+```bash
+cd electron
+npm install
+cd ..
+```
+
+### Running All Components
+
+#### Option 1: In separate terminals (recommended)
+
+Terminal 1 — Python REST API:
+```bash
+# Activate virtual environment (if needed)
+source venv/bin/activate
+
+# Run REST API on local server
+python -m gitlab_downloader.api
+```
+API will be available at: `http://localhost:5000`
+
+Terminal 2 — Electron GUI (development mode):
+```bash
+cd electron
+npm run dev
+```
+GUI will open with hot reload on code changes.
+
+Terminal 3 — Using CLI:
+```bash
+# In main project directory
+gitlab-dump --help
+gitlab-dump --url https://gitlab.com --token <token> --group my-group
+```
+
+#### Option 2: Running API in background
+
+```bash
+# Start API in background
+python -m gitlab_downloader.api &
+
+# Then in same terminal run GUI
+cd electron
+npm run dev
+
+# Or use CLI
+gitlab-dump --url https://gitlab.com --token <token> --group my-group
+```
+
+### Code Quality and Tests
+
+Run linter:
+```bash
+make lint
+```
+
+Format code:
+```bash
+make format
+```
+
+Run tests:
+```bash
+make test
+```
+
+Check test coverage:
+```bash
+make coverage
+```
+
+### Typical Developer Workflow
+
+1. Create a new branch for your feature:
+```bash
+git checkout -b feature/my-feature
+```
+
+2. Install dependencies:
+```bash
+make install
+cd electron && npm install && cd ..
+```
+
+3. Run components (in separate terminals):
+   - REST API: `python -m gitlab_downloader.api`
+   - GUI: `cd electron && npm run dev`
+   - CLI: `gitlab-dump ...` with needed parameters
+
+4. Make code changes and verify them:
+```bash
+make lint      # check syntax
+make format    # format code
+make test      # run tests
+```
+
+5. Create a commit:
+```bash
+git add .
+git commit -m "feat: description of changes"
+```
+
+6. Create Pull Request and wait for approval.
+
+### Troubleshooting
+
+**API fails to start**
+- Ensure Python 3.10+ is installed: `python --version`
+- Check that virtual environment is activated
+- Verify dependencies are installed: `make install`
+
+**GUI fails to start**
+- Ensure Node.js 16+ is installed: `node --version`
+- Check npm dependencies are installed: `cd electron && npm install`
+- Clear npm cache: `npm cache clean --force`
+- Delete node_modules and reinstall: `rm -rf node_modules && npm install`
+
+**CLI commands not working**
+- Ensure package is installed in development mode: `pip install -e .[dev]`
+- Check that virtual environment is activated
+- Use `python -m gitlab_downloader.cli --help` for help
+
+**Git credentials issues during testing**
+- Use real credentials only for local testing
+- Use environment variables instead of explicit token passing for CI/CD
+
 ## Docker
 ```bash
 docker build -t fetch-repositories .

@@ -247,6 +247,143 @@ npm run dist-linux    # для Linux
 - npm или yarn
 - Python 3.10+ (для встроенного Python бекенда)
 
+## Локальная разработка
+
+### Настройка среды разработки
+
+Для полной разработки проекта с CLI, REST API и Electron GUI необходимо:
+
+1. Установить зависимости Python:
+```bash
+make install
+```
+
+2. Установить зависимости Electron/Node.js:
+```bash
+cd electron
+npm install
+cd ..
+```
+
+### Запуск всех компонентов
+
+#### Вариант 1: В отдельных терминалах (рекомендуется)
+
+Терминал 1 — Python REST API:
+```bash
+# Активировать виртуальное окружение (если необходимо)
+source venv/bin/activate
+
+# Запустить REST API на локальном сервере
+python -m gitlab_downloader.api
+```
+API будет доступна по адресу: `http://localhost:5000`
+
+Терминал 2 — Electron GUI (в режиме разработки):
+```bash
+cd electron
+npm run dev
+```
+GUI будет открыта с горячей перезагрузкой при изменении кода.
+
+Терминал 3 — Использование CLI:
+```bash
+# В основной директории проекта
+gitlab-dump --help
+gitlab-dump --url https://gitlab.com --token <token> --group my-group
+```
+
+#### Вариант 2: Запуск API в фоне
+
+```bash
+# Запустить API в фоне
+python -m gitlab_downloader.api &
+
+# Затем в том же терминале запустить GUI
+cd electron
+npm run dev
+
+# Или использовать CLI
+gitlab-dump --url https://gitlab.com --token <token> --group my-group
+```
+
+### Проверка кода и тесты
+
+Запуск линтера:
+```bash
+make lint
+```
+
+Форматирование кода:
+```bash
+make format
+```
+
+Запуск тестов:
+```bash
+make test
+```
+
+Проверка покрытия кода тестами:
+```bash
+make coverage
+```
+
+### Общий рабочий процесс разработчика
+
+1. Создать новую ветку для фичи:
+```bash
+git checkout -b feature/my-feature
+```
+
+2. Установить зависимости:
+```bash
+make install
+cd electron && npm install && cd ..
+```
+
+3. Запустить компоненты (в отдельных терминалах):
+   - REST API: `python -m gitlab_downloader.api`
+   - GUI: `cd electron && npm run dev`
+   - CLI: `gitlab-dump ...` с нужными параметрами
+
+4. Внести изменения в код и проверить их:
+```bash
+make lint      # проверить синтаксис
+make format    # форматировать код
+make test      # запустить тесты
+```
+
+5. Создать коммит:
+```bash
+git add .
+git commit -m "feat: описание изменения"
+```
+
+6. Создать Pull Request и дождаться approval.
+
+### Troubleshooting
+
+**API не запускается**
+- Убедитесь, что Python 3.10+ установлен: `python --version`
+- Проверьте, что виртуальное окружение активировано
+- Проверьте, что зависимости установлены: `make install`
+
+**GUI не запускается**
+- Убедитесь, что Node.js 16+ установлен: `node --version`
+- Проверьте, что npm зависимости установлены: `cd electron && npm install`
+- Очистите кэш npm: `npm cache clean --force`
+- Удалите `node_modules` и переустановите: `rm -rf node_modules && npm install`
+
+**CLI команды не работают**
+- Убедитесь, что пакет установлен в режиме разработки: `pip install -e .[dev]`
+- Проверьте, что виртуальное окружение активировано
+- Используйте `python -m gitlab_downloader.cli --help` для справки
+
+**Проблемы с Git credentials при тестировании**
+- Используйте реальные учётные данные только при локальном тестировании
+- Для CI/CD используйте переменные окружения вместо явной передачи токенов
+
 ## Docker
 ```bash
 docker build -t fetch-repositories .

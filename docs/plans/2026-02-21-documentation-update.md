@@ -94,11 +94,11 @@ CLAUDE.md с информацией о проекте для агентов.
 **Files:**
 - Modify: `README.MD`, `README.en.md`
 
-- [ ] Add "Локальная разработка" (Local Development) section in Russian README
-- [ ] Include guide for running CLI, GUI, and API together during development
-- [ ] Add instructions for running tests and code quality checks
-- [ ] Mirror section in English README with "Local Development" title
-- [ ] Include typical developer workflow steps
+- [x] Add "Локальная разработка" (Local Development) section in Russian README
+- [x] Include guide for running CLI, GUI, and API together during development
+- [x] Add instructions for running tests and code quality checks
+- [x] Mirror section in English README with "Local Development" title
+- [x] Include typical developer workflow steps
 
 ### Task 8: Create or update CLAUDE.md with project information
 
