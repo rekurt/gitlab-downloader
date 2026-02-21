@@ -38,6 +38,9 @@ _migration_tasks: dict[str, dict[str, Any]] = {}
 _migration_tasks_lock = asyncio.Lock()
 _MIGRATION_TASK_TTL = 3600  # Clean up tasks older than 1 hour
 
+# Lock for author/committer mappings file access to prevent race conditions
+_author_mappings_lock = asyncio.Lock()
+
 
 async def _cleanup_old_migrations() -> None:
     """Remove migration tasks older than TTL that are not still running."""
@@ -101,29 +104,63 @@ def _sanitize_repo_url(url: str) -> str:
         url: URL that may contain embedded credentials
 
     Returns:
-        URL with credentials removed
+        URL with credentials removed or empty string if credentials detected
     """
     if not url:
         return ""
+
+    url = url.strip()
 
     from urllib.parse import urlparse, urlunparse
 
     try:
         parsed = urlparse(url)
-        # Handle SSH URLs (git@host:path) - no hostname in urlparse
-        if not parsed.hostname:
-            # For SSH URLs like git@gitlab.com:group/repo.git, return as-is
-            # SSH URLs don't contain embedded credentials in the URL structure
-            return url.strip()
+        # If urlparse recognized a hostname, this is HTTP(S) or similar
+        if parsed.hostname:
+            # Remove userinfo (username:password or oauth2:token) from HTTP(S) URLs
+            netloc = parsed.hostname
+            if parsed.port:
+                netloc = f"{netloc}:{parsed.port}"
+            sanitized = urlunparse(
+                (parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
+            )
+            return sanitized
 
-        # Remove userinfo (username:password or oauth2:token) from HTTP(S) URLs
-        netloc = parsed.hostname
-        if parsed.port:
-            netloc = f"{netloc}:{parsed.port}"
-        sanitized = urlunparse(
-            (parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
-        )
-        return sanitized
+        # No recognized hostname. This might be an SSH URL or something else.
+        # SSH URLs like git@host:path or user@host:path don't have :// and urlparse won't
+        # recognize them as URLs. We need to validate them carefully to avoid credential leakage.
+        if "@" not in url:
+            # No @ - just a plain path, safe to return
+            return url
+
+        # URL contains @ but no recognized scheme. Validate it's a legitimate SSH URL.
+        at_idx = url.find("@")
+        before_at = url[:at_idx]
+        after_at = url[at_idx + 1 :]
+
+        # The part before @ should look like a username, not credentials like user:password
+        # or oauth2:token. If it contains :, it's likely a credential pattern, not SSH user
+        if ":" in before_at:
+            logger.warning("Rejected URL with credential-like pattern before @")
+            return ""
+
+        # After @, we expect host:path pattern. If there's no :, it's not SSH format
+        if ":" not in after_at:
+            logger.warning("Rejected URL without colon after @ (not SSH format)")
+            return ""
+
+        # Check that the host part (before first :) looks valid
+        colon_idx = after_at.find(":")
+        host_part = after_at[:colon_idx]
+
+        # Host should not contain / which would indicate this is not SSH but something else
+        if "/" in host_part:
+            logger.warning("Rejected URL with invalid host pattern (contains /)")
+            return ""
+
+        # Looks like valid SSH URL (user@host:path)
+        return url
+
     except Exception as e:
         logger.warning(f"Could not sanitize URL: {e}")
 
@@ -194,27 +231,30 @@ async def list_repositories(clone_path: str = ".") -> RepositoriesListResponse:
 async def get_author_mappings(config_path: str = ".") -> dict[str, AuthorMappingRequest]:
     """Get saved author mappings from disk."""
     try:
-        validated_path = _validate_path(config_path)
-        config_file = validated_path / "migration_config.json"
-        if not config_file.exists():
-            config_file = validated_path / "migration_config.yaml"
+        async with _author_mappings_lock:
+            validated_path = _validate_path(config_path)
+            config_file = validated_path / "migration_config.json"
+            if not config_file.exists():
+                config_file = validated_path / "migration_config.yaml"
+            if not config_file.exists():
+                config_file = validated_path / "migration_config.yml"
 
-        if not config_file.exists():
-            return {}
+            if not config_file.exists():
+                return {}
 
-        mapper = AuthorMapper(str(config_file))
-        author_mappings, _ = mapper.load_mappings()
+            mapper = AuthorMapper(str(config_file))
+            author_mappings, _ = mapper.load_mappings()
 
-        # Convert to API response format
-        result = {}
-        for key, mapping in author_mappings.items():
-            result[key] = AuthorMappingRequest(
-                original_name=mapping.original_name,
-                original_email=mapping.original_email,
-                new_name=mapping.new_name,
-                new_email=mapping.new_email,
-            )
-        return result
+            # Convert to API response format
+            result = {}
+            for key, mapping in author_mappings.items():
+                result[key] = AuthorMappingRequest(
+                    original_name=mapping.original_name,
+                    original_email=mapping.original_email,
+                    new_name=mapping.new_name,
+                    new_email=mapping.new_email,
+                )
+            return result
     except ValueError as e:
         logger.error(f"Error reading author mappings: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -227,36 +267,57 @@ async def get_author_mappings(config_path: str = ".") -> dict[str, AuthorMapping
 async def save_author_mappings(
     request: AuthorMappingsSaveRequest, config_path: str = "."
 ) -> dict[str, str]:
-    """Save author and committer mappings to disk."""
+    """Save author and committer mappings to disk.
+
+    Replaces all mappings with the provided ones. To delete a mapping, simply omit it
+    from the request. This allows the UI to support add, edit, and delete operations.
+    """
     try:
-        validated_path = _validate_path(config_path)
-        config_file = validated_path / "migration_config.json"
+        async with _author_mappings_lock:
+            validated_path = _validate_path(config_path)
 
-        mapper = AuthorMapper(str(config_file))
+            # Determine which config file format to use
+            json_file = validated_path / "migration_config.json"
+            yaml_file = validated_path / "migration_config.yaml"
+            yml_file = validated_path / "migration_config.yml"
 
-        # Convert from API format to internal format
-        author_mappings = {
-            key: AuthorMapping(
-                original_name=req.original_name,
-                original_email=req.original_email,
-                new_name=req.new_name,
-                new_email=req.new_email,
-            )
-            for key, req in request.author_mappings.items()
-        }
+            config_file = None
+            if json_file.exists():
+                config_file = json_file
+            elif yaml_file.exists():
+                config_file = yaml_file
+            elif yml_file.exists():
+                config_file = yml_file
+            else:
+                # Default to JSON for new files
+                config_file = json_file
 
-        committer_mappings = {
-            key: CommitterMapping(
-                original_name=req.original_name,
-                original_email=req.original_email,
-                new_name=req.new_name,
-                new_email=req.new_email,
-            )
-            for key, req in request.committer_mappings.items()
-        }
+            mapper = AuthorMapper(str(config_file))
 
-        mapper.save_mappings(author_mappings, committer_mappings)
-        return {"status": "saved"}
+            # Convert from API format to internal format
+            author_mappings = {
+                key: AuthorMapping(
+                    original_name=req.original_name,
+                    original_email=req.original_email,
+                    new_name=req.new_name,
+                    new_email=req.new_email,
+                )
+                for key, req in request.author_mappings.items()
+            }
+
+            committer_mappings = {
+                key: CommitterMapping(
+                    original_name=req.original_name,
+                    original_email=req.original_email,
+                    new_name=req.new_name,
+                    new_email=req.new_email,
+                )
+                for key, req in request.committer_mappings.items()
+            }
+
+            # Replace all mappings (not merge) to support deletion
+            mapper.save_mappings(author_mappings, committer_mappings)
+            return {"status": "saved"}
     except ValueError as e:
         logger.error(f"Error saving author mappings: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e

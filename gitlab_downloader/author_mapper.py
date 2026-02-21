@@ -60,11 +60,17 @@ class AuthorMapper:
         author_mappings: dict[str, AuthorMapping],
         committer_mappings: dict[str, CommitterMapping],
     ) -> None:
-        """Save author and committer mappings to config file.
+        """Save author and committer mappings while preserving migration config.
+
+        If the config file exists, preserves required migration fields.
+        If the file doesn't exist, creates it with only the mappings.
 
         Args:
             author_mappings: Dictionary of author mappings
             committer_mappings: Dictionary of committer mappings
+
+        Raises:
+            ValueError: If config format is invalid
         """
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -72,6 +78,25 @@ class AuthorMapper:
             "author_mappings": self._serialize_mappings(author_mappings),
             "committer_mappings": self._serialize_mappings(committer_mappings),
         }
+
+        # If file exists, preserve required migration fields
+        if self.config_path.exists():
+            file_content = self.config_path.read_text()
+            if self.config_path.suffix in {".yaml", ".yml"}:
+                existing_data = yaml.safe_load(file_content)
+            elif self.config_path.suffix == ".json":
+                existing_data = json.loads(file_content)
+            else:
+                raise ValueError(f"Unsupported file format: {self.config_path.suffix}")
+
+            if not isinstance(existing_data, dict):
+                raise ValueError("Config must be a dictionary")
+
+            # Preserve required migration fields if they exist
+            required_fields = {"source_repos_path", "target_hosting_url", "target_token"}
+            for field in required_fields:
+                if field in existing_data:
+                    data[field] = existing_data[field]
 
         if self.config_path.suffix in {".yaml", ".yml"}:
             with self.config_path.open("w") as f:

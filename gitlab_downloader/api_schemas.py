@@ -39,12 +39,8 @@ class AuthorMappingRequest(BaseModel):
     original_email: str = Field(
         ..., min_length=1, max_length=512, description="Original author email"
     )
-    new_name: str = Field(
-        ..., min_length=1, max_length=512, description="New author name"
-    )
-    new_email: str = Field(
-        ..., min_length=1, max_length=512, description="New author email"
-    )
+    new_name: str = Field(..., min_length=1, max_length=512, description="New author name")
+    new_email: str = Field(..., min_length=1, max_length=512, description="New author email")
 
 
 class CommitterMappingRequest(BaseModel):
@@ -56,12 +52,8 @@ class CommitterMappingRequest(BaseModel):
     original_email: str = Field(
         ..., min_length=1, max_length=512, description="Original committer email"
     )
-    new_name: str = Field(
-        ..., min_length=1, max_length=512, description="New committer name"
-    )
-    new_email: str = Field(
-        ..., min_length=1, max_length=512, description="New committer email"
-    )
+    new_name: str = Field(..., min_length=1, max_length=512, description="New committer name")
+    new_email: str = Field(..., min_length=1, max_length=512, description="New committer email")
 
 
 class AuthorMappingsSaveRequest(BaseModel):
@@ -136,9 +128,7 @@ class ConfigSaveRequest(BaseModel):
     committer_mappings: dict[str, CommitterMappingRequest] = Field(
         default_factory=dict, description="Committer mapping rules"
     )
-    format: Literal["json", "yaml"] = Field(
-        default="json", description="Config file format"
-    )
+    format: Literal["json", "yaml"] = Field(default="json", description="Config file format")
 
 
 class ConfigGetResponse(BaseModel):
