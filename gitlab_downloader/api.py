@@ -60,3 +60,14 @@ def run_api_server(host: str = "127.0.0.1", port: int = 8000) -> None:
 
     app = create_app()
     uvicorn.run(app, host=host, port=port, log_level="info")
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="GitLab Dump API Server")
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
+    parser.add_argument("--port", type=int, default=5000, help="Port to bind to")
+    args = parser.parse_args()
+
+    run_api_server(host=args.host, port=args.port)

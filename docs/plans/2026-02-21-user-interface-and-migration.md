@@ -79,13 +79,13 @@
 - Create: `electron/preload.js` (IPC bridge for security)
 - Create: `electron/src/` (frontend source directory)
 
-- [ ] Initialize Electron project structure
-- [ ] Configure main.js to launch Python API backend on app start
-- [ ] Set up preload.js for safe IPC communication between Electron and Python
-- [ ] Configure webpack/vite for bundling frontend code
-- [ ] Set up environment configuration for dev/prod
-- [ ] write tests for Electron main process
-- [ ] run project test suite - must pass before task 5
+- [x] Initialize Electron project structure
+- [x] Configure main.js to launch Python API backend on app start
+- [x] Set up preload.js for safe IPC communication between Electron and Python
+- [x] Configure webpack/vite for bundling frontend code
+- [x] Set up environment configuration for dev/prod
+- [x] write tests for Electron main process
+- [x] run project test suite - must pass before task 5
 
 ### Task 5: Create Electron frontend components
 
