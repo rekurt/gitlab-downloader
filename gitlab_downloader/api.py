@@ -3,11 +3,19 @@
 from __future__ import annotations
 
 import logging
+import signal
+import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api_routes import router
+
+# Configure logging for API server
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +67,23 @@ def run_api_server(host: str = "127.0.0.1", port: int = 8000) -> None:
     import uvicorn
 
     app = create_app()
-    uvicorn.run(app, host=host, port=port, log_level="info")
+
+    # Set up signal handlers for graceful shutdown
+    def signal_handler(sig: int, frame: object) -> None:
+        """Handle shutdown signals."""
+        logger.info(f"Received signal {sig}, shutting down...")
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
+    logger.info(f"Starting API server on {host}:{port}")
+    try:
+        uvicorn.run(app, host=host, port=port, log_level="info")
+    except KeyboardInterrupt:
+        logger.info("Server interrupted by user")
+    except Exception as e:  # pylint: disable=broad-except
+        logger.error(f"Server error: {e}", exc_info=True)
 
 
 if __name__ == "__main__":

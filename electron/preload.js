@@ -16,6 +16,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkApiStatus: () => ipcRenderer.invoke('check-api-status'),
 
   /**
+   * Request graceful shutdown
+   */
+  requestShutdown: () => ipcRenderer.invoke('request-shutdown'),
+
+  /**
+   * Get backend process status
+   */
+  getBackendStatus: () => ipcRenderer.invoke('get-backend-status'),
+
+  /**
    * Send a message to the main process
    */
   send: (channel, args) => {

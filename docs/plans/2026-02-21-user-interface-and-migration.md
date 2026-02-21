@@ -113,13 +113,13 @@
 - Modify: `gitlab_downloader/api.py` (add shutdown handling)
 - Create: `electron/src/services/api.js` (Electron-side API client)
 
-- [ ] Implement process spawning of Python backend from Electron main
-- [ ] Set up IPC bridge for frontend-to-backend communication
-- [ ] Create API client service in Electron for calling Python endpoints
-- [ ] Handle backend process lifecycle (start, stop, error handling)
-- [ ] Configure proper logging and error reporting
-- [ ] write integration tests for backend-frontend communication
-- [ ] run project test suite - must pass before task 7
+- [x] Implement process spawning of Python backend from Electron main
+- [x] Set up IPC bridge for frontend-to-backend communication
+- [x] Create API client service in Electron for calling Python endpoints
+- [x] Handle backend process lifecycle (start, stop, error handling)
+- [x] Configure proper logging and error reporting
+- [x] write integration tests for backend-frontend communication
+- [x] run project test suite - must pass before task 7
 
 ### Task 7: Add migration configuration file support
 

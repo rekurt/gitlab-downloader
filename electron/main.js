@@ -41,6 +41,28 @@ function getPythonExecutablePath() {
 }
 
 /**
+ * Wait for API to be ready with health checks
+ */
+async function waitForApiReady(maxRetries = 10) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(
+        `http://${API_HOST}:${API_PORT}/api/status`,
+        { timeout: 1000 }
+      );
+      if (response.ok) {
+        console.log('API backend is ready');
+        return true;
+      }
+    } catch {
+      // API not ready yet
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+  throw new Error('API backend failed to start within timeout');
+}
+
+/**
  * Start the Python API backend process
  */
 async function startPythonBackend() {
@@ -50,9 +72,13 @@ async function startPythonBackend() {
 
       // Check if Python executable exists
       if (!fs.existsSync(pythonPath)) {
-        reject(new Error(`Python executable not found at ${pythonPath}`));
+        const error = new Error(`Python executable not found at ${pythonPath}`);
+        console.error(error.message);
+        reject(error);
         return;
       }
+
+      console.log(`Starting Python backend with: ${pythonPath}`);
 
       // Start the Python API server
       apiProcess = spawn(pythonPath, [
@@ -61,28 +87,44 @@ async function startPythonBackend() {
         '--port', API_PORT.toString(),
       ]);
 
-      // Log stdout and stderr
-      apiProcess.stdout?.on('data', (data) => {
-        console.log(`[Python Backend] ${data}`);
-      });
-
-      apiProcess.stderr?.on('data', (data) => {
-        console.error(`[Python Backend Error] ${data}`);
-      });
-
+      // Set up process error handler first
       apiProcess.on('error', (err) => {
         console.error('Failed to start Python backend:', err);
         reject(err);
       });
 
-      apiProcess.on('exit', (code) => {
-        console.log(`Python backend exited with code ${code}`);
+      // Log stdout and stderr
+      if (apiProcess.stdout) {
+        apiProcess.stdout.on('data', (data) => {
+          console.log(`[Python Backend] ${data.toString().trim()}`);
+        });
+      }
+
+      if (apiProcess.stderr) {
+        apiProcess.stderr.on('data', (data) => {
+          console.error(`[Python Backend Error] ${data.toString().trim()}`);
+        });
+      }
+
+      // Handle process exit
+      apiProcess.on('exit', (code, signal) => {
+        if (code === 0 || code === null) {
+          console.log(`Python backend exited normally (signal: ${signal})`);
+        } else {
+          console.error(
+            `Python backend exited with code ${code} (signal: ${signal})`
+          );
+        }
       });
 
-      // Give the process a moment to start, then resolve
-      setTimeout(() => {
-        resolve(true);
-      }, 2000);
+      // Wait for API to be ready
+      waitForApiReady()
+        .then(() => {
+          resolve(true);
+        })
+        .catch((err) => {
+          reject(err);
+        });
     } catch (err) {
       reject(err);
     }
@@ -179,17 +221,43 @@ function createMenu() {
 function setupIpcHandlers() {
   // Get API endpoint
   ipcMain.handle('get-api-endpoint', () => {
+    console.log('get-api-endpoint request');
     return `http://${API_HOST}:${API_PORT}`;
   });
 
   // Check API status
   ipcMain.handle('check-api-status', async () => {
     try {
-      const response = await fetch(`http://${API_HOST}:${API_PORT}/api/status`);
-      return response.ok;
-    } catch {
+      const response = await fetch(
+        `http://${API_HOST}:${API_PORT}/api/status`,
+        { timeout: 5000 }
+      );
+      const isOk = response.ok;
+      console.log(`check-api-status: ${isOk}`);
+      return isOk;
+    } catch (err) {
+      console.error('check-api-status failed:', err);
       return false;
     }
+  });
+
+  // Request graceful shutdown
+  ipcMain.handle('request-shutdown', async () => {
+    console.log('Shutdown requested from renderer');
+    stopPythonBackend();
+    app.quit();
+    return { success: true };
+  });
+
+  // Get backend status
+  ipcMain.handle('get-backend-status', () => {
+    const status = {
+      running: apiProcess !== null && !apiProcess.killed,
+      pid: apiProcess?.pid || null,
+      host: API_HOST,
+      port: API_PORT,
+    };
+    return status;
   });
 }
 
