@@ -43,8 +43,5 @@ warn_redundant_casts = true
 warn_unused_configs = true
 packages = ["gitlab_downloader"]
 
-[tool.setuptools]
-py-modules = ["fetch_repositories"]
-
 [tool.setuptools.packages.find]
 include = ["gitlab_downloader*"]

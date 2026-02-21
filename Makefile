@@ -21,7 +21,6 @@ interactive:
 venv:
 	@[ -d $(VENV_PATH) ] || python3 -m venv $(VENV_PATH)
 	@$(VENV_PATH)/bin/pip install --upgrade pip
-	@$(VENV_PATH)/bin/pip install --no-cache-dir -r requirements.txt
 	@$(VENV_PATH)/bin/pip install --no-cache-dir -e .[dev]
 
 install: venv

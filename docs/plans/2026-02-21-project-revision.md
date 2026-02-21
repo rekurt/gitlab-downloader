@@ -92,11 +92,11 @@
 - Modify: `Makefile`
 - Remove: `requirements.txt` (опционально, или оставить как `pip install -e .` wrapper)
 
-- [ ] Обновить Dockerfile для использования `pip install .` вместо `requirements.txt`
-- [ ] Убрать `py-modules = ["fetch_repositories"]` из pyproject.toml
-- [ ] Обновить Makefile если нужно
-- [ ] Проверить что Docker build работает (dry-run Dockerfile review)
-- [ ] Запустить тесты
+- [x] Обновить Dockerfile для использования `pip install .` вместо `requirements.txt`
+- [x] Убрать `py-modules = ["fetch_repositories"]` из pyproject.toml
+- [x] Обновить Makefile если нужно
+- [x] Проверить что Docker build работает (dry-run Dockerfile review)
+- [x] Запустить тесты
 
 ### Task 4: Добавить тесты для client.py
 
