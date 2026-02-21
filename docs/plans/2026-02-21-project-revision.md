@@ -125,10 +125,10 @@
 **Files:**
 - Create: `tests/test_reporting.py`
 
-- [ ] Написать тесты для `print_summary` (с failed, без failed)
-- [ ] Написать тесты для `write_json_report` (проверить JSON структуру)
-- [ ] Написать тесты для `print_dry_run`
-- [ ] Запустить тесты
+- [x] Написать тесты для `print_summary` (с failed, без failed)
+- [x] Написать тесты для `write_json_report` (проверить JSON структуру)
+- [x] Написать тесты для `print_dry_run`
+- [x] Запустить тесты
 
 ### Task 7: Типизировать CloneResult.status через Literal
 
