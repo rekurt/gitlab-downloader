@@ -105,16 +105,16 @@ CLAUDE.md с информацией о проекте для агентов.
 **Files:**
 - Create/Modify: `CLAUDE.md`
 
-- [ ] Add project overview and purpose
-- [ ] Document project structure and key directories
-- [ ] Add information about CLI, REST API, and Electron GUI components
-- [ ] Include key technologies and frameworks used
-- [ ] Document configuration files and their purpose
-- [ ] Add guidelines for code style and conventions
-- [ ] Include information about running tests and building binaries
-- [ ] Document the REST API endpoints for agent interaction
-- [ ] Add important patterns and architectural decisions
-- [ ] Include troubleshooting section for common development issues
+- [x] Add project overview and purpose
+- [x] Document project structure and key directories
+- [x] Add information about CLI, REST API, and Electron GUI components
+- [x] Include key technologies and frameworks used
+- [x] Document configuration files and their purpose
+- [x] Add guidelines for code style and conventions
+- [x] Include information about running tests and building binaries
+- [x] Document the REST API endpoints for agent interaction
+- [x] Add important patterns and architectural decisions
+- [x] Include troubleshooting section for common development issues
 
 ### Task 9: Verify all documentation updates
 
