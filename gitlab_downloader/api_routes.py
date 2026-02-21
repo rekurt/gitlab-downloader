@@ -14,11 +14,16 @@ from fastapi import APIRouter, HTTPException
 from .api_schemas import (
     AuthorMappingRequest,
     AuthorMappingsSaveRequest,
+    CommitterMappingRequest,
+    ConfigContentResponse,
+    ConfigGetResponse,
     ConfigSaveRequest,
     MigrationProgressResponse,
     MigrationStartRequest,
+    MigrationStartResponse,
     RepositoriesListResponse,
     RepositoryInfo,
+    SaveResponse,
     StatusResponse,
 )
 from .author_mapper import AuthorMapper
@@ -224,10 +229,10 @@ async def list_repositories(clone_path: str = ".") -> RepositoriesListResponse:
 
     except Exception as e:
         logger.error(f"Error listing repositories: {e}")
-        raise HTTPException(status_code=500, detail=f"Error listing repositories: {e}") from e
+        raise HTTPException(status_code=500, detail="Error listing repositories") from e
 
 
-@router.get("/author-mappings")
+@router.get("/author-mappings", response_model=dict[str, AuthorMappingRequest])
 async def get_author_mappings(config_path: str = ".") -> dict[str, AuthorMappingRequest]:
     """Get saved author mappings from disk."""
     try:
@@ -260,13 +265,13 @@ async def get_author_mappings(config_path: str = ".") -> dict[str, AuthorMapping
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error reading author mappings: {e}")
-        raise HTTPException(status_code=500, detail=f"Error reading author mappings: {e}") from e
+        raise HTTPException(status_code=500, detail="Error reading author mappings") from e
 
 
-@router.post("/author-mappings")
+@router.post("/author-mappings", response_model=SaveResponse)
 async def save_author_mappings(
     request: AuthorMappingsSaveRequest, config_path: str = "."
-) -> dict[str, str]:
+) -> SaveResponse:
     """Save author and committer mappings to disk.
 
     Replaces all mappings with the provided ones. To delete a mapping, simply omit it
@@ -331,17 +336,17 @@ async def save_author_mappings(
             # Replace all mappings (not merge) to support deletion
             mapper.save_mappings(author_mappings, committer_mappings)
 
-            return {"status": "saved"}
+            return SaveResponse(status="saved")
     except ValueError as e:
         logger.error(f"Error saving author mappings: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error saving author mappings: {e}")
-        raise HTTPException(status_code=500, detail=f"Error saving mappings: {e}") from e
+        raise HTTPException(status_code=500, detail="Error saving mappings") from e
 
 
-@router.post("/migrate")
-async def start_migration(request: MigrationStartRequest) -> dict[str, str]:
+@router.post("/migrate", response_model=MigrationStartResponse)
+async def start_migration(request: MigrationStartRequest) -> MigrationStartResponse:
     """Start a migration task for a repository."""
     try:
         # Validate repo path
@@ -391,10 +396,10 @@ async def start_migration(request: MigrationStartRequest) -> dict[str, str]:
             )
         )
 
-        return {"migration_id": migration_id}
+        return MigrationStartResponse(migration_id=migration_id)
     except Exception as e:
         logger.error(f"Error starting migration: {e}")
-        raise HTTPException(status_code=500, detail=f"Error starting migration: {e}") from e
+        raise HTTPException(status_code=500, detail="Error starting migration") from e
 
 
 async def _run_migration(
@@ -414,14 +419,15 @@ async def _run_migration(
             task_info["status"] = "running"
             task_info["progress"] = 25
 
-        # Closure to safely update progress in thread
+        # Closure to safely update progress in thread using a thread-safe queue
         updates_queue: list[str] = []
 
         def progress_callback(msg: str) -> None:
-            if task_info:
-                updates_queue.append(msg)
+            # Append to queue safely - this runs in thread
+            updates_queue.append(msg)
 
-        # Create migration config
+        # Create migration config - note: empty strings for target_hosting_url and target_token
+        # are used because this is for repository author mapping, not migration to new server
         config = MigrationConfig(
             source_repos_path=repo_path,
             target_hosting_url="",
@@ -446,8 +452,9 @@ async def _run_migration(
             progress_callback,
         )
 
-        # Process queued updates
+        # Process queued updates - re-acquire lock before accessing task_info
         async with _migration_tasks_lock:
+            task_info = _migration_tasks.get(migration_id)
             if task_info:
                 for msg in updates_queue:
                     task_info["messages"].append(msg)
@@ -488,52 +495,50 @@ async def get_migration_progress(migration_id: str) -> MigrationProgressResponse
         )
 
 
-@router.get("/config")
-async def get_config(repo_path: str) -> dict[str, Any]:
+@router.get("/config", response_model=ConfigGetResponse)
+async def get_config(repo_path: str) -> ConfigGetResponse:
     """Get migration config from repository directory."""
     try:
         async with _config_file_lock:
             validated_path = _validate_path(repo_path)
             config = ConfigFileManager.load_config(str(validated_path))
             if not config:
-                return {"found": False, "config": None}
+                return ConfigGetResponse(found=False, config=None)
 
-            return {
-                "found": True,
-                "config": {
-                    "source_repos_path": config.source_repos_path,
-                    "target_hosting_url": config.target_hosting_url,
-                    # NOTE: target_token is never returned for security reasons
-                    "author_mappings": {
-                        key: {
-                            "original_name": mapping.original_name,
-                            "original_email": mapping.original_email,
-                            "new_name": mapping.new_name,
-                            "new_email": mapping.new_email,
-                        }
-                        for key, mapping in config.author_mappings.items()
-                    },
-                    "committer_mappings": {
-                        key: {
-                            "original_name": mapping.original_name,
-                            "original_email": mapping.original_email,
-                            "new_name": mapping.new_name,
-                            "new_email": mapping.new_email,
-                        }
-                        for key, mapping in config.committer_mappings.items()
-                    },
+            config_content = ConfigContentResponse(
+                source_repos_path=config.source_repos_path,
+                target_hosting_url=config.target_hosting_url,
+                # NOTE: target_token is never returned for security reasons
+                author_mappings={
+                    key: AuthorMappingRequest(
+                        original_name=mapping.original_name,
+                        original_email=mapping.original_email,
+                        new_name=mapping.new_name,
+                        new_email=mapping.new_email,
+                    )
+                    for key, mapping in config.author_mappings.items()
                 },
-            }
+                committer_mappings={
+                    key: CommitterMappingRequest(
+                        original_name=mapping.original_name,
+                        original_email=mapping.original_email,
+                        new_name=mapping.new_name,
+                        new_email=mapping.new_email,
+                    )
+                    for key, mapping in config.committer_mappings.items()
+                },
+            )
+            return ConfigGetResponse(found=True, config=config_content)
     except ValueError as e:
         logger.error(f"Error reading config: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error reading config: {e}")
-        raise HTTPException(status_code=500, detail=f"Error reading config: {e}") from e
+        raise HTTPException(status_code=500, detail="Error reading config") from e
 
 
-@router.post("/config")
-async def save_config(request: ConfigSaveRequest) -> dict[str, str]:
+@router.post("/config", response_model=SaveResponse)
+async def save_config(request: ConfigSaveRequest) -> SaveResponse:
     """Save migration config to repository directory."""
     try:
         async with _config_file_lock:
@@ -569,10 +574,10 @@ async def save_config(request: ConfigSaveRequest) -> dict[str, str]:
             )
 
             ConfigFileManager.save_config(str(validated_path), config, format=request.format)
-            return {"status": "saved"}
+            return SaveResponse(status="saved")
     except ValueError as e:
         logger.error(f"Error saving config: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error saving config: {e}")
-        raise HTTPException(status_code=500, detail=f"Error saving config: {e}") from e
+        raise HTTPException(status_code=500, detail="Error saving config") from e

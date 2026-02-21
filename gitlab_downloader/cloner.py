@@ -41,6 +41,11 @@ async def run_git_command(
 async def _ensure_credentials_in_helper(repo_url: str, token: str | None) -> None:
     if not token:
         raise RuntimeError("Token is required for git credential helper mode")
+
+    # Validate token format - should not contain newlines which could cause injection
+    if "\n" in token or "\r" in token:
+        raise RuntimeError("Token contains invalid characters")
+
     parsed = urlparse(repo_url)
     if parsed.scheme != "https" or not parsed.hostname:
         raise RuntimeError("Credential helper mode supports only https repository urls")

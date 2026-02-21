@@ -32,7 +32,8 @@ def _read_cache(path: str) -> dict[str, Any] | None:
         return None
     try:
         return json.loads(cache.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as e:
+        logger.debug(f"Failed to read OAuth cache from {path}: {e}")
         return None
 
 
