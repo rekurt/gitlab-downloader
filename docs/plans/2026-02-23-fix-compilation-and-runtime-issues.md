@@ -61,9 +61,9 @@ When user configures OAuth but provides a token without OAuth client ID, the app
 **Files:**
 - Modify: `gitlab_downloader/config.py`
 
-- [ ] Add `logger.warning()` when auth method falls back from OAuth to token
-- [ ] Update or add test verifying warning is logged
-- [ ] Run project test suite - must pass before task 5
+- [x] Add `logger.warning()` when auth method falls back from OAuth to token
+- [x] Update or add test verifying warning is logged
+- [x] Run project test suite - must pass before task 5
 
 ### Task 5: Improve OAuth cache error logging
 

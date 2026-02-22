@@ -135,6 +135,15 @@ def test_parse_args_oauth_requires_client_id(monkeypatch):
         parse_args(["--auth-method", "oauth"])
 
 
+def test_parse_args_oauth_fallback_to_token_warns(monkeypatch, caplog):
+    monkeypatch.delenv("AUTH_METHOD", raising=False)
+    monkeypatch.delenv("GITLAB_OAUTH_CLIENT_ID", raising=False)
+    with caplog.at_level("WARNING", logger="gitlab_downloader.config"):
+        args = parse_args(["--url", "https://gitlab.com", "--token", "my-token"])
+    assert args.auth_method == "token"
+    assert "falling back to token authentication" in caplog.text
+
+
 def test_parse_args_oauth_client_id_from_cache(tmp_path):
     cache_path = tmp_path / "oauth.json"
     cache_path.write_text(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import json
+import logging
 import os
 import sys
 from importlib.metadata import PackageNotFoundError, version
@@ -20,6 +21,8 @@ from .constants import (
     MIN_CONCURRENCY,
 )
 from .models import GitlabConfig
+
+logger = logging.getLogger(__name__)
 
 
 def get_version() -> str:
@@ -160,6 +163,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         and not args.oauth_client_id
         and args.token
     ):
+        logger.warning(
+            "OAuth auth method requires --oauth-client-id or GITLAB_OAUTH_CLIENT_ID; "
+            "falling back to token authentication"
+        )
         args.auth_method = "token"
 
     if args.auth_method == "oauth" and not args.oauth_client_id:
