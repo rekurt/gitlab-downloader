@@ -10,13 +10,13 @@ ifneq (,$(wildcard .env))
 endif
 
 run:
-	@$(VENV_PATH)/bin/python fetch_repositories.py
+	@$(VENV_PATH)/bin/gitlab-dump
 
 dry_run:
-	@$(VENV_PATH)/bin/python fetch_repositories.py --dry-run
+	@$(VENV_PATH)/bin/gitlab-dump --dry-run
 
 interactive:
-	@$(VENV_PATH)/bin/python fetch_repositories.py --interactive
+	@$(VENV_PATH)/bin/gitlab-dump --interactive
 
 venv:
 	@[ -d $(VENV_PATH) ] || python3 -m venv $(VENV_PATH)
@@ -41,11 +41,11 @@ ci: lint typecheck test
 
 binary:
 	@$(VENV_PATH)/bin/pip install --no-cache-dir pyinstaller
-	@$(VENV_PATH)/bin/pyinstaller --onedir --name gitlab-dump --exclude-module multiprocessing fetch_repositories.py
+	@$(VENV_PATH)/bin/pyinstaller --onedir --name gitlab-dump --exclude-module multiprocessing gitlab_downloader/__main__.py
 
 binary_onefile:
 	@$(VENV_PATH)/bin/pip install --no-cache-dir pyinstaller
-	@$(VENV_PATH)/bin/pyinstaller --onefile --name gitlab-dump --exclude-module multiprocessing fetch_repositories.py
+	@$(VENV_PATH)/bin/pyinstaller --onefile --name gitlab-dump --exclude-module multiprocessing gitlab_downloader/__main__.py
 
 binary_clean:
 	@rm -rf build dist *.spec

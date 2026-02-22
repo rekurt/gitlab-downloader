@@ -100,13 +100,18 @@ class AuthorMapper:
                     data[field] = existing_data[field]
 
         if self.config_path.suffix in {".yaml", ".yml"}:
-            with self.config_path.open("w") as f:
-                yaml.dump(data, f, default_flow_style=False)
+            content = yaml.dump(data, default_flow_style=False)
         elif self.config_path.suffix == ".json":
-            with self.config_path.open("w") as f:
-                json.dump(data, f, indent=2)
+            content = json.dumps(data, indent=2)
         else:
             raise ValueError(f"Unsupported file format: {self.config_path.suffix}")
+
+        # Write with restricted permissions (0o600) since config may contain tokens
+        fd = os.open(str(self.config_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            os.write(fd, content.encode("utf-8"))
+        finally:
+            os.close(fd)
 
         logger.info(f"Mappings saved to {self.config_path}")
 

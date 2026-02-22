@@ -105,13 +105,14 @@ exe = EXE(
     entitlements_file=None,
 )
 
-# For macOS .app bundle
-app = BUNDLE(
-    exe,
-    name='api-server.app',
-    icon=None,
-    bundle_identifier='com.gitlab-dump.api-server',
-    info_plist={
-        'NSPrincipalClass': 'NSApplication',
-    },
-)
+# For macOS .app bundle (only on macOS)
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        exe,
+        name='api-server.app',
+        icon=None,
+        bundle_identifier='com.gitlab-dump.api-server',
+        info_plist={
+            'NSPrincipalClass': 'NSApplication',
+        },
+    )

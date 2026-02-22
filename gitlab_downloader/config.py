@@ -284,8 +284,8 @@ def fill_interactive(args: argparse.Namespace) -> argparse.Namespace:
 
 
 def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
-    # API server mode does not require GitLab credentials
-    if getattr(args, "api_server", False):
+    # API server and interactive menu modes do not require GitLab credentials
+    if getattr(args, "api_server", False) or getattr(args, "interactive_menu", False):
         return
 
     missing = []

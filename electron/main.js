@@ -40,7 +40,7 @@ async function waitForApiReady(maxRetries = 10) {
     try {
       const response = await fetch(
         `http://${API_HOST}:${API_PORT}/api/status`,
-        { timeout: 1000 }
+        { signal: AbortSignal.timeout(1000) }
       );
       if (response.ok) {
         console.log('API backend is ready');
@@ -222,7 +222,7 @@ function setupIpcHandlers() {
     try {
       const response = await fetch(
         `http://${API_HOST}:${API_PORT}/api/status`,
-        { timeout: 5000 }
+        { signal: AbortSignal.timeout(5000) }
       );
       const isOk = response.ok;
       console.log(`check-api-status: ${isOk}`);

@@ -41,6 +41,23 @@ async def main(argv: list[str] | None = None) -> int:
         await run_api_server_async(host=config.api_host, port=config.api_port)
         return 0
 
+    # Handle interactive menu mode
+    if config.interactive_menu:
+        from .cli_ui import CLIMenu
+
+        menu = CLIMenu()
+        while True:
+            choice = menu.show_main_menu()
+            if choice == "exit":
+                break
+            elif choice == "clone":
+                menu.show_clone_menu()
+            elif choice == "migrate":
+                menu.show_migration_wizard()
+            elif choice == "history":
+                menu.show_history_menu()
+        return 0
+
     from .auth import resolve_access_token
     from .client import fetch_group_metadata, get_all_projects, get_user_projects
     from .cloner import build_clone_target, clone_all_repositories
