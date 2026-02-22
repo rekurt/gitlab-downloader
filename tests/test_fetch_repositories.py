@@ -75,6 +75,7 @@ def test_extract_group_path():
 
 
 def test_parse_args_env_fallback(monkeypatch):
+    monkeypatch.delenv("AUTH_METHOD", raising=False)
     monkeypatch.setenv("GITLAB_URL", "https://gitlab.com")
     monkeypatch.setenv("GITLAB_OAUTH_CLIENT_ID", "client-id")
     monkeypatch.setenv("GITLAB_GROUP", "env-group")
@@ -112,6 +113,8 @@ def test_parse_args_missing_required(monkeypatch):
     monkeypatch.delenv("GITLAB_URL", raising=False)
     monkeypatch.delenv("GITLAB_TOKEN", raising=False)
     monkeypatch.delenv("GITLAB_GROUP", raising=False)
+    monkeypatch.delenv("AUTH_METHOD", raising=False)
+    monkeypatch.delenv("GITLAB_OAUTH_CLIENT_ID", raising=False)
     with pytest.raises(SystemExit):
         fr.parse_args(["--url", "https://gitlab.com"])
 
