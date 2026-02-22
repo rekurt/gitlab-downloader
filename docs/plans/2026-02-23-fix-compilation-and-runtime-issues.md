@@ -72,9 +72,9 @@ When user configures OAuth but provides a token without OAuth client ID, the app
 **Files:**
 - Modify: `gitlab_downloader/auth.py`
 
-- [ ] Change `logger.debug` to `logger.warning` for JSON decode errors in `_read_cache`
-- [ ] Update or add test verifying warning is logged on corrupted cache
-- [ ] Run project test suite - must pass before task 6
+- [x] Change `logger.debug` to `logger.warning` for JSON decode errors in `_read_cache`
+- [x] Update or add test verifying warning is logged on corrupted cache
+- [x] Run project test suite - must pass before task 6
 
 ### Task 6: Verify acceptance criteria
 

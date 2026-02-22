@@ -108,6 +108,15 @@ class TestCacheReadWrite:
         path.write_text("not json!", encoding="utf-8")
         assert _read_cache(str(path)) is None
 
+    def test_read_invalid_json_logs_warning(self, tmp_path, caplog):
+        import logging
+
+        path = tmp_path / "bad.json"
+        path.write_text("not json!", encoding="utf-8")
+        with caplog.at_level(logging.WARNING, logger="gitlab_downloader.auth"):
+            _read_cache(str(path))
+        assert any("Failed to read OAuth cache" in msg for msg in caplog.messages)
+
     def test_write_creates_parent_dirs(self, tmp_path):
         path = str(tmp_path / "sub" / "dir" / "cache.json")
         _write_cache(path, {"key": "value"})
