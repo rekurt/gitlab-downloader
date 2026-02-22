@@ -48,9 +48,8 @@ function MigrationWizard({ apiEndpoint, repo, onComplete, onCancel }) {
 
   const handleMigrationComplete = () => {
     setStep(4);
-    if (onComplete) {
-      onComplete();
-    }
+    // Don't call onComplete here - let user see the success screen first.
+    // The "Close" button on step 4 calls onCancel which navigates back.
   };
 
   const handleMigrationError = (errMsg) => {

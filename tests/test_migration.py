@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -529,17 +530,40 @@ class TestMigrationExecutor:
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create a valid git repo
+            # Create a valid git repo with a commit so filter-branch has something to process
             repo_path = Path(tmpdir)
             subprocess.run(["git", "init"], cwd=str(repo_path), capture_output=True)
+            commit_env = {
+                **os.environ,
+                "GIT_AUTHOR_NAME": "Old Author",
+                "GIT_AUTHOR_EMAIL": "old@test.com",
+                "GIT_COMMITTER_NAME": "Old Author",
+                "GIT_COMMITTER_EMAIL": "old@test.com",
+            }
+            subprocess.run(
+                ["git", "commit", "--allow-empty", "-m", "init"],
+                cwd=str(repo_path),
+                capture_output=True,
+                env=commit_env,
+            )
 
-            callback_messages = []
+            callback_messages: list[str] = []
 
             def progress_callback(msg: str) -> None:
                 callback_messages.append(msg)
 
             executor = MigrationExecutor(config)
-            result = executor.migrate_repository(repo_path, progress_callback=progress_callback)
+            author_mappings = {
+                "old": AuthorMapping(
+                    original_name="Old Author",
+                    original_email="old@test.com",
+                    new_name="New Author",
+                    new_email="new@test.com",
+                ),
+            }
+            result = executor.migrate_repository(
+                repo_path, author_mappings=author_mappings, progress_callback=progress_callback,
+            )
 
             assert result is True
             assert len(callback_messages) > 0

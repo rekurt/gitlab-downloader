@@ -355,7 +355,7 @@ async def start_migration(request: MigrationStartRequest) -> MigrationStartRespo
     """Start a migration task for a repository."""
     try:
         # Validate repo path
-        _validate_path(request.repo_path)
+        validated_repo_path = _validate_path(request.repo_path)
 
         migration_id = str(uuid.uuid4())
 
@@ -395,7 +395,7 @@ async def start_migration(request: MigrationStartRequest) -> MigrationStartRespo
         task = asyncio.create_task(
             _run_migration(
                 migration_id,
-                request.repo_path,
+                str(validated_repo_path),
                 author_mappings,
                 committer_mappings,
             )

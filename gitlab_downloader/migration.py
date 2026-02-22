@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -193,15 +194,60 @@ class MigrationExecutor:
             logger.error(f"Not a git repository: {repo_path}")
             return False
 
+        if author_mappings is None:
+            author_mappings = self.config.author_mappings
+        if committer_mappings is None:
+            committer_mappings = self.config.committer_mappings
+
+        if not author_mappings and not committer_mappings:
+            logger.info("No mappings provided, skipping migration")
+            return True
+
         if progress_callback:
             progress_callback(f"Starting migration for {repo_path.name}")
 
-        # Replace authors first
-        if not self.replace_authors(repo_path, author_mappings, progress_callback):
-            return False
+        # Combine author and committer scripts into a single filter-branch pass
+        # to avoid destroying backup refs with a second -f invocation
+        author_script = (
+            self._create_author_mapping_script(author_mappings)
+            if author_mappings
+            else "true"
+        )
+        committer_script = (
+            self._create_committer_mapping_script(committer_mappings)
+            if committer_mappings
+            else "true"
+        )
+        combined_script = f"{author_script}\n{committer_script}"
 
-        # Then replace committers
-        if not self.replace_committers(repo_path, committer_mappings, progress_callback):
+        try:
+            cmd = [
+                "git",
+                "filter-branch",
+                "-f",
+                "--env-filter",
+                combined_script,
+                "--",
+                "--all",
+            ]
+
+            result = subprocess.run(
+                cmd,
+                cwd=str(repo_path),
+                capture_output=True,
+                text=True,
+                timeout=3600,
+            )
+
+            if result.returncode != 0:
+                logger.error(f"Migration failed in {repo_path}: {result.stderr}")
+                return False
+
+        except subprocess.TimeoutExpired:
+            logger.error(f"Migration timed out for {repo_path}")
+            return False
+        except Exception as e:
+            logger.error(f"Error during migration in {repo_path}: {e}")
             return False
 
         if progress_callback:
@@ -347,11 +393,16 @@ class ConfigFileManager:
             data = ConfigFileManager._config_to_dict(config)
 
             if format == "json":
-                with open(config_file, "w") as f:
-                    json.dump(data, f, indent=2)
+                content = json.dumps(data, indent=2)
             else:
-                with open(config_file, "w") as f:
-                    yaml.dump(data, f, default_flow_style=False)
+                content = yaml.dump(data, default_flow_style=False)
+
+            # Write with restricted permissions (0o600) since config may contain tokens
+            fd = os.open(str(config_file), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            try:
+                os.write(fd, content.encode("utf-8"))
+            finally:
+                os.close(fd)
 
             logger.info(f"Config saved to {config_file}")
         except Exception as e:

@@ -9,13 +9,13 @@ class TestElectronBuilderConfig:
 
     def test_config_file_exists(self):
         """Test that electron-builder.config.js exists."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         assert config_path.exists(), "electron-builder.config.js should exist"
         assert config_path.stat().st_size > 0, "Config file should not be empty"
 
     def test_config_has_required_fields(self):
         """Test that config has required fields."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
 
         required_fields = [
@@ -31,32 +31,32 @@ class TestElectronBuilderConfig:
 
     def test_config_windows_portable_enabled(self):
         """Test that Windows portable target is enabled."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "portable" in content, "Windows portable target should be enabled"
         assert "target: 'portable'" in content or 'target: "portable"' in content
 
     def test_config_macos_dmg_enabled(self):
         """Test that macOS dmg target is enabled."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "dmg" in content, "macOS dmg target should be enabled"
 
     def test_config_linux_appimage_enabled(self):
         """Test that Linux AppImage target is enabled."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "AppImage" in content, "Linux AppImage target should be enabled"
 
     def test_config_asar_enabled(self):
         """Test that asar is enabled for security."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "asar: true" in content, "ASAR should be enabled for security"
 
     def test_config_python_binary_files_included(self):
         """Test that Python binary is included in files."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "python_binary" in content or "python" in content, (
             "Python binary should be included in files"
@@ -231,30 +231,30 @@ class TestCrossplatformConfiguration:
 
     def test_electron_builder_config_referenced(self):
         """Test that electron-builder.config.js is referenced."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         assert config_path.exists(), "electron-builder.config.js should exist"
 
     def test_windows_portable_exe_output(self):
         """Test that Windows output is portable .exe."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "portable" in content, "Should target portable .exe on Windows"
 
     def test_macos_single_app_bundle(self):
         """Test that macOS output is single .app bundle."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "dmg" in content, "Should create .dmg for macOS"
 
     def test_linux_appimage_single_file(self):
         """Test that Linux output is single AppImage file."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "AppImage" in content, "Should create AppImage for Linux"
 
     def test_environment_variables_for_signing(self):
         """Test that config uses environment variables for signing."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "process.env" in content, (
             "Config should use environment variables for signing credentials"
@@ -289,7 +289,7 @@ class TestBuildProcess:
 
     def test_python_binary_included_in_resources(self):
         """Test that Python binary is included in build resources."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "python_binary" in content or "python" in content, (
             "Python binary should be included in files"
@@ -297,7 +297,7 @@ class TestBuildProcess:
 
     def test_asar_packaging_enabled(self):
         """Test that ASAR packaging is enabled."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "asar: true" in content, "ASAR should be enabled"
 
@@ -307,7 +307,7 @@ class TestSecurityConfiguration:
 
     def test_code_signing_supported_windows(self):
         """Test that Windows code signing is supported."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "certificateFile" in content, "Windows code signing should be supported"
         assert "WIN_CERT" in content or "process.env" in content, (
@@ -316,12 +316,12 @@ class TestSecurityConfiguration:
 
     def test_code_signing_supported_macos(self):
         """Test that macOS code signing is supported."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "identity" in content, "macOS code signing should be supported"
 
     def test_notarization_supported_macos(self):
         """Test that macOS notarization is supported."""
-        config_path = Path(__file__).parent.parent / "electron-builder.config.js"
+        config_path = Path(__file__).parent.parent / "electron" / "electron-builder.config.js"
         content = config_path.read_text()
         assert "notarize" in content, "macOS notarization should be supported"
