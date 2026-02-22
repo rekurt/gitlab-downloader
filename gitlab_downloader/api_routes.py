@@ -474,7 +474,7 @@ async def _run_migration(
                         break
 
         # Poll for progress updates while migration runs in thread
-        migration_future = asyncio.get_event_loop().run_in_executor(
+        migration_future = asyncio.get_running_loop().run_in_executor(
             None,
             executor.migrate_repository,
             repo_path,
@@ -607,7 +607,7 @@ async def save_config(request: ConfigSaveRequest) -> SaveResponse:
                 committer_mappings=committer_map,
             )
 
-            ConfigFileManager.save_config(str(validated_path), config, format=request.format)
+            ConfigFileManager.save_config(str(validated_path), config, file_format=request.format)
             return SaveResponse(status="saved")
     except ValueError as e:
         logger.error(f"Error saving config: {e}")

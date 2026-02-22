@@ -115,7 +115,7 @@ async def main(argv: list[str] | None = None) -> int:
                         group=clone_config.get("group"),
                         clone_path=clone_config.get("clone_path", config.clone_path),
                     )
-                    return await _run_clone(updated)
+                    await _run_clone(updated)
             elif choice == "migrate":
                 migration_config = menu.show_migration_wizard()
                 if migration_config:

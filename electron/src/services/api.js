@@ -83,12 +83,10 @@ class APIClient {
       headers["X-API-Token"] = this.apiToken;
     }
 
-    const defaultOptions = { headers };
-
     try {
       const response = await fetch(url, {
-        ...defaultOptions,
         ...options,
+        headers: { ...headers, ...(options.headers || {}) },
       });
 
       if (!response.ok) {

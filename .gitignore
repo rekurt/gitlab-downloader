@@ -13,5 +13,10 @@ build/
 dist/
 *.spec
 
+# Migration config files (may contain tokens)
+migration_config.json
+migration_config.yaml
+migration_config.yml
+
 # ralphex progress logs
 .ralphex/progress/

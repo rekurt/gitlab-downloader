@@ -101,6 +101,10 @@ def create_app() -> FastAPI:
     # (data: URLs, file:// iframes) from reading sensitive data via GET endpoints,
     # while still allowing "null" origin needed for Electron's file:// protocol.
     api_token = os.environ.get("GITLAB_DUMP_API_TOKEN", "")
+    if not api_token:
+        logger.warning(
+            "GITLAB_DUMP_API_TOKEN is not set — API is running without authentication"
+        )
 
     @app.middleware("http")
     async def verify_api_token(

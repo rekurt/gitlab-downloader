@@ -45,7 +45,7 @@ class TestConfigFileManager:
             )
 
             # Save config
-            ConfigFileManager.save_config(repo_path, config, format="json")
+            ConfigFileManager.save_config(repo_path, config, file_format="json")
 
             # Verify file exists
             config_file = repo_path / "migration_config.json"
@@ -75,7 +75,7 @@ class TestConfigFileManager:
             )
 
             # Save config in YAML format
-            ConfigFileManager.save_config(repo_path, config, format="yaml")
+            ConfigFileManager.save_config(repo_path, config, file_format="yaml")
 
             # Verify file exists
             config_file = repo_path / "migration_config.yaml"
@@ -209,7 +209,7 @@ class TestConfigFileManager:
             )
 
             with pytest.raises(ValueError, match="Format must be"):
-                ConfigFileManager.save_config(repo_path, config, format="xml")
+                ConfigFileManager.save_config(repo_path, config, file_format="xml")
 
     def test_multiple_config_formats_preference(self):
         """Test that JSON is preferred over YAML if both exist."""
@@ -225,8 +225,8 @@ class TestConfigFileManager:
             )
 
             # Save in both formats
-            ConfigFileManager.save_config(repo_path, config, format="json")
-            ConfigFileManager.save_config(repo_path, config, format="yaml")
+            ConfigFileManager.save_config(repo_path, config, file_format="json")
+            ConfigFileManager.save_config(repo_path, config, file_format="yaml")
 
             # Load should get JSON (first in CONFIG_FILENAMES)
             loaded = ConfigFileManager.load_config(repo_path)
@@ -259,7 +259,7 @@ class TestConfigFileManager:
                 committer_mappings={},
             )
 
-            ConfigFileManager.save_config(repo_path, config, format="json")
+            ConfigFileManager.save_config(repo_path, config, file_format="json")
 
             # Read and parse JSON manually
             config_file = repo_path / "migration_config.json"
@@ -282,7 +282,7 @@ class TestConfigFileManager:
                 committer_mappings={},
             )
 
-            ConfigFileManager.save_config(repo_path, config, format="yaml")
+            ConfigFileManager.save_config(repo_path, config, file_format="yaml")
 
             # Read and parse YAML manually
             config_file = repo_path / "migration_config.yaml"
@@ -304,7 +304,7 @@ class TestConfigFileManager:
                 committer_mappings={},
             )
 
-            ConfigFileManager.save_config(repo_path, config, format="json")
+            ConfigFileManager.save_config(repo_path, config, file_format="json")
             loaded = ConfigFileManager.load_config(repo_path)
 
             assert loaded is not None
@@ -330,7 +330,7 @@ class TestConfigFileManager:
                 committer_mappings={},
             )
 
-            ConfigFileManager.save_config(repo_path, config, format="json")
+            ConfigFileManager.save_config(repo_path, config, file_format="json")
             loaded = ConfigFileManager.load_config(repo_path)
 
             assert loaded is not None

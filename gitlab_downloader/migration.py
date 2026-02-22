@@ -371,28 +371,30 @@ class ConfigFileManager:
         return None
 
     @staticmethod
-    def save_config(repo_path: str | Path, config: MigrationConfig, format: str = "json") -> None:
+    def save_config(
+        repo_path: str | Path, config: MigrationConfig, file_format: str = "json"
+    ) -> None:
         """Save migration config to repository directory.
 
         Args:
             repo_path: Path to the repository
             config: MigrationConfig instance to save
-            format: File format ('json' or 'yaml')
+            file_format: File format ('json' or 'yaml')
 
         Raises:
             ValueError: If format is invalid
         """
-        if format not in ("json", "yaml"):
-            raise ValueError(f"Format must be 'json' or 'yaml', got {format}")
+        if file_format not in ("json", "yaml"):
+            raise ValueError(f"Format must be 'json' or 'yaml', got {file_format}")
 
         repo_path = Path(repo_path)
-        filename = f"migration_config.{format}"
+        filename = f"migration_config.{file_format}"
         config_file = repo_path / filename
 
         try:
             data = ConfigFileManager._config_to_dict(config)
 
-            if format == "json":
+            if file_format == "json":
                 content = json.dumps(data, indent=2)
             else:
                 content = yaml.dump(data, default_flow_style=False)
