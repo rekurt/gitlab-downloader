@@ -9,7 +9,7 @@ from unittest import mock
 import pytest
 from fastapi.testclient import TestClient
 
-from gitlab_downloader.api import create_app
+from gitlab_downloader.api import _parse_args, create_app
 from gitlab_downloader.api_schemas import (
     AuthorMappingRequest,
     MigrationStartRequest,
@@ -478,3 +478,54 @@ class TestAPISchemas:
         req = MigrationStartRequest(**request_data)
         assert len(req.author_mappings) == 1
         assert len(req.committer_mappings) == 1
+
+
+class TestApiModuleInvocation:
+    """Tests for api.py CLI argument parsing and module invocation."""
+
+    def test_parse_args_defaults(self) -> None:
+        """Test default argument values."""
+        args = _parse_args([])
+        assert args.host == "127.0.0.1"
+        assert args.port == 8000
+
+    def test_parse_args_custom_host_and_port(self) -> None:
+        """Test custom host and port arguments."""
+        args = _parse_args(["--host", "0.0.0.0", "--port", "9999"])
+        assert args.host == "0.0.0.0"
+        assert args.port == 9999
+
+    def test_parse_args_only_host(self) -> None:
+        """Test specifying only host."""
+        args = _parse_args(["--host", "192.168.1.1"])
+        assert args.host == "192.168.1.1"
+        assert args.port == 8000
+
+    def test_parse_args_only_port(self) -> None:
+        """Test specifying only port."""
+        args = _parse_args(["--port", "3000"])
+        assert args.host == "127.0.0.1"
+        assert args.port == 3000
+
+    @mock.patch("gitlab_downloader.api.asyncio.run")
+    @mock.patch("gitlab_downloader.api._parse_args")
+    def test_main_block_calls_run_api_server(
+        self, mock_parse: mock.MagicMock, mock_asyncio_run: mock.MagicMock
+    ) -> None:
+        """Test that __main__ block invokes run_api_server_async with parsed args."""
+        import runpy
+
+        mock_parse.return_value = mock.MagicMock(host="127.0.0.1", port=19999)
+
+        with mock.patch("gitlab_downloader.api.run_api_server_async"):
+            mock_asyncio_run.return_value = None
+            try:
+                runpy.run_module("gitlab_downloader.api", run_name="__main__")
+            except SystemExit:
+                pass
+
+            mock_asyncio_run.assert_called_once()
+            call_args = mock_asyncio_run.call_args[0][0]
+            # The coroutine was created with the parsed args
+            # Close the coroutine to avoid RuntimeWarning
+            call_args.close()

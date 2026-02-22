@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import logging
 import os
@@ -138,3 +139,23 @@ async def run_api_server_async(host: str = "127.0.0.1", port: int = 8000) -> Non
         await server.serve()
     except Exception as e:  # pylint: disable=broad-except
         logger.error(f"Server error: {e}", exc_info=True)
+
+
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse command-line arguments for the API server.
+
+    Args:
+        argv: Argument list (defaults to sys.argv[1:])
+
+    Returns:
+        Parsed arguments namespace
+    """
+    parser = argparse.ArgumentParser(description="GitLab Dump API server")
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=8000, help="Port to bind to (default: 8000)")
+    return parser.parse_args(argv)
+
+
+if __name__ == "__main__":
+    args = _parse_args()
+    asyncio.run(run_api_server_async(host=args.host, port=args.port))
