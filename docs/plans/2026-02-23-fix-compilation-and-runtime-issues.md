@@ -38,10 +38,10 @@ The Electron app runs `python -m gitlab_downloader.api --host 127.0.0.1 --port 8
 - Modify: `tests/test_fetch_repositories.py`
 - Modify: `Dockerfile`
 
-- [ ] Update `tests/test_fetch_repositories.py` to import from `gitlab_downloader` package modules directly instead of `fetch_repositories`
-- [ ] Remove `COPY fetch_repositories.py .` from `Dockerfile`
-- [ ] Delete `fetch_repositories.py`
-- [ ] Run project test suite - must pass before task 3
+- [x] Update `tests/test_fetch_repositories.py` to import from `gitlab_downloader` package modules directly instead of `fetch_repositories`
+- [x] Remove `COPY fetch_repositories.py .` from `Dockerfile`
+- [x] Delete `fetch_repositories.py`
+- [x] Run project test suite - must pass before task 3
 
 ### Task 3: Fix path validation in API routes
 

@@ -8,7 +8,16 @@ import aiohttp
 import pytest
 from aioresponses import aioresponses
 
-import fetch_repositories as fr
+from gitlab_downloader.client import fetch_json, fetch_paginated, maybe_rate_limit_delay
+from gitlab_downloader.config import config_from_args, parse_args
+from gitlab_downloader.models import CloneResult, GitlabConfig
+from gitlab_downloader.reporting import print_summary
+from gitlab_downloader.utils import (
+    build_authenticated_clone_url,
+    extract_group_path,
+    sanitize_path_component,
+    trim_prefix,
+)
 
 
 def make_config(**overrides):
@@ -40,7 +49,7 @@ def make_config(**overrides):
         "api_port": 8000,
     }
     data.update(overrides)
-    return fr.GitlabConfig(**data)
+    return GitlabConfig(**data)
 
 
 @pytest.mark.parametrize(
@@ -53,7 +62,7 @@ def make_config(**overrides):
     ],
 )
 def test_trim_prefix(value, prefix, expected):
-    assert fr.trim_prefix(value, prefix) == expected
+    assert trim_prefix(value, prefix) == expected
 
 
 @pytest.mark.parametrize(
@@ -66,12 +75,12 @@ def test_trim_prefix(value, prefix, expected):
     ],
 )
 def test_sanitize_path_component(value, expected):
-    assert fr.sanitize_path_component(value) == expected
+    assert sanitize_path_component(value) == expected
 
 
 def test_extract_group_path():
-    assert fr.extract_group_path("root/main", "root/main/sub/repo") == "sub"
-    assert fr.extract_group_path("root/main", "root/main/repo") == ""
+    assert extract_group_path("root/main", "root/main/sub/repo") == "sub"
+    assert extract_group_path("root/main", "root/main/repo") == ""
 
 
 def test_parse_args_env_fallback(monkeypatch):
@@ -79,7 +88,7 @@ def test_parse_args_env_fallback(monkeypatch):
     monkeypatch.setenv("GITLAB_URL", "https://gitlab.com")
     monkeypatch.setenv("GITLAB_OAUTH_CLIENT_ID", "client-id")
     monkeypatch.setenv("GITLAB_GROUP", "env-group")
-    args = fr.parse_args([])
+    args = parse_args([])
 
     assert args.url == "https://gitlab.com"
     assert args.auth_method == "oauth"
@@ -92,7 +101,7 @@ def test_parse_args_cli_overrides_env(monkeypatch):
     monkeypatch.setenv("GITLAB_TOKEN", "env-token")
     monkeypatch.setenv("GITLAB_GROUP", "env-group")
 
-    args = fr.parse_args(
+    args = parse_args(
         ["--token", "cli-token", "--group", "cli-group", "--url", "https://example.com"]
     )
     assert args.token == "cli-token"
@@ -105,7 +114,7 @@ def test_parse_args_group_optional(monkeypatch):
     monkeypatch.setenv("GITLAB_TOKEN", "env-token")
     monkeypatch.delenv("GITLAB_GROUP", raising=False)
 
-    args = fr.parse_args(["--url", "https://gitlab.com", "--token", "token"])
+    args = parse_args(["--url", "https://gitlab.com", "--token", "token"])
     assert args.group is None
 
 
@@ -116,14 +125,14 @@ def test_parse_args_missing_required(monkeypatch):
     monkeypatch.delenv("AUTH_METHOD", raising=False)
     monkeypatch.delenv("GITLAB_OAUTH_CLIENT_ID", raising=False)
     with pytest.raises(SystemExit):
-        fr.parse_args(["--url", "https://gitlab.com"])
+        parse_args(["--url", "https://gitlab.com"])
 
 
 def test_parse_args_oauth_requires_client_id(monkeypatch):
     monkeypatch.setenv("GITLAB_URL", "https://gitlab.com")
     monkeypatch.delenv("GITLAB_OAUTH_CLIENT_ID", raising=False)
     with pytest.raises(SystemExit):
-        fr.parse_args(["--auth-method", "oauth"])
+        parse_args(["--auth-method", "oauth"])
 
 
 def test_parse_args_oauth_client_id_from_cache(tmp_path):
@@ -137,7 +146,7 @@ def test_parse_args_oauth_client_id_from_cache(tmp_path):
         ),
         encoding="utf-8",
     )
-    args = fr.parse_args(
+    args = parse_args(
         [
             "--url",
             "https://gitlab.com",
@@ -184,7 +193,7 @@ def test_parse_args_oauth_client_id_from_cache(tmp_path):
 )
 def test_parse_args_validation(argv, error_part):
     with pytest.raises(SystemExit) as exc:
-        fr.parse_args(argv)
+        parse_args(argv)
     assert error_part in str(exc.value) or exc.value.code == 2
 
 
@@ -212,7 +221,7 @@ def test_config_from_args():
         oauth_scope="read_api read_repository",
         oauth_cache_path=".tmp-oauth-cache.json",
     )
-    cfg = fr.config_from_args(args)
+    cfg = config_from_args(args)
     assert cfg.url == "https://gitlab.com"
     assert cfg.max_concurrency == 4
     assert cfg.update_existing is True
@@ -221,12 +230,12 @@ def test_config_from_args():
 def test_print_summary(caplog):
     caplog.set_level("INFO")
     results = [
-        fr.CloneResult("a", "success", "ok"),
-        fr.CloneResult("b", "skipped", "skip"),
-        fr.CloneResult("c", "failed", "boom"),
-        fr.CloneResult("d", "updated", "done"),
+        CloneResult("a", "success", "ok"),
+        CloneResult("b", "skipped", "skip"),
+        CloneResult("c", "failed", "boom"),
+        CloneResult("d", "updated", "done"),
     ]
-    has_failed = fr.print_summary(results)
+    has_failed = print_summary(results)
 
     assert has_failed is True
     assert "Summary:" in caplog.text
@@ -241,7 +250,7 @@ async def test_fetch_json_success():
     with aioresponses() as mocked:
         mocked.get(url, payload={"id": 1}, status=200)
         async with aiohttp.ClientSession() as session:
-            data = await fr.fetch_json(session, url, {}, "group metadata", config)
+            data = await fetch_json(session, url, {}, "group metadata", config)
 
     assert data == {"id": 1}
 
@@ -256,7 +265,7 @@ async def test_fetch_json_retries_on_429_then_success():
         mocked.get(url, payload={"ok": True}, status=200)
 
         async with aiohttp.ClientSession() as session:
-            data = await fr.fetch_json(session, url, {}, "group metadata", config)
+            data = await fetch_json(session, url, {}, "group metadata", config)
 
     assert data == {"ok": True}
 
@@ -277,7 +286,7 @@ async def test_fetch_json_respects_retry_after(monkeypatch):
         mocked.get(url, payload={"ok": True}, status=200)
 
         async with aiohttp.ClientSession() as session:
-            data = await fr.fetch_json(session, url, {}, "group metadata", config)
+            data = await fetch_json(session, url, {}, "group metadata", config)
 
     assert data == {"ok": True}
     assert slept
@@ -293,7 +302,7 @@ async def test_fetch_json_retries_on_500_then_success():
         mocked.get(url, payload={"ok": True}, status=200)
 
         async with aiohttp.ClientSession() as session:
-            data = await fr.fetch_json(session, url, {}, "group metadata", config)
+            data = await fetch_json(session, url, {}, "group metadata", config)
 
     assert data == {"ok": True}
 
@@ -307,7 +316,7 @@ async def test_fetch_json_timeout_returns_none():
         mocked.get(url, exception=asyncio.TimeoutError())
 
         async with aiohttp.ClientSession() as session:
-            data = await fr.fetch_json(session, url, {}, "group metadata", config)
+            data = await fetch_json(session, url, {}, "group metadata", config)
 
     assert data is None
 
@@ -322,7 +331,7 @@ async def test_fetch_paginated_multiple_pages():
         mocked.get(f"{url}?per_page=2&page=2", payload=[{"id": 3}], status=200)
 
         async with aiohttp.ClientSession() as session:
-            data = await fr.fetch_paginated(session, url, {}, "projects", config)
+            data = await fetch_paginated(session, url, {}, "projects", config)
 
     assert [item["id"] for item in data] == [1, 2, 3]
 
@@ -335,18 +344,18 @@ async def test_fetch_paginated_empty():
     with aioresponses() as mocked:
         mocked.get(f"{url}?per_page=2&page=1", payload=[], status=200)
         async with aiohttp.ClientSession() as session:
-            data = await fr.fetch_paginated(session, url, {}, "projects", config)
+            data = await fetch_paginated(session, url, {}, "projects", config)
 
     assert data == []
 
 
 def test_build_authenticated_clone_url():
     url = "https://gitlab.com/group/repo.git"
-    result = fr.build_authenticated_clone_url(url, "my:token/with?symbols")
+    result = build_authenticated_clone_url(url, "my:token/with?symbols")
     assert result.startswith("https://oauth2:")
     assert "@gitlab.com/group/repo.git" in result
 
 
 def test_maybe_rate_limit_delay():
     headers = {"RateLimit-Remaining": "5", "RateLimit-Reset": str(9999999999)}
-    assert fr.maybe_rate_limit_delay(headers) > 0
+    assert maybe_rate_limit_delay(headers) > 0

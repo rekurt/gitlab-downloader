@@ -9,7 +9,6 @@ RUN useradd -m -u 10001 appuser
 
 WORKDIR /app
 COPY pyproject.toml .
-COPY fetch_repositories.py .
 COPY gitlab_downloader ./gitlab_downloader
 RUN pip install --no-cache-dir .
 
