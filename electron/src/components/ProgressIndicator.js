@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import '../styles/ProgressIndicator.css';
 
 function ProgressIndicator({
@@ -12,11 +12,19 @@ function ProgressIndicator({
   const [error, setError] = useState(null);
   const [isFinished, setIsFinished] = useState(false);
 
+  // Use refs for callbacks to avoid restarting the polling interval
+  const onCompleteRef = useRef(onComplete);
+  const onErrorRef = useRef(onError);
+  onCompleteRef.current = onComplete;
+  onErrorRef.current = onError;
+
   useEffect(() => {
     if (!migrationId) {
       setLoading(false);
       return;
     }
+
+    let intervalId = null;
 
     const pollProgress = async () => {
       try {
@@ -33,15 +41,17 @@ function ProgressIndicator({
         if (data.status === 'completed') {
           setIsFinished(true);
           setLoading(false);
-          if (onComplete) {
-            onComplete(data);
+          if (intervalId) clearInterval(intervalId);
+          if (onCompleteRef.current) {
+            onCompleteRef.current(data);
           }
         } else if (data.status === 'failed') {
           setIsFinished(true);
           setLoading(false);
           setError(data.error || 'Migration failed');
-          if (onError) {
-            onError(data.error || 'Migration failed');
+          if (intervalId) clearInterval(intervalId);
+          if (onErrorRef.current) {
+            onErrorRef.current(data.error || 'Migration failed');
           }
         } else {
           setLoading(false);
@@ -49,17 +59,18 @@ function ProgressIndicator({
       } catch (err) {
         setError(err.message);
         setLoading(false);
-        if (onError) {
-          onError(err.message);
+        if (intervalId) clearInterval(intervalId);
+        if (onErrorRef.current) {
+          onErrorRef.current(err.message);
         }
       }
     };
 
-    const interval = setInterval(pollProgress, 1000);
+    intervalId = setInterval(pollProgress, 1000);
     pollProgress();
 
-    return () => clearInterval(interval);
-  }, [migrationId, apiEndpoint, onComplete, onError]);
+    return () => { if (intervalId) clearInterval(intervalId); };
+  }, [migrationId, apiEndpoint]);
 
   if (!progress) {
     return (

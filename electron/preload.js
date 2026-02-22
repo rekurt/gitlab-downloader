@@ -1,5 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Map of original callbacks to their wrapped versions for proper removal
+const listenerMap = new Map();
+
 /**
  * Expose safe APIs to the renderer process
  * This preload script establishes a secure bridge between the main and renderer processes
@@ -48,7 +51,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'migration-complete',
     ];
     if (validChannels.includes(channel)) {
-      ipcRenderer.on(channel, (event, ...args) => func(...args));
+      const wrapper = (event, ...args) => func(...args);
+      listenerMap.set(func, wrapper);
+      ipcRenderer.on(channel, wrapper);
     }
   },
 
@@ -63,7 +68,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'migration-complete',
     ];
     if (validChannels.includes(channel)) {
-      ipcRenderer.removeListener(channel, func);
+      const wrapper = listenerMap.get(func);
+      if (wrapper) {
+        ipcRenderer.removeListener(channel, wrapper);
+        listenerMap.delete(func);
+      }
     }
   },
 

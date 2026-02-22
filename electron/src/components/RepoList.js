@@ -82,9 +82,9 @@ function RepoList({ apiEndpoint, onSelectRepo, onMigrationStart }) {
       ) : (
         <>
           <div className="repo-list">
-            {repos.map((repo, index) => (
+            {repos.map((repo) => (
               <div
-                key={index}
+                key={repo.path}
                 className={`repo-item ${selectedRepo?.path === repo.path ? 'selected' : ''}`}
                 onClick={() => handleSelectRepo(repo)}
               >

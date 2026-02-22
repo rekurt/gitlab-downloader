@@ -26,66 +26,9 @@ function getPythonExecutablePath() {
     }
   } else {
     // In production, the Python binary will be embedded
-    const platform = os.platform();
     const resourcesPath = path.join(process.resourcesPath, 'python');
-    if (platform === 'win32') {
-      return path.join(resourcesPath, 'python.exe');
-    } else if (platform === 'darwin') {
-      // macOS app bundle
-      return path.join(resourcesPath, 'python');
-    } else {
-      // Linux
-      return path.join(resourcesPath, 'python');
-    }
-  }
-}
-
-/**
- * Extract embedded Python binary on first run
- * Creates a persistent copy in app data directory
- */
-function extractEmbeddedBinary() {
-  const platform = os.platform();
-  const appDataPath = path.join(app.getPath('appData'), 'gitlab-dump');
-  let binaryName = 'python';
-  if (platform === 'win32') {
-    binaryName = 'python.exe';
-  }
-
-  const extractedPath = path.join(appDataPath, 'bin', binaryName);
-
-  // If already extracted, use it
-  if (fs.existsSync(extractedPath)) {
-    return extractedPath;
-  }
-
-  try {
-    // Create directory if it doesn't exist (fs-extra's ensureDirSync equivalent)
-    const dirPath = path.dirname(extractedPath);
-    if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath, { recursive: true });
-    }
-
-    // Get embedded binary from resources
-    const embeddedPath = path.join(process.resourcesPath, 'python', binaryName);
-    if (!fs.existsSync(embeddedPath)) {
-      console.warn(`Embedded binary not found at ${embeddedPath}`);
-      return null;
-    }
-
-    // Copy to app data directory
-    fs.copyFileSync(embeddedPath, extractedPath);
-
-    // Make executable on Unix-like systems
-    if (platform !== 'win32') {
-      fs.chmodSync(extractedPath, '0755');
-    }
-
-    console.log(`Extracted embedded binary to ${extractedPath}`);
-    return extractedPath;
-  } catch (error) {
-    console.error('Failed to extract embedded binary:', error);
-    return null;
+    const binaryName = os.platform() === 'win32' ? 'python.exe' : 'python';
+    return path.join(resourcesPath, binaryName);
   }
 }
 
@@ -130,11 +73,11 @@ async function startPythonBackend() {
       console.log(`Starting Python backend with: ${pythonPath}`);
 
       // Start the Python API server
-      apiProcess = spawn(pythonPath, [
-        '-m', 'gitlab_downloader.api',
-        '--host', API_HOST,
-        '--port', API_PORT.toString(),
-      ]);
+      // In dev mode, use -m to run the module; in production, the binary is a standalone executable
+      const args = isDev
+        ? ['-m', 'gitlab_downloader.api', '--host', API_HOST, '--port', API_PORT.toString()]
+        : ['--host', API_HOST, '--port', API_PORT.toString()];
+      apiProcess = spawn(pythonPath, args);
 
       // Set up process error handler first
       apiProcess.on('error', (err) => {
@@ -209,7 +152,7 @@ function createWindow() {
 
   const startUrl = isDev
     ? 'http://localhost:8080'
-    : `file://${path.join(__dirname, '../dist/index.html')}`;
+    : `file://${path.join(__dirname, 'dist', 'index.html')}`;
 
   mainWindow.loadURL(startUrl);
 

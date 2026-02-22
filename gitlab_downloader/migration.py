@@ -223,22 +223,28 @@ class MigrationExecutor:
         """
         import shlex
 
-        conditions = []
+        parts = []
+        first = True
         for mapping in mappings.values():
             # Properly escape all values to prevent shell injection
+            original_name = shlex.quote(mapping.original_name)
             original_email = shlex.quote(mapping.original_email)
             new_name = shlex.quote(mapping.new_name)
             new_email = shlex.quote(mapping.new_email)
 
-            original_name = shlex.quote(mapping.original_name)
-            conditions.append(
-                f'[ "$GIT_AUTHOR_NAME" = {original_name} ] && '
-                f'[ "$GIT_AUTHOR_EMAIL" = {original_email} ] && '
-                f"export GIT_AUTHOR_NAME={new_name} && "
-                f"export GIT_AUTHOR_EMAIL={new_email}"
+            keyword = "if" if first else "elif"
+            parts.append(
+                f'{keyword} [ "$GIT_AUTHOR_NAME" = {original_name} ] && '
+                f'[ "$GIT_AUTHOR_EMAIL" = {original_email} ]; then\n'
+                f"  export GIT_AUTHOR_NAME={new_name}\n"
+                f"  export GIT_AUTHOR_EMAIL={new_email}"
             )
+            first = False
 
-        script = " || ".join(conditions) if conditions else "true"
+        if parts:
+            script = "\n".join(parts) + "\nfi"
+        else:
+            script = "true"
         return script
 
     @staticmethod
@@ -255,7 +261,8 @@ class MigrationExecutor:
         """
         import shlex
 
-        conditions = []
+        parts = []
+        first = True
         for mapping in mappings.values():
             # Properly escape all values to prevent shell injection
             original_name = shlex.quote(mapping.original_name)
@@ -263,14 +270,19 @@ class MigrationExecutor:
             new_name = shlex.quote(mapping.new_name)
             new_email = shlex.quote(mapping.new_email)
 
-            conditions.append(
-                f'[ "$GIT_COMMITTER_NAME" = {original_name} ] && '
-                f'[ "$GIT_COMMITTER_EMAIL" = {original_email} ] && '
-                f"export GIT_COMMITTER_NAME={new_name} && "
-                f"export GIT_COMMITTER_EMAIL={new_email}"
+            keyword = "if" if first else "elif"
+            parts.append(
+                f'{keyword} [ "$GIT_COMMITTER_NAME" = {original_name} ] && '
+                f'[ "$GIT_COMMITTER_EMAIL" = {original_email} ]; then\n'
+                f"  export GIT_COMMITTER_NAME={new_name}\n"
+                f"  export GIT_COMMITTER_EMAIL={new_email}"
             )
+            first = False
 
-        script = " || ".join(conditions) if conditions else "true"
+        if parts:
+            script = "\n".join(parts) + "\nfi"
+        else:
+            script = "true"
         return script
 
 

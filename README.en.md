@@ -277,7 +277,7 @@ source venv/bin/activate
 # Run REST API on local server
 python -m gitlab_downloader.api
 ```
-API will be available at: `http://localhost:5000`
+API will be available at: `http://localhost:8000`
 
 Terminal 2 — Electron GUI (development mode):
 ```bash

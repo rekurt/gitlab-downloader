@@ -386,8 +386,8 @@ async def start_migration(request: MigrationStartRequest) -> MigrationStartRespo
                 "created_at": time.time(),
             }
 
-        # Start migration in background
-        asyncio.create_task(
+        # Start migration in background and store task reference for cleanup
+        task = asyncio.create_task(
             _run_migration(
                 migration_id,
                 request.repo_path,
@@ -395,6 +395,8 @@ async def start_migration(request: MigrationStartRequest) -> MigrationStartRespo
                 committer_mappings,
             )
         )
+        async with _migration_tasks_lock:
+            _migration_tasks[migration_id]["task"] = task
 
         return MigrationStartResponse(migration_id=migration_id)
     except Exception as e:

@@ -48,7 +48,6 @@ electron/
 │   ├── index.html        # HTML template
 │   ├── components/       # React components
 │   │   ├── AuthorMapper.js
-│   │   ├── ConfigViewer.js
 │   │   ├── MigrationWizard.js
 │   │   ├── ProgressIndicator.js
 │   │   └── RepoList.js
@@ -66,7 +65,7 @@ electron/
 
 - **Node.js**: 16.x or higher (check with `node --version`)
 - **npm**: 8.x or higher (check with `npm --version`)
-- **Python**: 3.8+ (for the backend API)
+- **Python**: 3.10+ (for the backend API)
 - **Virtual Environment**: Backend should be running in `venv/`
 
 ### Installation
@@ -200,9 +199,6 @@ npm run dist-mac
 ### AuthorMapper
 Maps GitLab users to Git author identities for proper commit attribution during migration.
 
-### ConfigViewer
-Displays current configuration settings, environment variables, and connection details.
-
 ### MigrationWizard
 Step-by-step wizard guiding users through the migration process:
 - Repository selection
@@ -222,10 +218,12 @@ The application expects the Python backend to provide the following endpoints on
 
 - `GET /api/status` - Backend health check
 - `GET /api/repos` - List available repositories
+- `GET /api/author-mappings` - Get saved author mappings
+- `POST /api/author-mappings` - Save author mappings
 - `POST /api/migrate` - Start migration operation
-- `GET /api/progress` - Get current migration progress
-- `POST /api/config` - Update configuration
-- `GET /api/config` - Retrieve current configuration
+- `GET /api/migration-progress/{migration_id}` - Get migration progress
+- `POST /api/config` - Save migration configuration
+- `GET /api/config` - Retrieve migration configuration
 
 See the main project documentation for complete API specification.
 
@@ -236,7 +234,7 @@ Configuration is handled via `env.js`:
 ```javascript
 {
   isDev: boolean,           // Development mode indicator
-  API_PORT: 5000,          // Backend API port
+  API_PORT: 8000,          // Backend API port
   API_HOST: '127.0.0.1',   // Backend API host
   LOG_LEVEL: 'debug',      // 'debug' in dev, 'info' in production
   DEBUG: boolean           // Debug mode enabled
@@ -361,7 +359,6 @@ When modifying the Electron application:
 - **Webpack 5**: Module bundler
 - **Babel 7**: JavaScript transpiler
 - **electron-builder 24**: Distribution packaging
-- **axios**: HTTP client for API calls
 
 See `package.json` for complete dependency list and versions.
 

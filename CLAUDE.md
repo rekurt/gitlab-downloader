@@ -44,7 +44,7 @@ gitlab-downloader/
 │   │   └── styles/             # CSS modules
 │   ├── package.json            # Node dependencies
 │   ├── webpack.config.js       # Webpack configuration
-│   ├── electron-builder.yml    # Electron build config
+│   ├── electron-builder.config.js  # Electron build config
 │   └── README.md               # Electron-specific documentation
 ├── build/                      # Build scripts
 ├── docs/                       # Documentation
@@ -111,7 +111,7 @@ Development commands:
 - `make electron-build` - Build Electron GUI application
 - `make coverage` - Run tests with coverage report
 
-### electron-builder.yml
+### electron-builder.config.js
 Electron packaging configuration:
 - Application metadata and icons
 - Platform-specific build options (Windows, macOS, Linux)
@@ -152,7 +152,7 @@ Container configuration for running the application in Docker.
 
 ### Frontend (Electron/React)
 - Functional components with hooks
-- Use axios for API calls
+- Use native fetch API for API calls
 - CSS modules for styling
 - Service classes for API communication (see `src/services/`)
 
@@ -302,7 +302,7 @@ The Python application uses asyncio throughout for:
 
 ### Electron/GUI Problems
 - Ensure Node.js and npm are installed
-- Check Node version compatibility (14+)
+- Check Node version compatibility (16+)
 - Verify API server is running on expected host/port
 - Check browser console for React errors (F12 in dev mode)
 - Review main.js for Electron configuration issues

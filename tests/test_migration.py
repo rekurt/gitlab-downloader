@@ -411,7 +411,7 @@ class TestMigrationExecutor:
         script = MigrationExecutor._create_author_mapping_script(mappings)
         assert "john@example.com" in script
         assert "bob@example.com" in script
-        assert "||" in script  # Should have OR operator between conditions
+        assert "if" in script and "elif" in script and "fi" in script
 
     def test_create_author_mapping_script_empty_mappings(self):
         """Test creating author mapping script with no mappings."""

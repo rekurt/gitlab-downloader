@@ -125,12 +125,12 @@ class TestPythonBinaryEmbedding:
 class TestMainJSIntegration:
     """Test main.js integration with embedded binary."""
 
-    def test_main_js_has_extract_function(self):
-        """Test that main.js has extractEmbeddedBinary function."""
+    def test_main_js_has_python_executable_path(self):
+        """Test that main.js has getPythonExecutablePath function."""
         main_path = Path(__file__).parent.parent / "electron" / "main.js"
         content = main_path.read_text()
-        assert "extractEmbeddedBinary" in content, (
-            "main.js should have extractEmbeddedBinary function"
+        assert "getPythonExecutablePath" in content, (
+            "main.js should have getPythonExecutablePath function"
         )
 
     def test_main_js_supports_embedded_binary(self):
@@ -147,12 +147,12 @@ class TestMainJSIntegration:
         content = main_path.read_text()
         assert "try" in content and "catch" in content, "main.js should have error handling"
 
-    def test_main_js_caches_extracted_binary(self):
-        """Test that main.js caches extracted binary."""
+    def test_main_js_uses_resources_path(self):
+        """Test that main.js uses resourcesPath for production binary."""
         main_path = Path(__file__).parent.parent / "electron" / "main.js"
         content = main_path.read_text()
-        assert "app.getPath" in content or "appData" in content, (
-            "main.js should use persistent app data directory"
+        assert "process.resourcesPath" in content, (
+            "main.js should use process.resourcesPath for production binary"
         )
 
     def test_main_js_preserves_dev_behavior(self):

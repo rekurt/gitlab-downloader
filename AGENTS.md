@@ -29,7 +29,6 @@ Supports personal access tokens (PAT) and OAuth 2.0 device flow for authenticati
 - **Key components**:
   - `MigrationWizard.js`: Guides users through repository selection and configuration (author/committer mapping).
   - `RepoList.js`: Displays cloned repositories and their status.
-  - `ConfigViewer.js`: Displays and edits migration configuration.
   - `AuthorMapper.js`: UI for mapping original to new author information.
   - `ProgressIndicator.js`: Shows real-time migration progress.
 - **API communication**: Uses `services/api.js` to call Python REST API endpoints (see "REST API Endpoints" below).
@@ -58,7 +57,7 @@ The Electron GUI communicates with the Python backend via these REST API endpoin
 - `.env.example`: sample env vars for local runs.
 - `repositories/`: default clone target (created at runtime). Avoid committing its contents.
 - `electron/`: Electron GUI frontend directory. Contains Node.js/React application for desktop GUI. See "Electron GUI Frontend" section above.
-- `electron-builder.yml`: Configuration file for electron-builder, defines build targets for different platforms (Windows, macOS, Linux).
+- `electron-builder.config.js`: Configuration file for electron-builder, defines build targets for different platforms (Windows, macOS, Linux).
 
 ## Authentication
 Two auth methods are supported (selected via `--auth-method` or interactive prompt):
