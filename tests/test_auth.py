@@ -495,7 +495,7 @@ class TestPollDeviceToken:
             )
             mocked.post("https://gitlab.com/oauth/token", payload=token_response)
 
-            with patch("gitlab_downloader.auth.asyncio_sleep", new_callable=AsyncMock):
+            with patch("asyncio.sleep", new_callable=AsyncMock):
                 async with aiohttp.ClientSession() as session:
                     result = await _poll_device_token(session, cfg, "dev-code", 1, 60)
 
@@ -524,7 +524,7 @@ class TestPollDeviceToken:
             mocked.post("https://gitlab.com/oauth/token", payload=token_response)
 
             mock_sleep = AsyncMock()
-            with patch("gitlab_downloader.auth.asyncio_sleep", mock_sleep):
+            with patch("asyncio.sleep", mock_sleep):
                 async with aiohttp.ClientSession() as session:
                     result = await _poll_device_token(session, cfg, "dev-code", 1, 60)
 

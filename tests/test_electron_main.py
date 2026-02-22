@@ -63,7 +63,7 @@ class TestElectronStructure:
 
     def test_webpack_config_exists(self) -> None:
         """Test that webpack configuration exists."""
-        webpack_config = Path(__file__).parent.parent / "webpack.config.js"
+        webpack_config = Path(__file__).parent.parent / "electron" / "webpack.config.js"
         assert webpack_config.exists(), "webpack.config.js should exist"
 
         with open(webpack_config) as f:
@@ -214,16 +214,14 @@ class TestPreloadJsStructure:
 class TestPythonBackendIntegration:
     """Test Python backend integration."""
 
-    def test_api_module_has_main_support(self) -> None:
-        """Test that api.py can be run as a module."""
+    def test_api_module_has_create_app(self) -> None:
+        """Test that api.py has create_app and run_api_server_async."""
         api_py = Path(__file__).parent.parent / "gitlab_downloader" / "api.py"
         with open(api_py) as f:
             content = f.read()
 
-        assert 'if __name__ == "__main__"' in content
-        assert "argparse" in content
-        assert "--host" in content
-        assert "--port" in content
+        assert "def create_app" in content
+        assert "async def run_api_server_async" in content
 
     def test_main_module_exists(self) -> None:
         """Test that __main__.py exists for module execution."""
@@ -315,7 +313,7 @@ class TestWebpackConfiguration:
 
     def test_webpack_babel_loader(self) -> None:
         """Test that webpack is configured for Babel."""
-        webpack_config = Path(__file__).parent.parent / "webpack.config.js"
+        webpack_config = Path(__file__).parent.parent / "electron" / "webpack.config.js"
         with open(webpack_config) as f:
             content = f.read()
 
@@ -325,7 +323,7 @@ class TestWebpackConfiguration:
 
     def test_webpack_css_loader(self) -> None:
         """Test that webpack is configured for CSS."""
-        webpack_config = Path(__file__).parent.parent / "webpack.config.js"
+        webpack_config = Path(__file__).parent.parent / "electron" / "webpack.config.js"
         with open(webpack_config) as f:
             content = f.read()
 
@@ -334,7 +332,7 @@ class TestWebpackConfiguration:
 
     def test_webpack_html_plugin(self) -> None:
         """Test that webpack uses HtmlWebpackPlugin."""
-        webpack_config = Path(__file__).parent.parent / "webpack.config.js"
+        webpack_config = Path(__file__).parent.parent / "electron" / "webpack.config.js"
         with open(webpack_config) as f:
             content = f.read()
 

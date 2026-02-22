@@ -365,7 +365,7 @@ class ConfigFileManager:
                     raise ValueError(f"Config file must be a dictionary, got {type(data).__name__}")
 
                 return ConfigFileManager._validate_and_create_config(data)
-            except Exception as e:
+            except (json.JSONDecodeError, yaml.YAMLError, ValueError) as e:
                 raise ValueError(f"Failed to load config from {config_file}: {e}") from e
 
         return None

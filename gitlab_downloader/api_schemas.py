@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -138,15 +138,3 @@ class ConfigGetResponse(BaseModel):
     config: ConfigContentResponse | None = Field(
         None, description="Migration configuration content when found=true"
     )
-
-
-class ValidationErrorResponse(BaseModel):
-    """Validation or bad request response."""
-
-    detail: str = Field(..., description="Validation error details")
-
-
-class ServerErrorResponse(BaseModel):
-    """Unexpected server error response."""
-
-    detail: str | dict[str, Any] = Field(..., description="Server-side error details")

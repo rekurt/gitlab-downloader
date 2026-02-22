@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -135,21 +136,15 @@ async def _poll_device_token(
 
             error = str(body.get("error", "")) if isinstance(body, dict) else ""
             if error == "authorization_pending":
-                await asyncio_sleep(wait_seconds)
+                await asyncio.sleep(wait_seconds)
                 continue
             if error == "slow_down":
                 wait_seconds = min(wait_seconds + 2, RETRY_BACKOFF_MAX)
-                await asyncio_sleep(wait_seconds)
+                await asyncio.sleep(wait_seconds)
                 continue
             raise RuntimeError(f"Device token polling failed: {error or response.status}")
 
     raise RuntimeError("Device authorization expired before completion")
-
-
-async def asyncio_sleep(seconds: float) -> None:
-    import asyncio
-
-    await asyncio.sleep(seconds)
 
 
 def _normalize_oauth_payload(

@@ -90,9 +90,9 @@ def _validate_path(path_str: str, allow_parent_refs: bool = False) -> Path:
     # After normalization, verify path doesn't escape intended boundaries
     # by checking if it's within allowed parent directories
     if not allow_parent_refs:
-        # For safety, ensure the resolved path doesn't contain .. components
-        # (resolve() eliminates these, but we validate the string for defense in depth)
-        if ".." in path_str:
+        # Check for ".." as an actual path component (not just a substring)
+        # resolve() eliminates these, but we reject suspicious input early
+        if ".." in Path(path_str).parts:
             raise ValueError(f"Path traversal not allowed: {path_str}")
 
     return path
@@ -128,8 +128,9 @@ def _sanitize_repo_url(url: str) -> str:
             netloc = parsed.hostname
             if parsed.port:
                 netloc = f"{netloc}:{parsed.port}"
+            # Strip query params and fragments which could contain tokens
             sanitized = urlunparse(
-                (parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
+                (parsed.scheme, netloc, parsed.path, "", "", "")
             )
             return sanitized
 
@@ -188,14 +189,22 @@ def _find_git_repos(
                 continue
 
             git_dir = item / ".git"
+            if git_dir.is_symlink():
+                continue  # Skip symlinked .git to prevent information disclosure
             if git_dir.exists():
                 url = ""
                 try:
                     config_path = git_dir / "config"
-                    if config_path.exists():
+                    if config_path.is_symlink():
+                        pass  # Skip symlinked config files
+                    elif config_path.exists():
                         config_text = config_path.read_text()
+                        in_origin = False
                         for line in config_text.split("\n"):
-                            if "url =" in line:
+                            stripped = line.strip()
+                            if stripped.startswith("["):
+                                in_origin = stripped == '[remote "origin"]'
+                            elif in_origin and "url =" in line:
                                 parts = line.split("=", 1)
                                 if len(parts) == 2:
                                     raw_url = parts[1].strip()

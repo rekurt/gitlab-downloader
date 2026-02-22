@@ -6,8 +6,6 @@ import asyncio
 import logging
 import os
 import secrets
-import signal
-import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
@@ -23,30 +21,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-
-OPENAPI_TAGS = [
-    {
-        "name": "health",
-        "description": "Service health and version endpoints.",
-    },
-    {
-        "name": "repositories",
-        "description": "Operations with local cloned repositories.",
-    },
-    {
-        "name": "mappings",
-        "description": "Author and committer mapping management.",
-    },
-    {
-        "name": "migration",
-        "description": "Repository migration workflow endpoints.",
-    },
-    {
-        "name": "config",
-        "description": "Read and write migration configuration files.",
-    },
-]
 
 
 def create_app() -> FastAPI:
@@ -90,7 +64,6 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
-        openapi_tags=OPENAPI_TAGS,
         lifespan=lifespan,
     )
 
@@ -146,15 +119,6 @@ def create_app() -> FastAPI:
     return app
 
 
-def generate_api_token() -> str:
-    """Generate a random API token for securing mutating endpoints.
-
-    Returns:
-        Random URL-safe token string
-    """
-    return secrets.token_urlsafe(32)
-
-
 async def run_api_server_async(host: str = "127.0.0.1", port: int = 8000) -> None:
     """Run the API server asynchronously from within an event loop.
 
@@ -174,43 +138,3 @@ async def run_api_server_async(host: str = "127.0.0.1", port: int = 8000) -> Non
         await server.serve()
     except Exception as e:  # pylint: disable=broad-except
         logger.error(f"Server error: {e}", exc_info=True)
-
-
-def run_api_server(host: str = "127.0.0.1", port: int = 8000) -> None:
-    """Run the API server.
-
-    Args:
-        host: Host to bind to
-        port: Port to bind to
-    """
-    import uvicorn
-
-    app = create_app()
-
-    # Set up signal handlers for graceful shutdown
-    def signal_handler(sig: int, frame: object) -> None:
-        """Handle shutdown signals."""
-        logger.info(f"Received signal {sig}, shutting down...")
-        sys.exit(0)
-
-    signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGINT, signal_handler)
-
-    logger.info(f"Starting API server on {host}:{port}")
-    try:
-        uvicorn.run(app, host=host, port=port, log_level="info")
-    except KeyboardInterrupt:
-        logger.info("Server interrupted by user")
-    except Exception as e:  # pylint: disable=broad-except
-        logger.error(f"Server error: {e}", exc_info=True)
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="GitLab Dump API Server")
-    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
-    parser.add_argument("--port", type=int, default=8000, help="Port to bind to (default: 8000)")
-    args = parser.parse_args()
-
-    run_api_server(host=args.host, port=args.port)

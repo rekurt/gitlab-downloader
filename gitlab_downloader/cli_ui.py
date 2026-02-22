@@ -16,7 +16,6 @@ from .author_mapper import AuthorMapper
 from .models import AuthorMapping, CommitterMapping, MigrationConfig
 
 logger = logging.getLogger(__name__)
-console = Console()
 
 
 class CLIMenu:

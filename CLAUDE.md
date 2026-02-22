@@ -276,7 +276,7 @@ The Python application uses asyncio throughout for:
 
 ### Frontend-Backend Communication
 - Electron GUI communicates with API via REST endpoints
-- Axios client with base URL configuration
+- Custom APIClient class using native fetch API with base URL configuration
 - Service classes encapsulate API logic
 - Proper error handling and user feedback
 

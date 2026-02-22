@@ -378,7 +378,7 @@ git commit -m "feat: description of changes"
 **CLI commands not working**
 - Ensure package is installed in development mode: `pip install -e .[dev]`
 - Check that virtual environment is activated
-- Use `python -m gitlab_downloader.cli --help` for help
+- Use `python -m gitlab_downloader --help` for help
 
 **Git credentials issues during testing**
 - Use real credentials only for local testing
