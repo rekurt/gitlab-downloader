@@ -95,19 +95,20 @@ function AuthorMapper({ apiEndpoint, onSave, onCancel }) {
           return acc;
         }, {});
 
-      const response = await fetch(`${apiEndpoint}/api/author-mappings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          author_mappings: authorMappings,
-          committer_mappings: committerMappings,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to save mappings: ${response.statusText}`);
+      // Try to persist mappings to disk (best-effort, don't block wizard)
+      try {
+        await fetch(`${apiEndpoint}/api/author-mappings`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            author_mappings: authorMappings,
+            committer_mappings: committerMappings,
+          }),
+        });
+      } catch {
+        // Saving to disk is optional; mappings are passed in-memory to migration
       }
 
       if (onSave) {

@@ -37,11 +37,15 @@ class APIClient {
       await this.initialize();
     }
 
+    this.retries = 0;
+    return this._checkStatusWithRetries();
+  }
+
+  async _checkStatusWithRetries() {
     try {
       if (window.electronAPI) {
         const isAvailable = await window.electronAPI.checkApiStatus();
         if (isAvailable) {
-          this.retries = 0;
           return { status: "ok", available: true };
         }
       }
@@ -49,7 +53,7 @@ class APIClient {
       if (this.retries < this.maxRetries) {
         this.retries += 1;
         await this.delay(this.retryDelay);
-        return this.checkStatus();
+        return this._checkStatusWithRetries();
       }
 
       return { status: "error", available: false };

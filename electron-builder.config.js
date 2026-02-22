@@ -17,6 +17,8 @@ module.exports = {
     'preload.js',
     'dist/**/*',
     'node_modules/**/*',
+  ],
+  extraResources: [
     {
       from: 'python_binary',
       to: 'python',

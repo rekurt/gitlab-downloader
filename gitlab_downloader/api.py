@@ -101,6 +101,7 @@ def create_app() -> FastAPI:
             "http://127.0.0.1:3000",
             "http://localhost:8080",
             "http://127.0.0.1:8080",
+            "null",  # file:// protocol sends Origin: null (Electron production builds)
         ],
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "DELETE"],

@@ -172,6 +172,54 @@ def _sanitize_repo_url(url: str) -> str:
     return ""
 
 
+def _find_git_repos(
+    base_path: Path, max_depth: int = 10, current_depth: int = 0
+) -> list[RepositoryInfo]:
+    """Recursively find git repositories up to max_depth (synchronous)."""
+    if current_depth > max_depth:
+        return []
+
+    results: list[RepositoryInfo] = []
+    try:
+        for item in base_path.iterdir():
+            if not item.is_dir():
+                continue
+
+            git_dir = item / ".git"
+            if git_dir.exists():
+                url = ""
+                try:
+                    config_path = git_dir / "config"
+                    if config_path.exists():
+                        config_text = config_path.read_text()
+                        for line in config_text.split("\n"):
+                            if "url =" in line:
+                                parts = line.split("=", 1)
+                                if len(parts) == 2:
+                                    raw_url = parts[1].strip()
+                                    url = _sanitize_repo_url(raw_url)
+                                    break
+                except Exception as e:
+                    logger.warning(f"Could not read git config for {item.name}: {e}")
+
+                results.append(
+                    RepositoryInfo(
+                        name=item.name,
+                        path=str(item.absolute()),
+                        url=url,
+                        last_updated=None,
+                    )
+                )
+            else:
+                results.extend(
+                    _find_git_repos(item, max_depth=max_depth, current_depth=current_depth + 1)
+                )
+    except (PermissionError, OSError) as e:
+        logger.debug(f"Could not read directory {base_path}: {e}")
+
+    return results
+
+
 @router.get("/repos", response_model=RepositoriesListResponse)
 async def list_repositories(clone_path: str = ".") -> RepositoriesListResponse:
     """List cloned repositories in the specified path, including nested directories."""
@@ -180,50 +228,7 @@ async def list_repositories(clone_path: str = ".") -> RepositoriesListResponse:
         if not repo_path.exists():
             return RepositoriesListResponse(total=0, repositories=[])
 
-        repositories = []
-
-        def find_git_repos(base_path: Path, max_depth: int = 10, current_depth: int = 0) -> None:
-            """Recursively find git repositories up to max_depth."""
-            if current_depth > max_depth:
-                return
-
-            try:
-                for item in base_path.iterdir():
-                    if not item.is_dir():
-                        continue
-
-                    git_dir = item / ".git"
-                    if git_dir.exists():
-                        # Found a git repository
-                        url = ""
-                        try:
-                            config_path = git_dir / "config"
-                            if config_path.exists():
-                                config_text = config_path.read_text()
-                                for line in config_text.split("\n"):
-                                    if "url =" in line:
-                                        parts = line.split("=", 1)
-                                        if len(parts) == 2:
-                                            raw_url = parts[1].strip()
-                                            url = _sanitize_repo_url(raw_url)
-                                            break
-                        except Exception as e:
-                            logger.warning(f"Could not read git config for {item.name}: {e}")
-
-                        repo_info = RepositoryInfo(
-                            name=item.name,
-                            path=str(item.absolute()),
-                            url=url,
-                            last_updated=None,
-                        )
-                        repositories.append(repo_info)
-                    else:
-                        # Recurse into subdirectories
-                        find_git_repos(item, max_depth=max_depth, current_depth=current_depth + 1)
-            except (PermissionError, OSError) as e:
-                logger.debug(f"Could not read directory {base_path}: {e}")
-
-        find_git_repos(repo_path)
+        repositories = await asyncio.to_thread(_find_git_repos, repo_path)
 
         return RepositoriesListResponse(total=len(repositories), repositories=repositories)
 
