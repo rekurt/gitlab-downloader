@@ -6,10 +6,9 @@ endpoint contracts at runtime, rather than testing static dictionaries.
 
 from __future__ import annotations
 
-import subprocess
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -56,56 +55,6 @@ class TestAPIServerInitialization:
             "/api/migrate",
         }
         assert required_routes.issubset(routes)
-
-
-class TestIPCBridgeConfiguration:
-    """Test IPC bridge configuration for Electron communication."""
-
-    def test_electron_api_endpoint_exposed(self) -> None:
-        """Test that electronAPI.getApiEndpoint is configured."""
-        host = "127.0.0.1"
-        port = 5000
-        expected_endpoint = f"http://{host}:{port}"
-        assert expected_endpoint == "http://127.0.0.1:5000"
-
-    def test_electron_api_status_check(self) -> None:
-        """Test that API status check is configured."""
-        api_endpoint = "http://127.0.0.1:5000"
-        status_endpoint = f"{api_endpoint}/api/status"
-        assert "/api/status" in status_endpoint
-
-
-class TestBackendProcessManagement:
-    """Test backend process spawning and lifecycle."""
-
-    @patch("subprocess.Popen")
-    def test_spawn_python_backend_with_correct_args(self, mock_popen: Mock) -> None:
-        """Test that Python backend is spawned with correct arguments."""
-        mock_process = MagicMock()
-        mock_popen.return_value = mock_process
-
-        host = "127.0.0.1"
-        port = 5000
-        python_path = "/path/to/python"
-
-        process = subprocess.Popen(
-            [
-                python_path,
-                "-m",
-                "gitlab_downloader.api",
-                "--host",
-                host,
-                "--port",
-                str(port),
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-
-        assert process is not None
-        called_args = mock_popen.call_args
-        if called_args:
-            assert "gitlab_downloader.api" in called_args[0][0]
 
 
 class TestFrontendBackendCommunication:
@@ -299,30 +248,3 @@ class TestErrorHandling:
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 0
-
-
-class TestElectronIPCHandlers:
-    """Test Electron IPC handlers setup."""
-
-    def test_get_api_endpoint_handler(self) -> None:
-        """Test get-api-endpoint IPC handler format."""
-        host = "127.0.0.1"
-        port = 5000
-        expected_endpoint = f"http://{host}:{port}"
-
-        assert isinstance(expected_endpoint, str)
-        assert expected_endpoint.startswith("http://")
-
-    def test_get_backend_status_handler(self) -> None:
-        """Test get-backend-status IPC handler format."""
-        backend_status = {
-            "running": True,
-            "pid": 12345,
-            "host": "127.0.0.1",
-            "port": 5000,
-        }
-
-        assert isinstance(backend_status["running"], bool)
-        assert isinstance(backend_status["pid"], (int, type(None)))
-        assert isinstance(backend_status["host"], str)
-        assert isinstance(backend_status["port"], int)

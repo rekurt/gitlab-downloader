@@ -269,7 +269,7 @@ The Python application uses asyncio throughout for:
 - Configurable concurrency limits to prevent overwhelming servers
 
 ### Configuration Management
-- Centralized `config.py` with `Config` dataclass
+- Centralized `config.py` with `GitlabConfig` dataclass (defined in `models.py`)
 - Environment variable support via `.env`
 - CLI argument overrides environment variables
 - Validation at startup
