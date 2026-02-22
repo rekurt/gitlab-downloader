@@ -50,9 +50,9 @@ The Electron app runs `python -m gitlab_downloader.api --host 127.0.0.1 --port 8
 **Files:**
 - Modify: `gitlab_downloader/api_routes.py`
 
-- [ ] Add base directory boundary check to `_validate_path` - ensure resolved path starts with an expected prefix (e.g., the clone_path or home directory)
-- [ ] Update tests for path validation
-- [ ] Run project test suite - must pass before task 4
+- [x] Add base directory boundary check to `_validate_path` - ensure resolved path starts with an expected prefix (e.g., the clone_path or home directory)
+- [x] Update tests for path validation
+- [x] Run project test suite - must pass before task 4
 
 ### Task 4: Add auth method fallback warning
 

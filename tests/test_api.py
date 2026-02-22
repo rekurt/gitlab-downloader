@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from gitlab_downloader.api import _parse_args, create_app
+from gitlab_downloader.api_routes import _validate_path
 from gitlab_downloader.api_schemas import (
     AuthorMappingRequest,
     MigrationStartRequest,
@@ -105,15 +106,19 @@ class TestAuthorMappingsEndpoint:
     """Tests for /api/author-mappings endpoint."""
 
     @mock.patch("gitlab_downloader.api_routes.AuthorMapper")
-    @mock.patch("gitlab_downloader.api_routes.Path")
+    @mock.patch("gitlab_downloader.api_routes._validate_path")
     def test_get_author_mappings(
-        self, mock_path_class: mock.MagicMock, mock_mapper_class: mock.MagicMock, client: TestClient
+        self,
+        mock_validate: mock.MagicMock,
+        mock_mapper_class: mock.MagicMock,
+        client: TestClient,
     ) -> None:
         """Test getting author mappings."""
         # Setup mocks
         mock_path = mock.MagicMock()
-        mock_path_class.return_value = mock_path
-        mock_path.exists.return_value = True
+        mock_validate.return_value = mock_path
+        config_file = mock_path / "migration_config.json"
+        config_file.exists.return_value = True
 
         mock_mapper = mock.MagicMock()
         mock_mapper_class.return_value = mock_mapper
@@ -134,12 +139,12 @@ class TestAuthorMappingsEndpoint:
         assert data["john"]["new_name"] == "Jane Doe"
 
     @mock.patch("gitlab_downloader.api_routes.ConfigFileManager")
-    @mock.patch("gitlab_downloader.api_routes.Path")
+    @mock.patch("gitlab_downloader.api_routes._validate_path")
     @mock.patch("gitlab_downloader.api_routes.AuthorMapper")
     def test_save_author_mappings(
         self,
         mock_mapper_class: mock.MagicMock,
-        mock_path_class: mock.MagicMock,
+        mock_validate: mock.MagicMock,
         mock_config_manager_class: mock.MagicMock,
         client: TestClient,
     ) -> None:
@@ -148,7 +153,7 @@ class TestAuthorMappingsEndpoint:
         mock_mapper_class.return_value = mock_mapper
 
         mock_path = mock.MagicMock()
-        mock_path_class.return_value = mock_path
+        mock_validate.return_value = mock_path
 
         # Mock ConfigFileManager.load_config to return valid config
         mock_config_manager = mock.MagicMock()
@@ -177,12 +182,12 @@ class TestAuthorMappingsEndpoint:
         mock_mapper.save_mappings.assert_called_once()
 
     @mock.patch("gitlab_downloader.api_routes.ConfigFileManager")
-    @mock.patch("gitlab_downloader.api_routes.Path")
+    @mock.patch("gitlab_downloader.api_routes._validate_path")
     @mock.patch("gitlab_downloader.api_routes.AuthorMapper")
     def test_save_author_mappings_invalid_config(
         self,
         mock_mapper_class: mock.MagicMock,
-        mock_path_class: mock.MagicMock,
+        mock_validate: mock.MagicMock,
         mock_config_manager_class: mock.MagicMock,
         client: TestClient,
     ) -> None:
@@ -191,7 +196,7 @@ class TestAuthorMappingsEndpoint:
         mock_mapper_class.return_value = mock_mapper
 
         mock_path = mock.MagicMock()
-        mock_path_class.return_value = mock_path
+        mock_validate.return_value = mock_path
 
         # Mock ConfigFileManager.load_config to raise ValueError (invalid config)
         mock_config_manager_class.load_config.side_effect = ValueError(
@@ -302,11 +307,12 @@ class TestMigrationEndpoint:
         self,
         mock_create_task: mock.MagicMock,
         mock_executor_class: mock.MagicMock,
+        tmp_path: Path,
         client: TestClient,
     ) -> None:
         """Test starting a migration."""
         request_data = {
-            "repo_path": "/path/to/repo",
+            "repo_path": str(tmp_path),
             "author_mappings": {
                 "john": {
                     "original_name": "John Doe",
@@ -324,10 +330,12 @@ class TestMigrationEndpoint:
         assert "migration_id" in data
         assert len(data["migration_id"]) > 0
 
-    def test_start_migration_empty_mappings(self, client: TestClient) -> None:
+    def test_start_migration_empty_mappings(
+        self, tmp_path: Path, client: TestClient
+    ) -> None:
         """Test starting migration with empty mappings."""
         request_data = {
-            "repo_path": "/path/to/repo",
+            "repo_path": str(tmp_path),
             "author_mappings": {},
             "committer_mappings": {},
         }
@@ -352,12 +360,13 @@ class TestMigrationProgressEndpoint:
         self,
         mock_create_task: mock.MagicMock,
         mock_executor_class: mock.MagicMock,
+        tmp_path: Path,
         client: TestClient,
     ) -> None:
         """Test getting progress for pending migration."""
         # Start a migration
         request_data = {
-            "repo_path": "/path/to/repo",
+            "repo_path": str(tmp_path),
             "author_mappings": {},
             "committer_mappings": {},
         }
@@ -377,19 +386,23 @@ class TestMigrationProgressEndpoint:
 class TestErrorHandling:
     """Tests for error handling."""
 
-    @mock.patch("gitlab_downloader.api_routes.Path")
+    @mock.patch("gitlab_downloader.api_routes._validate_path")
     @mock.patch("gitlab_downloader.api_routes.AuthorMapper")
     def test_author_mappings_read_error(
-        self, mock_mapper_class: mock.MagicMock, mock_path_class: mock.MagicMock, client: TestClient
+        self,
+        mock_mapper_class: mock.MagicMock,
+        mock_validate: mock.MagicMock,
+        client: TestClient,
     ) -> None:
         """Test error handling when reading author mappings fails."""
+        mock_path_instance = mock.MagicMock()
+        mock_validate.return_value = mock_path_instance
+        config_file = mock_path_instance / "migration_config.json"
+        config_file.exists.return_value = True
+
         mock_mapper = mock.MagicMock()
         mock_mapper_class.return_value = mock_mapper
         mock_mapper.load_mappings.side_effect = OSError("File not found")
-
-        mock_path_instance = mock.MagicMock()
-        mock_path_class.return_value = mock_path_instance
-        mock_path_instance.exists.return_value = False
 
         response = client.get("/api/author-mappings", params={"config_path": "."})
         assert response.status_code == 500
@@ -529,3 +542,80 @@ class TestApiModuleInvocation:
             # The coroutine was created with the parsed args
             # Close the coroutine to avoid RuntimeWarning
             call_args.close()
+
+
+class TestValidatePath:
+    """Tests for _validate_path boundary validation."""
+
+    def test_valid_path_within_home(self, tmp_path: Path) -> None:
+        """Test that a path within home directory is accepted."""
+        # tmp_path is under the system temp dir; use it as explicit base_dir
+        result = _validate_path(str(tmp_path), base_dir=tmp_path)
+        assert result == tmp_path.resolve()
+
+    def test_valid_subpath_within_base(self, tmp_path: Path) -> None:
+        """Test that a sub-path within base directory is accepted."""
+        subdir = tmp_path / "sub" / "dir"
+        subdir.mkdir(parents=True)
+        result = _validate_path(str(subdir), base_dir=tmp_path)
+        assert result == subdir.resolve()
+
+    def test_rejects_path_outside_base_dir(self, tmp_path: Path) -> None:
+        """Test that a path outside the base directory is rejected."""
+        base = tmp_path / "allowed"
+        base.mkdir()
+        outside = tmp_path / "forbidden"
+        outside.mkdir()
+        with pytest.raises(ValueError, match="resolves outside allowed directories"):
+            _validate_path(str(outside), base_dir=base)
+
+    def test_rejects_traversal_with_dotdot(self, tmp_path: Path) -> None:
+        """Test that '..' path components are rejected."""
+        subdir = tmp_path / "sub"
+        subdir.mkdir()
+        with pytest.raises(ValueError, match="Path traversal not allowed"):
+            _validate_path(str(subdir) + "/../etc/passwd", base_dir=tmp_path)
+
+    def test_rejects_root_path(self, tmp_path: Path) -> None:
+        """Test that root path is rejected when base_dir is a subdirectory."""
+        with pytest.raises(ValueError, match="resolves outside allowed directories"):
+            _validate_path("/", base_dir=tmp_path)
+
+    def test_rejects_etc_passwd(self, tmp_path: Path) -> None:
+        """Test that /etc/passwd is rejected with a restricted base_dir."""
+        with pytest.raises(ValueError, match="resolves outside allowed directories"):
+            _validate_path("/etc/passwd", base_dir=tmp_path)
+
+    def test_default_base_dir_is_home(self) -> None:
+        """Test that default base_dir uses _allowed_base_dirs (which includes home)."""
+        home = Path.home()
+        result = _validate_path(str(home))
+        assert result == home.resolve()
+
+    def test_rejects_outside_all_allowed_dirs(self) -> None:
+        """Test that paths outside all allowed base dirs are rejected."""
+        import gitlab_downloader.api_routes as routes
+
+        # Temporarily set _allowed_base_dirs to a single restricted directory
+        original = routes._allowed_base_dirs.copy()
+        try:
+            routes._allowed_base_dirs[:] = [Path.home().resolve()]
+            # /nonexistent is definitely not under home
+            with pytest.raises(ValueError, match="resolves outside allowed directories"):
+                _validate_path("/nonexistent")
+        finally:
+            routes._allowed_base_dirs[:] = original
+
+    def test_repos_endpoint_rejects_traversal(self, client: TestClient) -> None:
+        """Test that /api/repos rejects path traversal."""
+        response = client.get(
+            "/api/repos", params={"clone_path": "/tmp/../etc/shadow"}
+        )
+        assert response.status_code == 400
+
+    def test_config_endpoint_rejects_traversal(self, client: TestClient) -> None:
+        """Test that /api/config rejects path traversal."""
+        response = client.get(
+            "/api/config", params={"repo_path": "/tmp/../etc"}
+        )
+        assert response.status_code == 400

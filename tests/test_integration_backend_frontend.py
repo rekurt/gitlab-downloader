@@ -159,11 +159,12 @@ class TestFrontendBackendCommunication:
         self,
         mock_create_task: MagicMock,
         mock_executor: MagicMock,
+        tmp_path: Path,
         client: TestClient,
     ) -> None:
         """Test POST /api/migrate and GET /api/migration-progress roundtrip."""
         migration_request = {
-            "repo_path": "/tmp/test-repo",
+            "repo_path": str(tmp_path),
             "author_mappings": {
                 "john": {
                     "original_name": "John Doe",
@@ -228,7 +229,9 @@ class TestAPITokenProtection:
         assert response.status_code == 403
         assert "Invalid or missing API token" in response.json()["detail"]
 
-    def test_post_with_valid_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_post_with_valid_token(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """Test that POST requests succeed with valid API token."""
         monkeypatch.setenv("GITLAB_DUMP_API_TOKEN", "test-secret-token")
         app = create_app()
@@ -239,7 +242,7 @@ class TestAPITokenProtection:
                 response = token_client.post(
                     "/api/migrate",
                     json={
-                        "repo_path": "/tmp/test",
+                        "repo_path": str(tmp_path),
                         "author_mappings": {},
                         "committer_mappings": {},
                     },
@@ -263,14 +266,16 @@ class TestAPITokenProtection:
         )
         assert response.status_code == 200
 
-    def test_no_token_env_allows_all(self, client: TestClient) -> None:
+    def test_no_token_env_allows_all(
+        self, tmp_path: Path, client: TestClient
+    ) -> None:
         """Test that without GITLAB_DUMP_API_TOKEN env, all requests pass."""
         with patch("gitlab_downloader.api_routes.MigrationExecutor"):
             with patch("gitlab_downloader.api_routes.asyncio.create_task"):
                 response = client.post(
                     "/api/migrate",
                     json={
-                        "repo_path": "/tmp/test",
+                        "repo_path": str(tmp_path),
                         "author_mappings": {},
                         "committer_mappings": {},
                     },

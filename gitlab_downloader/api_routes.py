@@ -48,6 +48,11 @@ _MAX_MIGRATION_MESSAGES = 1000  # Cap progress messages to prevent unbounded mem
 # Lock for config file access to prevent race conditions (used by both /config and /author-mappings)
 _config_file_lock = asyncio.Lock()
 
+# Allowed base directories for path validation.
+# Resolved paths must start with one of these prefixes.
+# Defaults to the user's home directory; extend for testing or custom deployments.
+_allowed_base_dirs: list[Path] = [Path.home().resolve()]
+
 
 async def _cleanup_old_migrations() -> None:
     """Remove migration tasks older than TTL that are not still running."""
@@ -71,18 +76,25 @@ async def _cleanup_old_migrations() -> None:
             logger.error(f"Error during migration cleanup: {e}")
 
 
-def _validate_path(path_str: str, allow_parent_refs: bool = False) -> Path:
+def _validate_path(
+    path_str: str,
+    allow_parent_refs: bool = False,
+    base_dir: Path | None = None,
+) -> Path:
     """Validate and normalize a path to prevent directory traversal attacks.
 
     Args:
         path_str: Path string from user input
         allow_parent_refs: Whether to allow .. in paths (should be False for user input)
+        base_dir: If provided, the resolved path must be within this directory.
+                  If None, the path is checked against the module-level
+                  ``_allowed_base_dirs`` list (defaults to user home).
 
     Returns:
         Validated Path object
 
     Raises:
-        ValueError: If path contains invalid traversal patterns
+        ValueError: If path contains invalid traversal patterns or escapes allowed directories
     """
     # Normalize path first to handle symlinks and ..
     path = Path(path_str).expanduser().resolve()
@@ -95,7 +107,21 @@ def _validate_path(path_str: str, allow_parent_refs: bool = False) -> Path:
         if ".." in Path(path_str).parts:
             raise ValueError(f"Path traversal not allowed: {path_str}")
 
-    return path
+    # Verify the resolved path is within the allowed base directories
+    if base_dir is not None:
+        bases = [base_dir.resolve()]
+    else:
+        bases = _allowed_base_dirs
+
+    path_str_resolved = str(path)
+    for base in bases:
+        base_str = str(base)
+        if path_str_resolved == base_str or path_str_resolved.startswith(base_str + "/"):
+            return path
+
+    raise ValueError(
+        f"Path {path_str} resolves outside allowed directories"
+    )
 
 
 @router.get("/status", response_model=StatusResponse)
