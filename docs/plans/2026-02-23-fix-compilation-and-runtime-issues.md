@@ -78,12 +78,12 @@ When user configures OAuth but provides a token without OAuth client ID, the app
 
 ### Task 6: Verify acceptance criteria
 
-- [ ] Manual test: run `venv/bin/python -m gitlab_downloader.api --host 127.0.0.1 --port 19999` and verify server starts
-- [ ] Manual test: run `venv/bin/gitlab-dump --help` and verify CLI works
-- [ ] Run full test suite (`make test`)
-- [ ] Run linter (`make lint`)
-- [ ] Run type checker (`make typecheck`)
-- [ ] Verify test coverage meets 80%+
+- [x] Manual test: run `venv/bin/python -m gitlab_downloader.api --host 127.0.0.1 --port 19999` and verify server starts
+- [x] Manual test: run `venv/bin/gitlab-dump --help` and verify CLI works
+- [x] Run full test suite (`make test`)
+- [x] Run linter (`make lint`)
+- [x] Run type checker (`make typecheck`)
+- [x] Verify test coverage meets 80%+
 
 ### Task 7: Update documentation
 

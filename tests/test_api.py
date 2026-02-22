@@ -520,17 +520,16 @@ class TestApiModuleInvocation:
         assert args.host == "127.0.0.1"
         assert args.port == 3000
 
-    @mock.patch("gitlab_downloader.api.asyncio.run")
-    @mock.patch("gitlab_downloader.api._parse_args")
-    def test_main_block_calls_run_api_server(
-        self, mock_parse: mock.MagicMock, mock_asyncio_run: mock.MagicMock
-    ) -> None:
+    def test_main_block_calls_run_api_server(self) -> None:
         """Test that __main__ block invokes run_api_server_async with parsed args."""
         import runpy
 
-        mock_parse.return_value = mock.MagicMock(host="127.0.0.1", port=19999)
-
-        with mock.patch("gitlab_downloader.api.run_api_server_async"):
+        argv = ["gitlab_downloader.api", "--host", "127.0.0.1", "--port", "19999"]
+        with (
+            mock.patch("sys.argv", argv),
+            mock.patch("gitlab_downloader.api.asyncio.run") as mock_asyncio_run,
+            mock.patch("gitlab_downloader.api.run_api_server_async"),
+        ):
             mock_asyncio_run.return_value = None
             try:
                 runpy.run_module("gitlab_downloader.api", run_name="__main__")
@@ -619,3 +618,260 @@ class TestValidatePath:
             "/api/config", params={"repo_path": "/tmp/../etc"}
         )
         assert response.status_code == 400
+
+
+class TestSanitizeRepoUrl:
+    """Tests for _sanitize_repo_url."""
+
+    def test_empty_url(self) -> None:
+        from gitlab_downloader.api_routes import _sanitize_repo_url
+
+        assert _sanitize_repo_url("") == ""
+
+    def test_https_url_without_credentials(self) -> None:
+        from gitlab_downloader.api_routes import _sanitize_repo_url
+
+        url = "https://gitlab.com/group/repo.git"
+        assert _sanitize_repo_url(url) == "https://gitlab.com/group/repo.git"
+
+    def test_https_url_with_credentials(self) -> None:
+        from gitlab_downloader.api_routes import _sanitize_repo_url
+
+        url = "https://oauth2:mytoken@gitlab.com/group/repo.git"
+        result = _sanitize_repo_url(url)
+        assert "mytoken" not in result
+        assert "oauth2" not in result
+        assert "gitlab.com" in result
+
+    def test_https_url_with_port(self) -> None:
+        from gitlab_downloader.api_routes import _sanitize_repo_url
+
+        url = "https://user:pass@gitlab.com:8443/group/repo.git"
+        result = _sanitize_repo_url(url)
+        assert "user" not in result
+        assert "pass" not in result
+        assert "8443" in result
+
+    def test_ssh_url(self) -> None:
+        from gitlab_downloader.api_routes import _sanitize_repo_url
+
+        url = "git@gitlab.com:group/repo.git"
+        assert _sanitize_repo_url(url) == url
+
+    def test_plain_path_no_at(self) -> None:
+        from gitlab_downloader.api_routes import _sanitize_repo_url
+
+        assert _sanitize_repo_url("/path/to/repo") == "/path/to/repo"
+
+    def test_rejects_credential_like_pattern(self) -> None:
+        from gitlab_downloader.api_routes import _sanitize_repo_url
+
+        result = _sanitize_repo_url("user:password@host:path")
+        assert result == ""
+
+    def test_rejects_url_without_colon_after_at(self) -> None:
+        from gitlab_downloader.api_routes import _sanitize_repo_url
+
+        result = _sanitize_repo_url("user@hostpath")
+        assert result == ""
+
+    def test_rejects_invalid_host_with_slash(self) -> None:
+        from gitlab_downloader.api_routes import _sanitize_repo_url
+
+        result = _sanitize_repo_url("user@ho/st:path")
+        assert result == ""
+
+    def test_strips_query_params(self) -> None:
+        from gitlab_downloader.api_routes import _sanitize_repo_url
+
+        url = "https://gitlab.com/repo.git?token=secret"
+        result = _sanitize_repo_url(url)
+        assert "secret" not in result
+        assert "token" not in result
+
+
+class TestConfigEndpoint:
+    """Tests for /api/config endpoints."""
+
+    @mock.patch("gitlab_downloader.api_routes.ConfigFileManager")
+    def test_get_config_not_found(
+        self, mock_cfm: mock.MagicMock, tmp_path: Path, client: TestClient
+    ) -> None:
+        """Test getting config when no config file exists."""
+        mock_cfm.load_config.return_value = None
+        response = client.get("/api/config", params={"repo_path": str(tmp_path)})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["found"] is False
+        assert data["config"] is None
+
+    @mock.patch("gitlab_downloader.api_routes.ConfigFileManager")
+    def test_get_config_found(
+        self, mock_cfm: mock.MagicMock, tmp_path: Path, client: TestClient
+    ) -> None:
+        """Test getting config when config exists."""
+        mock_config = mock.MagicMock()
+        mock_config.source_repos_path = "/src"
+        mock_config.target_hosting_url = "https://target.com"
+        mock_config.author_mappings = {}
+        mock_config.committer_mappings = {}
+        mock_cfm.load_config.return_value = mock_config
+
+        response = client.get("/api/config", params={"repo_path": str(tmp_path)})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["found"] is True
+        assert data["config"]["source_repos_path"] == "/src"
+
+    @mock.patch("gitlab_downloader.api_routes.ConfigFileManager")
+    def test_get_config_error(
+        self, mock_cfm: mock.MagicMock, tmp_path: Path, client: TestClient
+    ) -> None:
+        """Test get_config error handling."""
+        mock_cfm.load_config.side_effect = RuntimeError("disk error")
+        response = client.get("/api/config", params={"repo_path": str(tmp_path)})
+        assert response.status_code == 500
+
+    @mock.patch("gitlab_downloader.api_routes.ConfigFileManager")
+    def test_save_config(
+        self, mock_cfm: mock.MagicMock, tmp_path: Path, client: TestClient
+    ) -> None:
+        """Test saving config."""
+        request_data = {
+            "repo_path": str(tmp_path),
+            "source_repos_path": str(tmp_path),
+            "target_hosting_url": "https://target.gitlab.com",
+            "target_token": "tok123",
+            "author_mappings": {},
+            "committer_mappings": {},
+            "format": "json",
+        }
+        response = client.post("/api/config", json=request_data)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "saved"
+        mock_cfm.save_config.assert_called_once()
+
+    @mock.patch("gitlab_downloader.api_routes.ConfigFileManager")
+    def test_save_config_error(
+        self, mock_cfm: mock.MagicMock, tmp_path: Path, client: TestClient
+    ) -> None:
+        """Test save_config error handling."""
+        mock_cfm.save_config.side_effect = RuntimeError("write error")
+        request_data = {
+            "repo_path": str(tmp_path),
+            "source_repos_path": str(tmp_path),
+            "target_hosting_url": "https://target.gitlab.com",
+            "target_token": "tok123",
+            "author_mappings": {},
+            "committer_mappings": {},
+            "format": "json",
+        }
+        response = client.post("/api/config", json=request_data)
+        assert response.status_code == 500
+
+
+class TestFindGitRepos:
+    """Tests for _find_git_repos."""
+
+    def test_max_depth_exceeded(self, tmp_path: Path) -> None:
+        """Test that max_depth prevents infinite recursion."""
+        from gitlab_downloader.api_routes import _find_git_repos
+
+        result = _find_git_repos(tmp_path, max_depth=10, current_depth=11)
+        assert result == []
+
+    def test_skips_symlinked_git_dir(self, tmp_path: Path) -> None:
+        """Test that symlinked .git directories are skipped."""
+        import os
+
+        from gitlab_downloader.api_routes import _find_git_repos
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        real_git = tmp_path / "real_git"
+        real_git.mkdir()
+        os.symlink(str(real_git), str(repo / ".git"))
+
+        result = _find_git_repos(tmp_path)
+        assert len(result) == 0
+
+    def test_skips_symlinked_config(self, tmp_path: Path) -> None:
+        """Test that symlinked git config files are skipped."""
+        import os
+
+        from gitlab_downloader.api_routes import _find_git_repos
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        git_dir = repo / ".git"
+        git_dir.mkdir()
+        real_config = tmp_path / "real_config"
+        real_config.write_text('[remote "origin"]\n\turl = https://example.com/repo.git\n')
+        os.symlink(str(real_config), str(git_dir / "config"))
+
+        result = _find_git_repos(tmp_path)
+        assert len(result) == 1
+        assert result[0].url == ""  # URL should be empty since config is symlinked
+
+    def test_handles_permission_error(self, tmp_path: Path) -> None:
+        """Test graceful handling of PermissionError."""
+        from gitlab_downloader.api_routes import _find_git_repos
+
+        unreadable = tmp_path / "unreadable"
+        unreadable.mkdir()
+        unreadable.chmod(0o000)
+
+        try:
+            result = _find_git_repos(tmp_path)
+            # The unreadable dir will either be skipped or cause a PermissionError
+            # which is caught internally
+            assert isinstance(result, list)
+        finally:
+            unreadable.chmod(0o755)
+
+    def test_nested_git_repos(self, tmp_path: Path) -> None:
+        """Test finding nested git repos."""
+        from gitlab_downloader.api_routes import _find_git_repos
+
+        group = tmp_path / "group"
+        group.mkdir()
+        repo = group / "repo"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+
+        result = _find_git_repos(tmp_path)
+        assert len(result) == 1
+        assert result[0].name == "repo"
+
+    def test_repo_without_remote_url(self, tmp_path: Path) -> None:
+        """Test repo with .git but no remote origin."""
+        from gitlab_downloader.api_routes import _find_git_repos
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        git_dir = repo / ".git"
+        git_dir.mkdir()
+        (git_dir / "config").write_text("[core]\n\tbare = false\n")
+
+        result = _find_git_repos(tmp_path)
+        assert len(result) == 1
+        assert result[0].url == ""
+
+
+class TestReposEndpointIntegration:
+    """Integration tests for /api/repos endpoint."""
+
+    def test_repos_empty_clone_path_param(self, client: TestClient) -> None:
+        """Test that empty clone_path returns empty result."""
+        response = client.get("/api/repos", params={"clone_path": ""})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 0
+
+    def test_repos_no_param(self, client: TestClient) -> None:
+        """Test that missing clone_path returns empty result."""
+        response = client.get("/api/repos")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 0
