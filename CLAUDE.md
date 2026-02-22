@@ -18,7 +18,7 @@ gitlab-downloader/
 │   ├── __init__.py
 │   ├── __main__.py             # CLI entry point
 │   ├── app.py                  # Main application logic
-│   ├── api.py                  # FastAPI application setup
+│   ├── api.py                  # FastAPI application setup (runnable via python -m)
 │   ├── api_routes.py           # API endpoint definitions
 │   ├── api_schemas.py          # Pydantic models for API
 │   ├── auth.py                 # Authentication (OAuth, token-based)
@@ -199,6 +199,12 @@ gitlab-dump --update --url <url> --token <token>         # Update existing repos
 gitlab-dump --api-server --api-host 0.0.0.0 --api-port 8080
 ```
 
+### API Server (Direct Module)
+Used by Electron GUI to start the backend:
+```bash
+python -m gitlab_downloader.api --host 127.0.0.1 --port 8000
+```
+
 ### Electron GUI
 ```bash
 cd electron
@@ -275,6 +281,7 @@ The Python application uses asyncio throughout for:
 - OpenAPI/Swagger documentation available at `/docs`
 
 ### Frontend-Backend Communication
+- Electron GUI starts API backend via `python -m gitlab_downloader.api --host --port`
 - Electron GUI communicates with API via REST endpoints
 - Custom APIClient class using native fetch API with base URL configuration
 - Service classes encapsulate API logic

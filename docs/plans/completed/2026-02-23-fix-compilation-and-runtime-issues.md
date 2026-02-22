@@ -87,5 +87,5 @@ When user configures OAuth but provides a token without OAuth client ID, the app
 
 ### Task 7: Update documentation
 
-- [ ] Update CLAUDE.md if internal patterns changed
-- [ ] Move this plan to `docs/plans/completed/`
+- [x] Update CLAUDE.md if internal patterns changed
+- [x] Move this plan to `docs/plans/completed/`
