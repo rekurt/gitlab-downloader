@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .config import config_from_args, parse_args
 from .logging_config import setup_logging
+from .models import GitlabConfig
 
 logger = logging.getLogger("gitlab_downloader")
 
@@ -24,40 +25,8 @@ def install_signal_handlers(loop: asyncio.AbstractEventLoop, shutdown_event: asy
             pass
 
 
-async def main(argv: list[str] | None = None) -> int:
-    from dotenv import load_dotenv
-
-    load_dotenv()
-    args = parse_args(argv)
-
-    setup_logging(args.log_level, args.log_file)
-    config = config_from_args(args)
-
-    # Handle API server mode
-    if config.api_server:
-        from .api import run_api_server_async
-
-        logger.info(f"Starting API server on {config.api_host}:{config.api_port}")
-        await run_api_server_async(host=config.api_host, port=config.api_port)
-        return 0
-
-    # Handle interactive menu mode
-    if config.interactive_menu:
-        from .cli_ui import CLIMenu
-
-        menu = CLIMenu()
-        while True:
-            choice = menu.show_main_menu()
-            if choice == "exit":
-                break
-            elif choice == "clone":
-                menu.show_clone_menu()
-            elif choice == "migrate":
-                menu.show_migration_wizard()
-            elif choice == "history":
-                menu.show_history_menu()
-        return 0
-
+async def _run_clone(config: GitlabConfig) -> int:
+    """Run the clone workflow with the given config."""
     from .auth import resolve_access_token
     from .client import fetch_group_metadata, get_all_projects, get_user_projects
     from .cloner import build_clone_target, clone_all_repositories
@@ -106,6 +75,61 @@ async def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         logger.exception("Unhandled error: %s", exc)
         return 1
+
+
+async def main(argv: list[str] | None = None) -> int:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    args = parse_args(argv)
+
+    setup_logging(args.log_level, args.log_file)
+    config = config_from_args(args)
+
+    # Handle API server mode
+    if config.api_server:
+        from .api import run_api_server_async
+
+        logger.info(f"Starting API server on {config.api_host}:{config.api_port}")
+        await run_api_server_async(host=config.api_host, port=config.api_port)
+        return 0
+
+    # Handle interactive menu mode
+    if config.interactive_menu:
+        from .cli_ui import CLIMenu
+        from .migration import MigrationExecutor
+
+        menu = CLIMenu()
+        while True:
+            choice = menu.show_main_menu()
+            if choice == "exit":
+                break
+            elif choice == "clone":
+                clone_config = menu.show_clone_menu()
+                if clone_config:
+                    updated = replace(
+                        config,
+                        url=clone_config["url"].rstrip("/"),
+                        token=clone_config["token"],
+                        group=clone_config.get("group"),
+                        clone_path=clone_config.get("clone_path", config.clone_path),
+                    )
+                    return await _run_clone(updated)
+            elif choice == "migrate":
+                migration_config = menu.show_migration_wizard()
+                if migration_config:
+                    executor = MigrationExecutor(migration_config)
+                    source = Path(migration_config.source_repos_path)
+                    for repo_dir in source.iterdir():
+                        if (repo_dir / ".git").exists():
+                            logger.info(f"Migrating {repo_dir.name}...")
+                            executor.migrate_repository(str(repo_dir))
+                    logger.info("Migration complete.")
+            elif choice == "history":
+                menu.show_history_menu()
+        return 0
+
+    return await _run_clone(config)
 
 
 def run() -> int:

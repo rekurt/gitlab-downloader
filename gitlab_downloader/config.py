@@ -319,7 +319,7 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
 
 def config_from_args(args: argparse.Namespace) -> GitlabConfig:
     return GitlabConfig(
-        url=args.url.rstrip("/"),
+        url=(args.url or "").rstrip("/"),
         token=args.token or None,
         group=args.group or None,
         clone_path=args.clone_path,
