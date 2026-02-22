@@ -121,10 +121,25 @@ async def main(argv: list[str] | None = None) -> int:
                 if migration_config:
                     executor = MigrationExecutor(migration_config)
                     source = Path(migration_config.source_repos_path)
-                    for repo_dir in source.iterdir():
-                        if (repo_dir / ".git").exists():
-                            logger.info(f"Migrating {repo_dir.name}...")
-                            executor.migrate_repository(str(repo_dir))
+
+                    def _find_repos(base: Path) -> list[Path]:
+                        """Recursively find git repositories under base."""
+                        repos: list[Path] = []
+                        try:
+                            for item in base.iterdir():
+                                if not item.is_dir() or item.is_symlink():
+                                    continue
+                                if (item / ".git").exists():
+                                    repos.append(item)
+                                else:
+                                    repos.extend(_find_repos(item))
+                        except (PermissionError, OSError):
+                            pass
+                        return repos
+
+                    for repo_dir in _find_repos(source):
+                        logger.info(f"Migrating {repo_dir.name}...")
+                        executor.migrate_repository(str(repo_dir))
                     logger.info("Migration complete.")
             elif choice == "history":
                 menu.show_history_menu()

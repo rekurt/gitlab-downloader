@@ -43,6 +43,7 @@ router = APIRouter(prefix="/api", tags=["api"])
 _migration_tasks: dict[str, dict[str, Any]] = {}
 _migration_tasks_lock = asyncio.Lock()
 _MIGRATION_TASK_TTL = 3600  # Clean up tasks older than 1 hour
+_MAX_MIGRATION_MESSAGES = 1000  # Cap progress messages to prevent unbounded memory growth
 
 # Lock for config file access to prevent race conditions (used by both /config and /author-mappings)
 _config_file_lock = asyncio.Lock()
@@ -183,7 +184,7 @@ def _find_git_repos(
     results: list[RepositoryInfo] = []
     try:
         for item in base_path.iterdir():
-            if not item.is_dir():
+            if item.is_symlink() or not item.is_dir():
                 continue
 
             git_dir = item / ".git"
@@ -387,7 +388,7 @@ async def start_migration(request: MigrationStartRequest) -> MigrationStartRespo
             for key, req in request.committer_mappings.items()
         }
 
-        # Store task info (thread-safe)
+        # Store task info (coroutine-safe via asyncio lock)
         async with _migration_tasks_lock:
             _migration_tasks[migration_id] = {
                 "status": "pending",
@@ -468,7 +469,8 @@ async def _run_migration(
                 while not updates.empty():
                     try:
                         msg = updates.get_nowait()
-                        info["messages"].append(msg)
+                        if len(info["messages"]) < _MAX_MIGRATION_MESSAGES:
+                            info["messages"].append(msg)
                         info["current_task"] = msg
                     except queue.Empty:
                         break

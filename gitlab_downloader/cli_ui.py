@@ -64,7 +64,7 @@ class CLIMenu:
         self.console.print("\n[bold cyan]Clone Repositories[/bold cyan]")
 
         gitlab_url = Prompt.ask("[cyan]GitLab URL[/cyan]")
-        gitlab_token = _getpass_module.getpass("[cyan]GitLab token (hidden)[/cyan]: ")
+        gitlab_token = _getpass_module.getpass("GitLab token (hidden): ")
         group_or_user = Prompt.ask("[cyan]Group or user[/cyan]", default="")
         clone_path = Prompt.ask(
             "[cyan]Clone path[/cyan]",
@@ -94,7 +94,7 @@ class CLIMenu:
 
         # Step 2: Select target hosting
         target_url = Prompt.ask("[cyan]Target GitLab/Git hosting URL[/cyan]")
-        target_token = _getpass_module.getpass("[cyan]Target hosting token (hidden)[/cyan]: ")
+        target_token = _getpass_module.getpass("Target hosting token (hidden): ")
 
         # Step 3: Configure author mappings
         author_mappings = self._configure_author_mappings()
