@@ -32,6 +32,8 @@ function RepoList({ apiEndpoint, onSelectRepo, onMigrationStart }) {
       fetchRepos();
       const interval = setInterval(fetchRepos, 10000);
       return () => clearInterval(interval);
+    } else {
+      setLoading(false);
     }
   }, [apiEndpoint]);
 

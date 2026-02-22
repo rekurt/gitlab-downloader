@@ -232,6 +232,9 @@ async def list_repositories(clone_path: str = ".") -> RepositoriesListResponse:
 
         return RepositoriesListResponse(total=len(repositories), repositories=repositories)
 
+    except ValueError as e:
+        logger.error(f"Invalid path: {e}")
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error listing repositories: {e}")
         raise HTTPException(status_code=500, detail="Error listing repositories") from e

@@ -2,9 +2,6 @@
  * electron-builder configuration for single-file distribution
  * Supports Windows (portable .exe), macOS (.app), and Linux (AppImage)
  */
-const path = require('path');
-const os = require('os');
-
 module.exports = {
   appId: 'com.gitlabdump.app',
   productName: 'GitLab Dump',
