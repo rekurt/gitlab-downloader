@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 const os = require('os');
 const fs = require('fs');
 
@@ -9,6 +10,8 @@ let mainWindow;
 let apiProcess = null;
 const API_PORT = Number.parseInt(process.env.API_PORT || '8000', 10);
 const API_HOST = '127.0.0.1';
+// Generate a random token to protect mutating API endpoints from CSRF
+const API_TOKEN = crypto.randomBytes(32).toString('base64url');
 
 /**
  * Get the path to the Python API executable
@@ -40,7 +43,10 @@ async function waitForApiReady(maxRetries = 10) {
     try {
       const response = await fetch(
         `http://${API_HOST}:${API_PORT}/api/status`,
-        { signal: AbortSignal.timeout(1000) }
+        {
+          signal: AbortSignal.timeout(1000),
+          headers: { 'X-API-Token': API_TOKEN },
+        }
       );
       if (response.ok) {
         console.log('API backend is ready');
@@ -77,7 +83,10 @@ async function startPythonBackend() {
       const args = isDev
         ? ['-m', 'gitlab_downloader.api', '--host', API_HOST, '--port', API_PORT.toString()]
         : ['--host', API_HOST, '--port', API_PORT.toString()];
-      apiProcess = spawn(pythonPath, args);
+      apiProcess = spawn(pythonPath, args, {
+        env: { ...process.env, GITLAB_DUMP_API_TOKEN: API_TOKEN },
+        cwd: os.homedir(),
+      });
 
       // Set up process error handler first
       apiProcess.on('error', (err) => {
@@ -217,12 +226,20 @@ function setupIpcHandlers() {
     return `http://${API_HOST}:${API_PORT}`;
   });
 
+  // Get API token for authenticating mutating requests
+  ipcMain.handle('get-api-token', () => {
+    return API_TOKEN;
+  });
+
   // Check API status
   ipcMain.handle('check-api-status', async () => {
     try {
       const response = await fetch(
         `http://${API_HOST}:${API_PORT}/api/status`,
-        { signal: AbortSignal.timeout(5000) }
+        {
+          signal: AbortSignal.timeout(5000),
+          headers: { 'X-API-Token': API_TOKEN },
+        }
       );
       const isOk = response.ok;
       console.log(`check-api-status: ${isOk}`);
@@ -239,6 +256,18 @@ function setupIpcHandlers() {
     stopPythonBackend();
     app.quit();
     return { success: true };
+  });
+
+  // Get clone path (where repositories are stored)
+  // Resolve relative paths against user's home directory (backend cwd) to ensure
+  // the frontend and backend agree on the same absolute path
+  ipcMain.handle('get-clone-path', () => {
+    let clonePath = process.env.CLONE_PATH || 'repositories';
+    // Expand leading ~ to user's home directory (shell doesn't expand ~ in env vars)
+    if (clonePath.startsWith('~/') || clonePath.startsWith('~\\') || clonePath === '~') {
+      clonePath = path.join(os.homedir(), clonePath.slice(1));
+    }
+    return path.resolve(os.homedir(), clonePath);
   });
 
   // Get backend status

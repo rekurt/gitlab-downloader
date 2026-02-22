@@ -9,7 +9,12 @@ from urllib.parse import urlparse
 
 from .constants import RETRY_BACKOFF_MAX
 from .models import CloneResult, GitlabConfig
-from .utils import build_authenticated_clone_url, is_subpath, sanitize_path_component
+from .utils import (
+    build_authenticated_clone_url,
+    is_subpath,
+    sanitize_git_output,
+    sanitize_path_component,
+)
 
 logger = logging.getLogger("gitlab_downloader")
 _CREDENTIAL_LOCK = asyncio.Lock()
@@ -63,7 +68,9 @@ async def _ensure_credentials_in_helper(repo_url: str, token: str | None) -> Non
             stdin_text=approve_payload,
         )
         if code != 0:
-            raise RuntimeError(f"Unable to store credentials in helper: {stderr[:200]}")
+            raise RuntimeError(
+                f"Unable to store credentials in helper: {sanitize_git_output(stderr)[:200]}"
+            )
         _CREDENTIAL_READY_HOSTS.add(parsed.hostname)
 
 
@@ -117,7 +124,7 @@ async def clone_repository(
             return CloneResult(
                 name=repo_name,
                 status="failed",
-                message=f"Update failed: {stderr[:200]}",
+                message=f"Update failed: {sanitize_git_output(stderr)[:200]}",
             )
 
         try:
@@ -146,7 +153,7 @@ async def clone_repository(
                 repo_name,
                 attempt,
                 total_attempts,
-                stderr[:200],
+                sanitize_git_output(stderr)[:200],
             )
             shutil.rmtree(full_clone_path, ignore_errors=True)
 
@@ -154,7 +161,10 @@ async def clone_repository(
                 await asyncio.sleep(delay)
                 delay = min(delay * 2, RETRY_BACKOFF_MAX)
 
-        return CloneResult(name=repo_name, status="failed", message=f"Clone failed: {stderr[:200]}")
+        sanitized_err = sanitize_git_output(stderr)[:200]
+        return CloneResult(
+            name=repo_name, status="failed", message=f"Clone failed: {sanitized_err}"
+        )
 
 
 async def clone_all_repositories(

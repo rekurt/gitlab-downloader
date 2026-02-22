@@ -111,6 +111,7 @@ async def main(argv: list[str] | None = None) -> int:
                         config,
                         url=clone_config["url"].rstrip("/"),
                         token=clone_config["token"],
+                        auth_method="token",
                         group=clone_config.get("group"),
                         clone_path=clone_config.get("clone_path", config.clone_path),
                     )

@@ -3,6 +3,7 @@ import '../styles/ProgressIndicator.css';
 
 function ProgressIndicator({
   apiEndpoint,
+  apiToken,
   migrationId,
   onComplete,
   onError,
@@ -28,8 +29,13 @@ function ProgressIndicator({
 
     const pollProgress = async () => {
       try {
+        const progressHeaders = {};
+        if (apiToken) {
+          progressHeaders['X-API-Token'] = apiToken;
+        }
         const response = await fetch(
-          `${apiEndpoint}/api/migration-progress/${migrationId}`
+          `${apiEndpoint}/api/migration-progress/${migrationId}`,
+          { headers: progressHeaders }
         );
         if (!response.ok) {
           throw new Error(`Failed to fetch progress: ${response.statusText}`);
@@ -70,7 +76,7 @@ function ProgressIndicator({
     pollProgress();
 
     return () => { if (intervalId) clearInterval(intervalId); };
-  }, [migrationId, apiEndpoint]);
+  }, [migrationId, apiEndpoint, apiToken]);
 
   if (!progress) {
     return (

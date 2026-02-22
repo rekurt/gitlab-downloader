@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import secrets
 import signal
 import sys
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import RequestResponseEndpoint
 
 from .api_routes import _cleanup_old_migrations, router
 
@@ -90,8 +94,32 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # SECURITY: API token protects all API endpoints from unauthorized access.
+    # The Electron main process generates a random token and passes it via
+    # GITLAB_DUMP_API_TOKEN env var. All requests (except OPTIONS for CORS preflight)
+    # must include it in the X-API-Token header. This prevents sandboxed contexts
+    # (data: URLs, file:// iframes) from reading sensitive data via GET endpoints,
+    # while still allowing "null" origin needed for Electron's file:// protocol.
+    api_token = os.environ.get("GITLAB_DUMP_API_TOKEN", "")
+
+    @app.middleware("http")
+    async def verify_api_token(
+        request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        """Verify API token for all API requests."""
+        if api_token and request.method != "OPTIONS":
+            provided_token = request.headers.get("X-API-Token", "")
+            if not secrets.compare_digest(provided_token, api_token):
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Invalid or missing API token"},
+                )
+        return await call_next(request)
+
     # Add CORS middleware for Electron communication
     # Restrict to localhost only since this is for the local Electron app
+    # "null" origin is needed for Electron production builds (file:// protocol).
+    # The API token middleware above protects mutating endpoints from CSRF.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
@@ -105,13 +133,22 @@ def create_app() -> FastAPI:
         ],
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "DELETE"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "X-API-Token"],
     )
 
     # Include API routes
     app.include_router(router)
 
     return app
+
+
+def generate_api_token() -> str:
+    """Generate a random API token for securing mutating endpoints.
+
+    Returns:
+        Random URL-safe token string
+    """
+    return secrets.token_urlsafe(32)
 
 
 async def run_api_server_async(host: str = "127.0.0.1", port: int = 8000) -> None:

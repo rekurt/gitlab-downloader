@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import '../styles/AuthorMapper.css';
 
-function AuthorMapper({ apiEndpoint, onSave, onCancel }) {
+function AuthorMapper({ apiEndpoint, apiToken, onSave, onCancel }) {
   const [mappings, setMappings] = useState([
     {
       type: 'author',
@@ -97,11 +97,13 @@ function AuthorMapper({ apiEndpoint, onSave, onCancel }) {
 
       // Try to persist mappings to disk (best-effort, don't block wizard)
       try {
+        const persistHeaders = { 'Content-Type': 'application/json' };
+        if (apiToken) {
+          persistHeaders['X-API-Token'] = apiToken;
+        }
         await fetch(`${apiEndpoint}/api/author-mappings`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: persistHeaders,
           body: JSON.stringify({
             author_mappings: authorMappings,
             committer_mappings: committerMappings,

@@ -6,6 +6,8 @@ import './App.css';
 function App() {
   const [apiStatus, setApiStatus] = useState('checking');
   const [apiEndpoint, setApiEndpoint] = useState('');
+  const [apiToken, setApiToken] = useState('');
+  const [clonePath, setClonePath] = useState('');
   const [currentView, setCurrentView] = useState('repos');
   const [selectedRepo, setSelectedRepo] = useState(null);
 
@@ -14,6 +16,12 @@ function App() {
       try {
         const endpoint = await window.electronAPI.getApiEndpoint();
         setApiEndpoint(endpoint);
+
+        const token = await window.electronAPI.getApiToken();
+        setApiToken(token || '');
+
+        const path = await window.electronAPI.getClonePath();
+        setClonePath(path || '');
 
         const status = await window.electronAPI.checkApiStatus();
         setApiStatus(status ? 'connected' : 'disconnected');
@@ -86,6 +94,8 @@ function App() {
         {currentView === 'repos' && (
           <RepoList
             apiEndpoint={apiEndpoint}
+            apiToken={apiToken}
+            clonePath={clonePath}
             onSelectRepo={setSelectedRepo}
             onMigrationStart={handleMigrationStart}
           />
@@ -94,6 +104,7 @@ function App() {
         {currentView === 'migration' && selectedRepo && (
           <MigrationWizard
             apiEndpoint={apiEndpoint}
+            apiToken={apiToken}
             repo={selectedRepo}
             onComplete={handleMigrationComplete}
             onCancel={() => {

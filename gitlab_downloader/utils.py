@@ -30,6 +30,17 @@ def is_subpath(base_path: str, target_path: str) -> bool:
     return os.path.commonpath([base_real, target_real]) == base_real
 
 
+def sanitize_git_output(text: str) -> str:
+    """Remove credentials from git command output (stderr/stdout).
+
+    Strips oauth2:token@ and user:password@ patterns from URLs in the text.
+    """
+    import re
+
+    # Remove oauth2:token@, user:password@, or bare token@ patterns in URLs
+    return re.sub(r"://[^@/\s]+@", "://***@", text)
+
+
 def build_authenticated_clone_url(https_url: str, token: str) -> str:
     parsed = urlparse(https_url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:

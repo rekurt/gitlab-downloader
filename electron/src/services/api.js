@@ -6,6 +6,7 @@
 class APIClient {
   constructor(endpoint = null) {
     this.endpoint = endpoint;
+    this.apiToken = null;
     this.initialized = false;
     this.retries = 0;
     this.maxRetries = 5;
@@ -13,12 +14,13 @@ class APIClient {
   }
 
   /**
-   * Initialize the API client with endpoint from main process
+   * Initialize the API client with endpoint and token from main process
    */
   async initialize() {
     try {
       if (window.electronAPI) {
         this.endpoint = await window.electronAPI.getApiEndpoint();
+        this.apiToken = await window.electronAPI.getApiToken();
         this.initialized = true;
         console.log(`API client initialized with endpoint: ${this.endpoint}`);
         return true;
@@ -72,11 +74,16 @@ class APIClient {
     }
 
     const url = `${this.endpoint}${endpoint}`;
-    const defaultOptions = {
-      headers: {
-        "Content-Type": "application/json",
-      },
+    const headers = {
+      "Content-Type": "application/json",
     };
+
+    // Include API token for all requests to prevent unauthorized access
+    if (this.apiToken) {
+      headers["X-API-Token"] = this.apiToken;
+    }
+
+    const defaultOptions = { headers };
 
     try {
       const response = await fetch(url, {
@@ -106,8 +113,9 @@ class APIClient {
   /**
    * Get list of cloned repositories
    */
-  async getRepositories() {
-    return this.fetch("/api/repos");
+  async getRepositories(clonePath = "") {
+    const params = clonePath ? `?clone_path=${encodeURIComponent(clonePath)}` : "";
+    return this.fetch(`/api/repos${params}`);
   }
 
   /**

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/RepoList.css';
 
-function RepoList({ apiEndpoint, onSelectRepo, onMigrationStart }) {
+function RepoList({ apiEndpoint, apiToken, clonePath, onSelectRepo, onMigrationStart }) {
   const [repos, setRepos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,7 +13,15 @@ function RepoList({ apiEndpoint, onSelectRepo, onMigrationStart }) {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`${apiEndpoint}/api/repos`);
+        const headers = {};
+        if (apiToken) {
+          headers['X-API-Token'] = apiToken;
+        }
+        const params = new URLSearchParams();
+        if (clonePath) {
+          params.set('clone_path', clonePath);
+        }
+        const response = await fetch(`${apiEndpoint}/api/repos?${params}`, { headers });
         if (!response.ok) {
           throw new Error(`Failed to fetch repositories: ${response.statusText}`);
         }
@@ -35,7 +43,7 @@ function RepoList({ apiEndpoint, onSelectRepo, onMigrationStart }) {
     } else {
       setLoading(false);
     }
-  }, [apiEndpoint]);
+  }, [apiEndpoint, apiToken, clonePath]);
 
   const handleSelectRepo = (repo) => {
     setSelectedRepo(repo);

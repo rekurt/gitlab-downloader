@@ -3,7 +3,7 @@ import AuthorMapper from './AuthorMapper';
 import ProgressIndicator from './ProgressIndicator';
 import '../styles/MigrationWizard.css';
 
-function MigrationWizard({ apiEndpoint, repo, onComplete, onCancel }) {
+function MigrationWizard({ apiEndpoint, apiToken, repo, onComplete, onCancel }) {
   const [step, setStep] = useState(1);
   const [mappings, setMappings] = useState(null);
   const [migrationId, setMigrationId] = useState(null);
@@ -20,11 +20,14 @@ function MigrationWizard({ apiEndpoint, repo, onComplete, onCancel }) {
       setLoading(true);
       setError(null);
 
+      const headers = { 'Content-Type': 'application/json' };
+      if (apiToken) {
+        headers['X-API-Token'] = apiToken;
+      }
+
       const response = await fetch(`${apiEndpoint}/api/migrate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           repo_path: repo.path,
           author_mappings: mappings?.authorMappings || {},
@@ -91,6 +94,7 @@ function MigrationWizard({ apiEndpoint, repo, onComplete, onCancel }) {
         {step === 1 && (
           <AuthorMapper
             apiEndpoint={apiEndpoint}
+            apiToken={apiToken}
             onSave={handleMappingsSave}
             onCancel={onCancel}
           />
@@ -169,6 +173,7 @@ function MigrationWizard({ apiEndpoint, repo, onComplete, onCancel }) {
         {step === 3 && (
           <ProgressIndicator
             apiEndpoint={apiEndpoint}
+            apiToken={apiToken}
             migrationId={migrationId}
             onComplete={handleMigrationComplete}
             onError={handleMigrationError}

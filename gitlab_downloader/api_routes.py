@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import queue
 import time
 import uuid
 from pathlib import Path
@@ -221,9 +222,12 @@ def _find_git_repos(
 
 
 @router.get("/repos", response_model=RepositoriesListResponse)
-async def list_repositories(clone_path: str = ".") -> RepositoriesListResponse:
+async def list_repositories(clone_path: str = "") -> RepositoriesListResponse:
     """List cloned repositories in the specified path, including nested directories."""
     try:
+        if not clone_path:
+            return RepositoriesListResponse(total=0, repositories=[])
+
         repo_path = _validate_path(clone_path)
         if not repo_path.exists():
             return RepositoriesListResponse(total=0, repositories=[])
@@ -407,6 +411,9 @@ async def start_migration(request: MigrationStartRequest) -> MigrationStartRespo
             _migration_tasks[migration_id]["task"] = task
 
         return MigrationStartResponse(migration_id=migration_id)
+    except ValueError as e:
+        logger.error(f"Invalid migration request: {e}")
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error starting migration: {e}")
         raise HTTPException(status_code=500, detail="Error starting migration") from e
@@ -429,12 +436,11 @@ async def _run_migration(
             task_info["status"] = "running"
             task_info["progress"] = 25
 
-        # Closure to safely update progress in thread using a thread-safe queue
-        updates_queue: list[str] = []
+        # Thread-safe queue for progress updates from worker thread
+        updates: queue.Queue[str] = queue.Queue()
 
         def progress_callback(msg: str) -> None:
-            # Append to queue safely - this runs in thread
-            updates_queue.append(msg)
+            updates.put(msg)
 
         # Create migration config - note: empty strings for target_hosting_url and target_token
         # are used because this is for repository author mapping, not migration to new server
@@ -453,8 +459,23 @@ async def _run_migration(
             if task_info:
                 task_info["progress"] = 50
 
-        # Run migration in thread pool to avoid blocking event loop
-        success = await asyncio.to_thread(
+        # Drain pending messages from the queue into _migration_tasks
+        async def _flush_updates() -> None:
+            async with _migration_tasks_lock:
+                info = _migration_tasks.get(migration_id)
+                if not info:
+                    return
+                while not updates.empty():
+                    try:
+                        msg = updates.get_nowait()
+                        info["messages"].append(msg)
+                        info["current_task"] = msg
+                    except queue.Empty:
+                        break
+
+        # Poll for progress updates while migration runs in thread
+        migration_future = asyncio.get_event_loop().run_in_executor(
+            None,
             executor.migrate_repository,
             repo_path,
             author_mappings,
@@ -462,15 +483,18 @@ async def _run_migration(
             progress_callback,
         )
 
-        # Process queued updates - re-acquire lock before accessing task_info
+        while not migration_future.done():
+            await asyncio.sleep(0.5)
+            await _flush_updates()
+
+        success = await migration_future
+
+        # Final flush
+        await _flush_updates()
+
         async with _migration_tasks_lock:
             task_info = _migration_tasks.get(migration_id)
             if task_info:
-                for msg in updates_queue:
-                    task_info["messages"].append(msg)
-                if updates_queue:
-                    task_info["current_task"] = updates_queue[-1]
-
                 if success:
                     task_info["status"] = "completed"
                     task_info["progress"] = 100

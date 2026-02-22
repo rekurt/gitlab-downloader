@@ -14,6 +14,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getApiEndpoint: () => ipcRenderer.invoke('get-api-endpoint'),
 
   /**
+   * Get the API token for authenticating mutating requests
+   */
+  getApiToken: () => ipcRenderer.invoke('get-api-token'),
+
+  /**
    * Check if the API backend is running
    */
   checkApiStatus: () => ipcRenderer.invoke('check-api-status'),
@@ -22,6 +27,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * Request graceful shutdown
    */
   requestShutdown: () => ipcRenderer.invoke('request-shutdown'),
+
+  /**
+   * Get clone path (where repositories are stored)
+   */
+  getClonePath: () => ipcRenderer.invoke('get-clone-path'),
 
   /**
    * Get backend process status
