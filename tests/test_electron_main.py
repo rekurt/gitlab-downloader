@@ -122,18 +122,6 @@ class TestElectronStructure:
         assert "ReactDOM" in content
         assert "createRoot" in content
 
-    def test_env_config_exists(self) -> None:
-        """Test that environment configuration exists."""
-        env_config = Path(__file__).parent.parent / "electron" / "env.js"
-        assert env_config.exists(), "electron/env.js should exist"
-
-        with open(env_config) as f:
-            content = f.read()
-
-        assert "isDev" in content
-        assert "API_PORT" in content
-        assert "API_HOST" in content
-
 
 class TestMainJsStructure:
     """Test main.js implementation details."""

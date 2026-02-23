@@ -27,7 +27,10 @@ def extract_group_path(root_full_path: str, path_with_namespace: str) -> str:
 def is_subpath(base_path: str, target_path: str) -> bool:
     base_real = os.path.realpath(base_path)
     target_real = os.path.realpath(target_path)
-    return os.path.commonpath([base_real, target_real]) == base_real
+    try:
+        return os.path.commonpath([base_real, target_real]) == base_real
+    except ValueError:
+        return False
 
 
 def sanitize_git_output(text: str) -> str:
