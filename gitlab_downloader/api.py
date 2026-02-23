@@ -14,12 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import RequestResponseEndpoint
 
-from .api_routes import _cleanup_old_migrations, router
-
-# Configure logging for API server
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+from .api_routes import _cleanup_old_migrations, _migration_tasks, _migration_tasks_lock, router
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +45,16 @@ def create_app() -> FastAPI:
                     await cleanup_task
                 except asyncio.CancelledError:
                     pass
+            # Cancel in-flight migration tasks
+            async with _migration_tasks_lock:
+                for _mid, info in _migration_tasks.items():
+                    t = info.get("task")
+                    if isinstance(t, asyncio.Task) and not t.done():
+                        t.cancel()
+                        try:
+                            await t
+                        except (asyncio.CancelledError, Exception):
+                            pass
 
     app = FastAPI(
         title="GitLab Dump API",
@@ -155,5 +160,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
     args = _parse_args()
     asyncio.run(run_api_server_async(host=args.host, port=args.port))

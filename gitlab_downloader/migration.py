@@ -281,9 +281,21 @@ class MigrationExecutor:
             new_email = shlex.quote(mapping.new_email)
 
             keyword = "if" if first else "elif"
+            # Build condition: match on non-empty fields only
+            conditions = []
+            if mapping.original_name:
+                conditions.append(
+                    f'[ "$GIT_{env_prefix}_NAME" = {original_name} ]'
+                )
+            if mapping.original_email:
+                conditions.append(
+                    f'[ "$GIT_{env_prefix}_EMAIL" = {original_email} ]'
+                )
+            if not conditions:
+                continue
+            condition = " && ".join(conditions)
             parts.append(
-                f'{keyword} [ "$GIT_{env_prefix}_NAME" = {original_name} ] && '
-                f'[ "$GIT_{env_prefix}_EMAIL" = {original_email} ]; then\n'
+                f"{keyword} {condition}; then\n"
                 f"  export GIT_{env_prefix}_NAME={new_name}\n"
                 f"  export GIT_{env_prefix}_EMAIL={new_email}"
             )

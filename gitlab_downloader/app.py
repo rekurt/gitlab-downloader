@@ -126,6 +126,8 @@ async def main(argv: list[str] | None = None) -> int:
                         """Recursively find git repositories under base."""
                         if _depth > max_depth:
                             return []
+                        if (base / ".git").exists():
+                            return [base]
                         repos: list[Path] = []
                         try:
                             for item in base.iterdir():

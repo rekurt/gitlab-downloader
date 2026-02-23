@@ -93,7 +93,7 @@ clean:
 
 electron-build:
 	@cd electron && npm run dist
-	@echo "Electron binary built successfully in electron/dist"
+	@echo "Electron binary built successfully in electron/dist_electron"
 
 coverage:
 	@$(VENV_PATH)/bin/pip install --no-cache-dir pytest-cov
