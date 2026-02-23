@@ -210,11 +210,23 @@ class AuthorMapper:
                 continue
 
             try:
+                original_name = value.get("original_name", "")
+                original_email = value.get("original_email", "")
+                new_name = value.get("new_name", "")
+                new_email = value.get("new_email", "")
+
+                if not original_name or not original_email:
+                    logger.warning(
+                        f"Skipping {label} mapping '{key}': "
+                        "original_name and original_email are required"
+                    )
+                    continue
+
                 mapping = cls(
-                    original_name=value.get("original_name", ""),
-                    original_email=value.get("original_email", ""),
-                    new_name=value.get("new_name", ""),
-                    new_email=value.get("new_email", ""),
+                    original_name=original_name,
+                    original_email=original_email,
+                    new_name=new_name,
+                    new_email=new_email,
                 )
                 mappings[key] = mapping
             except (KeyError, TypeError):

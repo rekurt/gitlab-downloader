@@ -422,7 +422,7 @@ async def start_migration(request: MigrationStartRequest) -> MigrationStartRespo
             for key, req in request.committer_mappings.items()
         }
 
-        # Limit concurrent migrations to prevent resource exhaustion
+        # Check limit, store task info, and start migration in a single lock
         async with _migration_tasks_lock:
             running = sum(
                 1
@@ -434,8 +434,6 @@ async def start_migration(request: MigrationStartRequest) -> MigrationStartRespo
                     status_code=429, detail="Too many concurrent migrations"
                 )
 
-        # Store task info (coroutine-safe via asyncio lock)
-        async with _migration_tasks_lock:
             _migration_tasks[migration_id] = {
                 "status": "pending",
                 "progress": 0,
@@ -445,16 +443,14 @@ async def start_migration(request: MigrationStartRequest) -> MigrationStartRespo
                 "created_at": time.time(),
             }
 
-        # Start migration in background and store task reference for cleanup
-        task = asyncio.create_task(
-            _run_migration(
-                migration_id,
-                str(validated_repo_path),
-                author_mappings,
-                committer_mappings,
+            task = asyncio.create_task(
+                _run_migration(
+                    migration_id,
+                    str(validated_repo_path),
+                    author_mappings,
+                    committer_mappings,
+                )
             )
-        )
-        async with _migration_tasks_lock:
             _migration_tasks[migration_id]["task"] = task
 
         return MigrationStartResponse(migration_id=migration_id)

@@ -127,7 +127,7 @@ class ConfigSaveRequest(BaseModel):
         ..., min_length=1, max_length=4096, description="Path with source repositories"
     )
     target_hosting_url: str = Field(
-        ..., max_length=2048, description="Destination Git hosting URL"
+        ..., min_length=1, max_length=2048, description="Destination Git hosting URL"
     )
     target_token: str = Field(
         ..., min_length=1, max_length=512, description="Token for target Git hosting"

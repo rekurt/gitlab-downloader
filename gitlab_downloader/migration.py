@@ -385,8 +385,8 @@ class ConfigFileManager:
                 os.close(fd)
 
             logger.info(f"Config saved to {config_file}")
-        except Exception:
-            raise ValueError(f"Failed to save config to {config_file}") from None
+        except Exception as e:
+            raise ValueError(f"Failed to save config to {config_file}") from e
 
     @staticmethod
     def validate_config(data: dict) -> dict:
