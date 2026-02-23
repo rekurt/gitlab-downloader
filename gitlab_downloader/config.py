@@ -32,6 +32,17 @@ def get_version() -> str:
         return "0.0.0-dev"
 
 
+def _env_int(name: str, default: int) -> int:
+    val = os.getenv(name)
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except ValueError:
+        logger.warning("Invalid integer for %s: %r, using default %s", name, val, default)
+        return default
+
+
 def env_bool(name: str, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -70,27 +81,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--concurrency",
         type=int,
-        default=int(os.getenv("MAX_CONCURRENCY", DEFAULT_CONCURRENCY)),
+        default=_env_int("MAX_CONCURRENCY", DEFAULT_CONCURRENCY),
     )
     parser.add_argument(
         "--timeout",
         type=int,
-        default=int(os.getenv("REQUEST_TIMEOUT", DEFAULT_TIMEOUT)),
+        default=_env_int("REQUEST_TIMEOUT", DEFAULT_TIMEOUT),
     )
     parser.add_argument(
         "--per-page",
         type=int,
-        default=int(os.getenv("PER_PAGE", DEFAULT_PER_PAGE)),
+        default=_env_int("PER_PAGE", DEFAULT_PER_PAGE),
     )
     parser.add_argument(
         "--api-retries",
         type=int,
-        default=int(os.getenv("MAX_RETRIES", DEFAULT_API_RETRIES)),
+        default=_env_int("MAX_RETRIES", DEFAULT_API_RETRIES),
     )
     parser.add_argument(
         "--clone-retries",
         type=int,
-        default=int(os.getenv("CLONE_RETRIES", DEFAULT_CLONE_RETRIES)),
+        default=_env_int("CLONE_RETRIES", DEFAULT_CLONE_RETRIES),
     )
     parser.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "INFO"))
     parser.add_argument("--log-file", default=os.getenv("LOG_FILE"))
@@ -146,7 +157,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--api-port",
         type=int,
-        default=int(os.getenv("API_PORT", 8001)),
+        default=_env_int("API_PORT", 8001),
         help="Port for API server",
     )
 

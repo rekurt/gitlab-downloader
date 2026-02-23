@@ -39,7 +39,7 @@ class AuthorMapper:
         if not self.config_path.exists():
             raise FileNotFoundError(f"Config file not found: {self.config_path}")
 
-        file_content = self.config_path.read_text()
+        file_content = self.config_path.read_text(encoding="utf-8")
 
         if self.config_path.suffix in {".yaml", ".yml"}:
             data = yaml.safe_load(file_content)
@@ -82,7 +82,7 @@ class AuthorMapper:
 
         # If file exists, preserve required migration fields
         if self.config_path.exists():
-            file_content = self.config_path.read_text()
+            file_content = self.config_path.read_text(encoding="utf-8")
             if self.config_path.suffix in {".yaml", ".yml"}:
                 existing_data = yaml.safe_load(file_content)
             elif self.config_path.suffix == ".json":
@@ -128,7 +128,7 @@ class AuthorMapper:
         if not self.config_path.exists():
             raise FileNotFoundError(f"Config file not found: {self.config_path}")
 
-        file_content = self.config_path.read_text()
+        file_content = self.config_path.read_text(encoding="utf-8")
 
         if self.config_path.suffix in {".yaml", ".yml"}:
             data = yaml.safe_load(file_content)

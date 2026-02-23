@@ -336,7 +336,7 @@ class ConfigFileManager:
                 continue
 
             try:
-                with open(config_file) as f:
+                with open(config_file, encoding="utf-8") as f:
                     data = yaml.safe_load(f) if filename.endswith(("yaml", "yml")) else json.load(f)
 
                 if not isinstance(data, dict):

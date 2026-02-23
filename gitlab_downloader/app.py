@@ -122,8 +122,10 @@ async def main(argv: list[str] | None = None) -> int:
                     executor = MigrationExecutor(migration_config)
                     source = Path(migration_config.source_repos_path)
 
-                    def _find_repos(base: Path) -> list[Path]:
+                    def _find_repos(base: Path, max_depth: int = 10, _depth: int = 0) -> list[Path]:
                         """Recursively find git repositories under base."""
+                        if _depth > max_depth:
+                            return []
                         repos: list[Path] = []
                         try:
                             for item in base.iterdir():
@@ -132,7 +134,7 @@ async def main(argv: list[str] | None = None) -> int:
                                 if (item / ".git").exists():
                                     repos.append(item)
                                 else:
-                                    repos.extend(_find_repos(item))
+                                    repos.extend(_find_repos(item, max_depth, _depth + 1))
                         except (PermissionError, OSError):
                             pass
                         return repos

@@ -70,7 +70,9 @@ class AuthorMappingsSaveRequest(BaseModel):
 class MigrationStartRequest(BaseModel):
     """Request to start a migration."""
 
-    repo_path: str = Field(..., min_length=1, description="Path to repository to migrate")
+    repo_path: str = Field(
+        ..., min_length=1, max_length=4096, description="Path to repository to migrate"
+    )
     author_mappings: dict[str, AuthorMappingRequest] = Field(
         default_factory=dict, description="Author mappings to apply"
     )
@@ -118,10 +120,18 @@ class ConfigContentResponse(BaseModel):
 class ConfigSaveRequest(BaseModel):
     """Request to save migration config."""
 
-    repo_path: str = Field(..., description="Repository directory path")
-    source_repos_path: str = Field(..., description="Path with source repositories")
-    target_hosting_url: str = Field(..., description="Destination Git hosting URL")
-    target_token: str = Field(..., min_length=1, description="Token for target Git hosting")
+    repo_path: str = Field(
+        ..., max_length=4096, description="Repository directory path"
+    )
+    source_repos_path: str = Field(
+        ..., max_length=4096, description="Path with source repositories"
+    )
+    target_hosting_url: str = Field(
+        ..., max_length=2048, description="Destination Git hosting URL"
+    )
+    target_token: str = Field(
+        ..., min_length=1, max_length=512, description="Token for target Git hosting"
+    )
     author_mappings: dict[str, AuthorMappingRequest] = Field(
         default_factory=dict, description="Author mapping rules"
     )
