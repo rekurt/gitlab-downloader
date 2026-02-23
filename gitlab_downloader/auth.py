@@ -44,11 +44,12 @@ def _write_cache(path: str, payload: dict[str, Any]) -> None:
     cache.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     # Ensure existing parent directory has secure permissions
     cache.parent.chmod(0o700)
-    fd = os.open(str(cache), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    try:
-        os.write(fd, json.dumps(payload, ensure_ascii=True, indent=2).encode("utf-8"))
-    finally:
-        os.close(fd)
+    with os.fdopen(
+        os.open(str(cache), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
+        "w",
+        encoding="utf-8",
+    ) as f:
+        f.write(json.dumps(payload, ensure_ascii=True, indent=2))
 
 
 def _token_valid(payload: dict[str, Any], min_ttl: int = 60) -> bool:

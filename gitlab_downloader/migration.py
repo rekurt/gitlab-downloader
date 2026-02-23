@@ -378,11 +378,12 @@ class ConfigFileManager:
                 content = yaml.dump(data, default_flow_style=False)
 
             # Write with restricted permissions (0o600) since config may contain tokens
-            fd = os.open(str(config_file), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            try:
-                os.write(fd, content.encode("utf-8"))
-            finally:
-                os.close(fd)
+            with os.fdopen(
+                os.open(str(config_file), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
+                "w",
+                encoding="utf-8",
+            ) as f:
+                f.write(content)
 
             logger.info(f"Config saved to {config_file}")
         except Exception as e:

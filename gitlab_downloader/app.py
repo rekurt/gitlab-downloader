@@ -156,6 +156,9 @@ async def main(argv: list[str] | None = None) -> int:
                         f"Migration complete: {succeeded} succeeded, {failed} failed"
                         f" out of {len(repos)} repositories"
                     )
+                    menu.save_migration_config(
+                        migration_config, migration_config.source_repos_path
+                    )
             elif choice == "history":
                 menu.show_history_menu()
         return 0

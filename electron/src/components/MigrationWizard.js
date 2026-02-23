@@ -57,6 +57,8 @@ function MigrationWizard({ apiEndpoint, apiToken, repo, onComplete, onCancel }) 
 
   const handleMigrationError = (errMsg) => {
     setError(errMsg);
+    setMigrationId(null);
+    setStep(2);
   };
 
   return (

@@ -8,7 +8,9 @@ def trim_prefix(value: str, prefix: str) -> str:
     normalized_value = value.strip("/")
     normalized_prefix = prefix.strip("/")
     if normalized_prefix and normalized_value.startswith(normalized_prefix):
-        return normalized_value[len(normalized_prefix) :].strip("/")
+        rest = normalized_value[len(normalized_prefix) :]
+        if not rest or rest.startswith("/"):
+            return rest.strip("/")
     return normalized_value
 
 

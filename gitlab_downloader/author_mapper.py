@@ -107,11 +107,12 @@ class AuthorMapper:
             raise ValueError(f"Unsupported file format: {self.config_path.suffix}")
 
         # Write with restricted permissions (0o600) since config may contain tokens
-        fd = os.open(str(self.config_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        try:
-            os.write(fd, content.encode("utf-8"))
-        finally:
-            os.close(fd)
+        with os.fdopen(
+            os.open(str(self.config_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
+            "w",
+            encoding="utf-8",
+        ) as f:
+            f.write(content)
 
         logger.info(f"Mappings saved to {self.config_path}")
 
@@ -184,11 +185,12 @@ class AuthorMapper:
             raise ValueError(f"Unsupported file format: {self.config_path.suffix}")
 
         # Write with restricted permissions (0o600) since config contains tokens
-        fd = os.open(str(self.config_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        try:
-            os.write(fd, content.encode("utf-8"))
-        finally:
-            os.close(fd)
+        with os.fdopen(
+            os.open(str(self.config_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
+            "w",
+            encoding="utf-8",
+        ) as f:
+            f.write(content)
 
         logger.info(f"Migration config saved to {self.config_path}")
 
