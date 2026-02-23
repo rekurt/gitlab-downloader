@@ -62,12 +62,17 @@ async def _cleanup_old_migrations() -> None:
             await asyncio.sleep(300)  # Check every 5 minutes
             async with _migration_tasks_lock:
                 current_time = time.time()
-                to_remove = [
-                    task_id
-                    for task_id, task in list(_migration_tasks.items())
-                    if current_time - task.get("created_at", current_time) > _MIGRATION_TASK_TTL
-                    and task.get("status") not in ("pending", "running")
-                ]
+                to_remove = []
+                for task_id, task in list(_migration_tasks.items()):
+                    age = current_time - task.get("created_at", current_time)
+                    status = task.get("status")
+                    if age > _MIGRATION_TASK_TTL and status not in ("pending", "running"):
+                        to_remove.append(task_id)
+                    elif age > _MIGRATION_TASK_TTL * 2:
+                        # Force-clean stuck tasks whose asyncio Task is done
+                        task_obj = task.get("task")
+                        if task_obj is not None and task_obj.done():
+                            to_remove.append(task_id)
                 for task_id in to_remove:
                     logger.info(f"Cleaning up old migration task {task_id}")
                     del _migration_tasks[task_id]
@@ -548,13 +553,21 @@ async def _run_migration(
                     task_info["status"] = "failed"
                     task_info["error"] = "Migration failed"
 
+    except asyncio.CancelledError:
+        logger.warning(f"Migration {migration_id} was cancelled")
+        async with _migration_tasks_lock:
+            task = _migration_tasks.get(migration_id)
+            if task:
+                task["status"] = "failed"
+                task["error"] = "Migration was cancelled"
+        raise
     except Exception as e:
         logger.error(f"Error during migration {migration_id}: {e}")
         async with _migration_tasks_lock:
             task = _migration_tasks.get(migration_id)
             if task:
                 task["status"] = "failed"
-                task["error"] = str(e)
+                task["error"] = "Migration failed due to an internal error"
 
 
 @router.get("/migration-progress/{migration_id}", response_model=MigrationProgressResponse)

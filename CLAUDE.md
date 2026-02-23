@@ -159,7 +159,7 @@ Container configuration for running the application in Docker.
 
 ## REST API Endpoints
 
-The API server runs on the configured host/port (default: localhost:8000) and provides the following endpoints:
+The API server runs on the configured host/port (default: localhost:8001) and provides the following endpoints:
 
 ### Status and Configuration
 - `GET /api/status` - Get application status and version
@@ -205,7 +205,7 @@ gitlab-dump --api-server --api-host 0.0.0.0 --api-port 8080
 ### API Server (Direct Module)
 Used by Electron GUI to start the backend:
 ```bash
-python -m gitlab_downloader.api --host 127.0.0.1 --port 8000
+python -m gitlab_downloader.api --host 127.0.0.1 --port 8001
 ```
 
 ### Electron GUI

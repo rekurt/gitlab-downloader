@@ -141,7 +141,7 @@ async def main(argv: list[str] | None = None) -> int:
 
                     for repo_dir in _find_repos(source):
                         logger.info(f"Migrating {repo_dir.name}...")
-                        executor.migrate_repository(str(repo_dir))
+                        await asyncio.to_thread(executor.migrate_repository, str(repo_dir))
                     logger.info("Migration complete.")
             elif choice == "history":
                 menu.show_history_menu()

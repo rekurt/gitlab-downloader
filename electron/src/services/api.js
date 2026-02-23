@@ -8,7 +8,6 @@ class APIClient {
     this.endpoint = endpoint;
     this.apiToken = null;
     this.initialized = false;
-    this.retries = 0;
     this.maxRetries = 5;
     this.retryDelay = 1000;
   }
@@ -39,11 +38,10 @@ class APIClient {
       await this.initialize();
     }
 
-    this.retries = 0;
-    return this._checkStatusWithRetries();
+    return this._checkStatusWithRetries(0);
   }
 
-  async _checkStatusWithRetries() {
+  async _checkStatusWithRetries(retries) {
     try {
       if (window.electronAPI) {
         const isAvailable = await window.electronAPI.checkApiStatus();
@@ -52,10 +50,9 @@ class APIClient {
         }
       }
 
-      if (this.retries < this.maxRetries) {
-        this.retries += 1;
+      if (retries < this.maxRetries) {
         await this.delay(this.retryDelay);
-        return this._checkStatusWithRetries();
+        return this._checkStatusWithRetries(retries + 1);
       }
 
       return { status: "error", available: false };
