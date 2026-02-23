@@ -29,3 +29,11 @@ def _allow_temp_dir_in_path_validation() -> None:
             api_routes._allowed_base_dirs.append(d)
     yield  # type: ignore[misc]
     api_routes._allowed_base_dirs[:] = original
+
+
+@pytest.fixture(autouse=True)
+def _clear_migration_tasks() -> None:  # type: ignore[misc]
+    """Clear in-memory migration tasks between tests to prevent state leakage."""
+    api_routes._migration_tasks.clear()
+    yield  # type: ignore[misc]
+    api_routes._migration_tasks.clear()

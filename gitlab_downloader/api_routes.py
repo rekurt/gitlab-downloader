@@ -44,6 +44,7 @@ _migration_tasks: dict[str, dict[str, Any]] = {}
 _migration_tasks_lock = asyncio.Lock()
 _MIGRATION_TASK_TTL = 3600  # Clean up tasks older than 1 hour
 _MAX_MIGRATION_MESSAGES = 1000  # Cap progress messages to prevent unbounded memory growth
+_MAX_CONCURRENT_MIGRATIONS = 3  # Limit concurrent migration tasks
 
 # Lock for config file access to prevent race conditions (used by both /config and /author-mappings)
 _config_file_lock = asyncio.Lock()
@@ -421,6 +422,18 @@ async def start_migration(request: MigrationStartRequest) -> MigrationStartRespo
             for key, req in request.committer_mappings.items()
         }
 
+        # Limit concurrent migrations to prevent resource exhaustion
+        async with _migration_tasks_lock:
+            running = sum(
+                1
+                for t in _migration_tasks.values()
+                if t.get("status") in ("pending", "running")
+            )
+            if running >= _MAX_CONCURRENT_MIGRATIONS:
+                raise HTTPException(
+                    status_code=429, detail="Too many concurrent migrations"
+                )
+
         # Store task info (coroutine-safe via asyncio lock)
         async with _migration_tasks_lock:
             _migration_tasks[migration_id] = {
@@ -445,6 +458,8 @@ async def start_migration(request: MigrationStartRequest) -> MigrationStartRespo
             _migration_tasks[migration_id]["task"] = task
 
         return MigrationStartResponse(migration_id=migration_id)
+    except HTTPException:
+        raise
     except ValueError as e:
         logger.error(f"Invalid migration request: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e

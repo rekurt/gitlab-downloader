@@ -121,10 +121,10 @@ class ConfigSaveRequest(BaseModel):
     """Request to save migration config."""
 
     repo_path: str = Field(
-        ..., max_length=4096, description="Repository directory path"
+        ..., min_length=1, max_length=4096, description="Repository directory path"
     )
     source_repos_path: str = Field(
-        ..., max_length=4096, description="Path with source repositories"
+        ..., min_length=1, max_length=4096, description="Path with source repositories"
     )
     target_hosting_url: str = Field(
         ..., max_length=2048, description="Destination Git hosting URL"
