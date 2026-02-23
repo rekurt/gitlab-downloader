@@ -114,7 +114,10 @@ async function startPythonBackend() {
         });
       }
 
-      // Handle process exit
+      // Track whether the startup promise has been settled
+      let settled = false;
+
+      // Handle process exit — reject if it happens before API is ready
       apiProcess.on("exit", (code, signal) => {
         if (code === 0 || code === null) {
           console.log(`Python backend exited normally (signal: ${signal})`);
@@ -123,14 +126,24 @@ async function startPythonBackend() {
             `Python backend exited with code ${code} (signal: ${signal})`,
           );
         }
+        if (!settled) {
+          settled = true;
+          reject(
+            new Error(
+              `Python backend exited unexpectedly during startup: code=${code}, signal=${signal}`,
+            ),
+          );
+        }
       });
 
       // Wait for API to be ready
       waitForApiReady()
         .then(() => {
+          settled = true;
           resolve(true);
         })
         .catch((err) => {
+          settled = true;
           reject(err);
         });
     } catch (err) {

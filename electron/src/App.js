@@ -11,17 +11,37 @@ function App() {
   const [currentView, setCurrentView] = useState('repos');
   const [selectedRepo, setSelectedRepo] = useState(null);
 
+  // One-time initialization of config values (endpoint, token, clone path)
   useEffect(() => {
-    async function checkApi() {
+    async function init() {
       try {
         if (!window.electronAPI) {
-          // Running outside Electron (e.g. browser dev server) — use defaults
-          const fallbackEndpoint = 'http://127.0.0.1:8001';
-          setApiEndpoint(fallbackEndpoint);
+          setApiEndpoint('http://127.0.0.1:8001');
           setApiToken('');
           setClonePath('');
+          return;
+        }
+        const endpoint = await window.electronAPI.getApiEndpoint();
+        setApiEndpoint(endpoint);
+        const token = await window.electronAPI.getApiToken();
+        setApiToken(token || '');
+        const path = await window.electronAPI.getClonePath();
+        setClonePath(path || '');
+      } catch (error) {
+        console.error('Failed to initialize config:', error);
+      }
+    }
+    init();
+  }, []);
+
+  // Periodic health check — only updates apiStatus, not config state
+  useEffect(() => {
+    async function checkStatus() {
+      try {
+        if (!window.electronAPI) {
+          const endpoint = 'http://127.0.0.1:8001';
           try {
-            const res = await fetch(`${fallbackEndpoint}/api/status`, {
+            const res = await fetch(`${endpoint}/api/status`, {
               signal: AbortSignal.timeout(3000),
             });
             setApiStatus(res.ok ? 'connected' : 'disconnected');
@@ -30,16 +50,6 @@ function App() {
           }
           return;
         }
-
-        const endpoint = await window.electronAPI.getApiEndpoint();
-        setApiEndpoint(endpoint);
-
-        const token = await window.electronAPI.getApiToken();
-        setApiToken(token || '');
-
-        const path = await window.electronAPI.getClonePath();
-        setClonePath(path || '');
-
         const status = await window.electronAPI.checkApiStatus();
         setApiStatus(status ? 'connected' : 'disconnected');
       } catch (error) {
@@ -48,8 +58,8 @@ function App() {
       }
     }
 
-    checkApi();
-    const interval = setInterval(checkApi, 5000);
+    checkStatus();
+    const interval = setInterval(checkStatus, 5000);
     return () => clearInterval(interval);
   }, []);
 
