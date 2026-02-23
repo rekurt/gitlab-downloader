@@ -139,10 +139,23 @@ async def main(argv: list[str] | None = None) -> int:
                             pass
                         return repos
 
-                    for repo_dir in _find_repos(source):
+                    succeeded = 0
+                    failed = 0
+                    repos = _find_repos(source)
+                    for repo_dir in repos:
                         logger.info(f"Migrating {repo_dir.name}...")
-                        await asyncio.to_thread(executor.migrate_repository, str(repo_dir))
-                    logger.info("Migration complete.")
+                        success = await asyncio.to_thread(
+                            executor.migrate_repository, str(repo_dir)
+                        )
+                        if success:
+                            succeeded += 1
+                        else:
+                            failed += 1
+                            logger.error(f"Migration failed for {repo_dir.name}")
+                    logger.info(
+                        f"Migration complete: {succeeded} succeeded, {failed} failed"
+                        f" out of {len(repos)} repositories"
+                    )
             elif choice == "history":
                 menu.show_history_menu()
         return 0

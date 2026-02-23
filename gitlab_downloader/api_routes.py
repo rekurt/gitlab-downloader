@@ -583,7 +583,7 @@ async def get_migration_progress(migration_id: str) -> MigrationProgressResponse
             status=task_info["status"],
             progress=task_info["progress"],
             current_task=task_info["current_task"],
-            messages=task_info["messages"],
+            messages=list(task_info["messages"]),
             error=task_info["error"],
         )
 
