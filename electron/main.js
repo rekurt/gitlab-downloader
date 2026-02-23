@@ -1,17 +1,17 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
-const path = require('path');
-const isDev = require('electron-is-dev');
-const { spawn } = require('child_process');
-const crypto = require('crypto');
-const os = require('os');
-const fs = require('fs');
+const { app, BrowserWindow, Menu, ipcMain } = require("electron");
+const path = require("path");
+const isDev = require("electron-is-dev");
+const { spawn } = require("child_process");
+const crypto = require("crypto");
+const os = require("os");
+const fs = require("fs");
 
 let mainWindow;
 let apiProcess = null;
-const API_PORT = Number.parseInt(process.env.API_PORT || '8000', 10);
-const API_HOST = '127.0.0.1';
+const API_PORT = Number.parseInt(process.env.API_PORT || "8001", 10);
+const API_HOST = "127.0.0.1";
 // Generate a random token to protect mutating API endpoints from CSRF
-const API_TOKEN = crypto.randomBytes(32).toString('base64url');
+const API_TOKEN = crypto.randomBytes(32).toString("base64url");
 
 /**
  * Get the path to the Python API executable
@@ -22,15 +22,15 @@ function getPythonExecutablePath() {
   if (isDev) {
     // In development, use the Python from the virtual environment
     const platform = os.platform();
-    if (platform === 'win32') {
-      return path.join(__dirname, '..', 'venv', 'Scripts', 'python.exe');
+    if (platform === "win32") {
+      return path.join(__dirname, "..", "venv", "Scripts", "python.exe");
     } else {
-      return path.join(__dirname, '..', 'venv', 'bin', 'python');
+      return path.join(__dirname, "..", "venv", "bin", "python");
     }
   } else {
     // In production, the Python binary will be embedded
-    const resourcesPath = path.join(process.resourcesPath, 'python');
-    const binaryName = os.platform() === 'win32' ? 'python.exe' : 'python';
+    const resourcesPath = path.join(process.resourcesPath, "python");
+    const binaryName = os.platform() === "win32" ? "python.exe" : "python";
     return path.join(resourcesPath, binaryName);
   }
 }
@@ -45,11 +45,11 @@ async function waitForApiReady(maxRetries = 10) {
         `http://${API_HOST}:${API_PORT}/api/status`,
         {
           signal: AbortSignal.timeout(1000),
-          headers: { 'X-API-Token': API_TOKEN },
-        }
+          headers: { "X-API-Token": API_TOKEN },
+        },
       );
       if (response.ok) {
-        console.log('API backend is ready');
+        console.log("API backend is ready");
         return true;
       }
     } catch {
@@ -57,7 +57,7 @@ async function waitForApiReady(maxRetries = 10) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
-  throw new Error('API backend failed to start within timeout');
+  throw new Error("API backend failed to start within timeout");
 }
 
 /**
@@ -81,39 +81,46 @@ async function startPythonBackend() {
       // Start the Python API server
       // In dev mode, use -m to run the module; in production, the binary is a standalone executable
       const args = isDev
-        ? ['-m', 'gitlab_downloader.api', '--host', API_HOST, '--port', API_PORT.toString()]
-        : ['--host', API_HOST, '--port', API_PORT.toString()];
+        ? [
+            "-m",
+            "gitlab_downloader.api",
+            "--host",
+            API_HOST,
+            "--port",
+            API_PORT.toString(),
+          ]
+        : ["--host", API_HOST, "--port", API_PORT.toString()];
       apiProcess = spawn(pythonPath, args, {
         env: { ...process.env, GITLAB_DUMP_API_TOKEN: API_TOKEN },
         cwd: os.homedir(),
       });
 
       // Set up process error handler first
-      apiProcess.on('error', (err) => {
-        console.error('Failed to start Python backend:', err);
+      apiProcess.on("error", (err) => {
+        console.error("Failed to start Python backend:", err);
         reject(err);
       });
 
       // Log stdout and stderr
       if (apiProcess.stdout) {
-        apiProcess.stdout.on('data', (data) => {
+        apiProcess.stdout.on("data", (data) => {
           console.log(`[Python Backend] ${data.toString().trim()}`);
         });
       }
 
       if (apiProcess.stderr) {
-        apiProcess.stderr.on('data', (data) => {
+        apiProcess.stderr.on("data", (data) => {
           console.error(`[Python Backend Error] ${data.toString().trim()}`);
         });
       }
 
       // Handle process exit
-      apiProcess.on('exit', (code, signal) => {
+      apiProcess.on("exit", (code, signal) => {
         if (code === 0 || code === null) {
           console.log(`Python backend exited normally (signal: ${signal})`);
         } else {
           console.error(
-            `Python backend exited with code ${code} (signal: ${signal})`
+            `Python backend exited with code ${code} (signal: ${signal})`,
           );
         }
       });
@@ -152,7 +159,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       enableRemoteModule: false,
       nodeIntegration: false,
@@ -160,8 +167,8 @@ function createWindow() {
   });
 
   const startUrl = isDev
-    ? 'http://localhost:8080'
-    : `file://${path.join(__dirname, 'dist', 'index.html')}`;
+    ? "http://localhost:8000"
+    : `file://${path.join(__dirname, "dist", "index.html")}`;
 
   mainWindow.loadURL(startUrl);
 
@@ -169,7 +176,7 @@ function createWindow() {
     mainWindow.webContents.openDevTools();
   }
 
-  mainWindow.on('closed', () => {
+  mainWindow.on("closed", () => {
     mainWindow = null;
   });
 }
@@ -180,11 +187,11 @@ function createWindow() {
 function createMenu() {
   const template = [
     {
-      label: 'File',
+      label: "File",
       submenu: [
         {
-          label: 'Exit',
-          accelerator: 'CmdOrCtrl+Q',
+          label: "Exit",
+          accelerator: "CmdOrCtrl+Q",
           click: () => {
             app.quit();
           },
@@ -192,22 +199,22 @@ function createMenu() {
       ],
     },
     {
-      label: 'Edit',
+      label: "Edit",
       submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
+        { role: "undo" },
+        { role: "redo" },
+        { type: "separator" },
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
       ],
     },
     {
-      label: 'View',
+      label: "View",
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
+        { role: "reload" },
+        { role: "forceReload" },
+        { role: "toggleDevTools" },
       ],
     },
   ];
@@ -221,38 +228,38 @@ function createMenu() {
  */
 function setupIpcHandlers() {
   // Get API endpoint
-  ipcMain.handle('get-api-endpoint', () => {
-    console.log('get-api-endpoint request');
+  ipcMain.handle("get-api-endpoint", () => {
+    console.log("get-api-endpoint request");
     return `http://${API_HOST}:${API_PORT}`;
   });
 
   // Get API token for authenticating mutating requests
-  ipcMain.handle('get-api-token', () => {
+  ipcMain.handle("get-api-token", () => {
     return API_TOKEN;
   });
 
   // Check API status
-  ipcMain.handle('check-api-status', async () => {
+  ipcMain.handle("check-api-status", async () => {
     try {
       const response = await fetch(
         `http://${API_HOST}:${API_PORT}/api/status`,
         {
           signal: AbortSignal.timeout(5000),
-          headers: { 'X-API-Token': API_TOKEN },
-        }
+          headers: { "X-API-Token": API_TOKEN },
+        },
       );
       const isOk = response.ok;
       console.log(`check-api-status: ${isOk}`);
       return isOk;
     } catch (err) {
-      console.error('check-api-status failed:', err);
+      console.error("check-api-status failed:", err);
       return false;
     }
   });
 
   // Request graceful shutdown
-  ipcMain.handle('request-shutdown', async () => {
-    console.log('Shutdown requested from renderer');
+  ipcMain.handle("request-shutdown", async () => {
+    console.log("Shutdown requested from renderer");
     stopPythonBackend();
     app.quit();
     return { success: true };
@@ -261,17 +268,21 @@ function setupIpcHandlers() {
   // Get clone path (where repositories are stored)
   // Resolve relative paths against user's home directory (backend cwd) to ensure
   // the frontend and backend agree on the same absolute path
-  ipcMain.handle('get-clone-path', () => {
-    let clonePath = process.env.CLONE_PATH || 'repositories';
+  ipcMain.handle("get-clone-path", () => {
+    let clonePath = process.env.CLONE_PATH || "repositories";
     // Expand leading ~ to user's home directory (shell doesn't expand ~ in env vars)
-    if (clonePath.startsWith('~/') || clonePath.startsWith('~\\') || clonePath === '~') {
+    if (
+      clonePath.startsWith("~/") ||
+      clonePath.startsWith("~\\") ||
+      clonePath === "~"
+    ) {
       clonePath = path.join(os.homedir(), clonePath.slice(1));
     }
     return path.resolve(os.homedir(), clonePath);
   });
 
   // Get backend status
-  ipcMain.handle('get-backend-status', () => {
+  ipcMain.handle("get-backend-status", () => {
     const status = {
       running: apiProcess !== null && !apiProcess.killed,
       pid: apiProcess?.pid || null,
@@ -285,7 +296,7 @@ function setupIpcHandlers() {
 /**
  * App event handlers
  */
-app.on('ready', async () => {
+app.on("ready", async () => {
   try {
     // Start the Python backend
     await startPythonBackend();
@@ -296,19 +307,19 @@ app.on('ready', async () => {
     createMenu();
     setupIpcHandlers();
   } catch (err) {
-    console.error('Failed to start application:', err);
+    console.error("Failed to start application:", err);
     app.quit();
   }
 });
 
-app.on('window-all-closed', () => {
+app.on("window-all-closed", () => {
   // On macOS, applications stay active until the user quits explicitly
-  if (process.platform !== 'darwin') {
+  if (process.platform !== "darwin") {
     app.quit();
   }
 });
 
-app.on('activate', () => {
+app.on("activate", () => {
   // On macOS, re-create a window when the dock icon is clicked
   if (mainWindow === null) {
     createWindow();
@@ -316,18 +327,18 @@ app.on('activate', () => {
 });
 
 // Handle app termination
-process.on('exit', () => {
+process.on("exit", () => {
   stopPythonBackend();
 });
 
 // Handle SIGTERM (for graceful shutdown)
-process.on('SIGTERM', () => {
+process.on("SIGTERM", () => {
   stopPythonBackend();
   app.quit();
 });
 
 // Handle SIGINT (Ctrl+C)
-process.on('SIGINT', () => {
+process.on("SIGINT", () => {
   stopPythonBackend();
   app.quit();
 });

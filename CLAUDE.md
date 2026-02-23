@@ -108,6 +108,7 @@ Development commands:
 - `make binary_onefile` - Build single-file binary
 - `make clean` - Remove venv and build artifacts
 - `make help` - Show all available targets
+- `make interactive` - Run CLI in interactive mode
 - `make electron-build` - Build Electron GUI application
 - `make coverage` - Run tests with coverage report
 
@@ -192,6 +193,8 @@ gitlab-dump --version                        # Show version
 gitlab-dump --url <url> --token <token> --group <group>  # Clone repositories
 gitlab-dump --dry-run --url <url> --token <token>        # Preview without cloning
 gitlab-dump --update --url <url> --token <token>         # Update existing repos
+gitlab-dump --interactive                                # Interactive setup mode
+gitlab-dump --interactive-menu                           # Rich interactive menu (clone/migrate)
 ```
 
 ### API Server Mode

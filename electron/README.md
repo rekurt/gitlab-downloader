@@ -14,7 +14,7 @@ The application consists of three main layers:
 
 1. **Main Process** (`main.js`): Electron main process that manages windows, handles IPC communication, and spawns the Python backend process
 2. **Renderer Process** (`src/`): React application UI that runs in a Chromium window
-3. **Python Backend**: CLI tool exposing REST API on port 8000
+3. **Python Backend**: CLI tool exposing REST API on port 8001
 
 ### Communication Flow
 
@@ -87,7 +87,7 @@ npm run dev
 ```
 
 This command:
-1. Starts Webpack dev server on port 8080 with hot reload
+1. Starts Webpack dev server on port 8001 with hot reload
 2. Waits for the dev server to be ready
 3. Launches Electron with remote debugging enabled on port 9222
 
@@ -214,7 +214,7 @@ Browsable list of available repositories from the GitLab instance with filtering
 
 ## REST API Endpoints
 
-The application expects the Python backend to provide the following endpoints on `http://127.0.0.1:8000`:
+The application expects the Python backend to provide the following endpoints on `http://127.0.0.1:8001`:
 
 - `GET /api/status` - Backend health check
 - `GET /api/repos` - List available repositories
@@ -234,7 +234,7 @@ Configuration is handled via `env.js`:
 ```javascript
 {
   isDev: boolean,           // Development mode indicator
-  API_PORT: 8000,          // Backend API port
+  API_PORT: 8001,          // Backend API port
   API_HOST: '127.0.0.1',   // Backend API host
   LOG_LEVEL: 'debug',      // 'debug' in dev, 'info' in production
   DEBUG: boolean           // Debug mode enabled
@@ -243,7 +243,7 @@ Configuration is handled via `env.js`:
 
 Override at runtime with environment variables:
 ```bash
-API_PORT=8000 npm run dev
+API_PORT=8001 npm run dev
 API_HOST=192.168.1.100 npm run dev
 ```
 
@@ -300,14 +300,14 @@ npm run webpack-dev
 ```
 
 **Electron window shows blank page**
-- Ensure Webpack dev server is running on port 8080
+- Ensure Webpack dev server is running on port 8001
 - Check `npm run webpack-dev` output for errors
 - Clear Electron cache: `rm -rf ~/.config/GitLab\ Dump/`
 
 **Backend not connecting**
-- Verify Python backend is running on port 8000
+- Verify Python backend is running on port 8001
 - Check main.js logs for Python process startup errors
-- Test API manually: `curl http://127.0.0.1:8000/api/status`
+- Test API manually: `curl http://127.0.0.1:8001/api/status`
 
 **High CPU usage after build**
 - This is typically the embedded Python binary indexing files on first run

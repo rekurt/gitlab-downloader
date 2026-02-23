@@ -42,7 +42,7 @@ class TestElectronStructure:
 
         # Check for required Electron main process code
         assert "BrowserWindow" in content
-        assert "app.on('ready'" in content
+        assert 'app.on("ready"' in content
         assert "startPythonBackend" in content
         assert "stopPythonBackend" in content
 
@@ -144,7 +144,7 @@ class TestMainJsStructure:
         with open(main_js) as f:
             content = f.read()
 
-        assert "require('electron')" in content
+        assert 'require("electron")' in content
         assert "BrowserWindow" in content
         assert "ipcMain" in content
 
@@ -164,7 +164,7 @@ class TestMainJsStructure:
         with open(main_js) as f:
             content = f.read()
 
-        required_events = ["app.on('ready'", "app.on('window-all-closed'", "app.on('activate'"]
+        required_events = ['app.on("ready"', 'app.on("window-all-closed"', 'app.on("activate"']
         for event in required_events:
             assert event in content, f"main.js should handle {event}"
 

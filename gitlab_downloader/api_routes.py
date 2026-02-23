@@ -113,10 +113,8 @@ def _validate_path(
     else:
         bases = _allowed_base_dirs
 
-    path_str_resolved = str(path)
     for base in bases:
-        base_str = str(base)
-        if path_str_resolved == base_str or path_str_resolved.startswith(base_str + "/"):
+        if path == base or path.is_relative_to(base):
             return path
 
     raise ValueError(
@@ -224,7 +222,7 @@ def _find_git_repos(
                     if config_path.is_symlink():
                         pass  # Skip symlinked config files
                     elif config_path.exists():
-                        config_text = config_path.read_text()
+                        config_text = config_path.read_text(encoding="utf-8", errors="replace")
                         in_origin = False
                         for line in config_text.split("\n"):
                             stripped = line.strip()

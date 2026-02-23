@@ -256,13 +256,15 @@ class MigrationExecutor:
         return True
 
     @staticmethod
-    def _create_author_mapping_script(
-        mappings: dict[str, AuthorMapping],
+    def _create_mapping_script(
+        mappings: dict[str, AuthorMapping] | dict[str, CommitterMapping],
+        env_prefix: str,
     ) -> str:
-        """Create bash script for git filter-branch author replacement.
+        """Create bash script for git filter-branch author or committer replacement.
 
         Args:
-            mappings: Dictionary of author mappings
+            mappings: Dictionary of author or committer mappings
+            env_prefix: Git env var prefix, either "AUTHOR" or "COMMITTER"
 
         Returns:
             Bash script as string
@@ -280,10 +282,10 @@ class MigrationExecutor:
 
             keyword = "if" if first else "elif"
             parts.append(
-                f'{keyword} [ "$GIT_AUTHOR_NAME" = {original_name} ] && '
-                f'[ "$GIT_AUTHOR_EMAIL" = {original_email} ]; then\n'
-                f"  export GIT_AUTHOR_NAME={new_name}\n"
-                f"  export GIT_AUTHOR_EMAIL={new_email}"
+                f'{keyword} [ "$GIT_{env_prefix}_NAME" = {original_name} ] && '
+                f'[ "$GIT_{env_prefix}_EMAIL" = {original_email} ]; then\n'
+                f"  export GIT_{env_prefix}_NAME={new_name}\n"
+                f"  export GIT_{env_prefix}_EMAIL={new_email}"
             )
             first = False
 
@@ -294,42 +296,18 @@ class MigrationExecutor:
         return script
 
     @staticmethod
+    def _create_author_mapping_script(
+        mappings: dict[str, AuthorMapping],
+    ) -> str:
+        """Create bash script for git filter-branch author replacement."""
+        return MigrationExecutor._create_mapping_script(mappings, "AUTHOR")
+
+    @staticmethod
     def _create_committer_mapping_script(
         mappings: dict[str, CommitterMapping],
     ) -> str:
-        """Create bash script for git filter-branch committer replacement.
-
-        Args:
-            mappings: Dictionary of committer mappings
-
-        Returns:
-            Bash script as string
-        """
-        import shlex
-
-        parts = []
-        first = True
-        for mapping in mappings.values():
-            # Properly escape all values to prevent shell injection
-            original_name = shlex.quote(mapping.original_name)
-            original_email = shlex.quote(mapping.original_email)
-            new_name = shlex.quote(mapping.new_name)
-            new_email = shlex.quote(mapping.new_email)
-
-            keyword = "if" if first else "elif"
-            parts.append(
-                f'{keyword} [ "$GIT_COMMITTER_NAME" = {original_name} ] && '
-                f'[ "$GIT_COMMITTER_EMAIL" = {original_email} ]; then\n'
-                f"  export GIT_COMMITTER_NAME={new_name}\n"
-                f"  export GIT_COMMITTER_EMAIL={new_email}"
-            )
-            first = False
-
-        if parts:
-            script = "\n".join(parts) + "\nfi"
-        else:
-            script = "true"
-        return script
+        """Create bash script for git filter-branch committer replacement."""
+        return MigrationExecutor._create_mapping_script(mappings, "COMMITTER")
 
 
 class ConfigFileManager:

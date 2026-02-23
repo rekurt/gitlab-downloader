@@ -14,6 +14,23 @@ function App() {
   useEffect(() => {
     async function checkApi() {
       try {
+        if (!window.electronAPI) {
+          // Running outside Electron (e.g. browser dev server) — use defaults
+          const fallbackEndpoint = 'http://127.0.0.1:8001';
+          setApiEndpoint(fallbackEndpoint);
+          setApiToken('');
+          setClonePath('');
+          try {
+            const res = await fetch(`${fallbackEndpoint}/api/status`, {
+              signal: AbortSignal.timeout(3000),
+            });
+            setApiStatus(res.ok ? 'connected' : 'disconnected');
+          } catch {
+            setApiStatus('disconnected');
+          }
+          return;
+        }
+
         const endpoint = await window.electronAPI.getApiEndpoint();
         setApiEndpoint(endpoint);
 

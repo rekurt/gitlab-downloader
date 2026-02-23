@@ -146,7 +146,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--api-port",
         type=int,
-        default=int(os.getenv("API_PORT", 8000)),
+        default=int(os.getenv("API_PORT", 8001)),
         help="Port for API server",
     )
 
@@ -350,5 +350,5 @@ def config_from_args(args: argparse.Namespace) -> GitlabConfig:
         oauth_cache_path=args.oauth_cache_path,
         api_server=getattr(args, "api_server", False),
         api_host=getattr(args, "api_host", "127.0.0.1"),
-        api_port=getattr(args, "api_port", 8000),
+        api_port=getattr(args, "api_port", 8001),
     )

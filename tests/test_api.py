@@ -500,7 +500,7 @@ class TestApiModuleInvocation:
         """Test default argument values."""
         args = _parse_args([])
         assert args.host == "127.0.0.1"
-        assert args.port == 8000
+        assert args.port == 8001
 
     def test_parse_args_custom_host_and_port(self) -> None:
         """Test custom host and port arguments."""
@@ -512,7 +512,7 @@ class TestApiModuleInvocation:
         """Test specifying only host."""
         args = _parse_args(["--host", "192.168.1.1"])
         assert args.host == "192.168.1.1"
-        assert args.port == 8000
+        assert args.port == 8001
 
     def test_parse_args_only_port(self) -> None:
         """Test specifying only port."""

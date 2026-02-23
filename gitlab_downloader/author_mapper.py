@@ -193,18 +193,24 @@ class AuthorMapper:
         logger.info(f"Migration config saved to {self.config_path}")
 
     @staticmethod
-    def _parse_author_mappings(data: Any) -> dict[str, AuthorMapping]:
-        """Parse author mappings from dictionary."""
+    def _parse_mappings(data: Any, cls: type, label: str) -> dict[str, Any]:
+        """Parse mappings from dictionary using the given dataclass type.
+
+        Args:
+            data: Raw mapping dictionary from config file
+            cls: Dataclass type to instantiate (AuthorMapping or CommitterMapping)
+            label: Human-readable label for log messages
+        """
         if not isinstance(data, dict):
             return {}
 
-        mappings = {}
+        mappings: dict[str, Any] = {}
         for key, value in data.items():
             if not isinstance(value, dict):
                 continue
 
             try:
-                mapping = AuthorMapping(
+                mapping = cls(
                     original_name=value.get("original_name", ""),
                     original_email=value.get("original_email", ""),
                     new_name=value.get("new_name", ""),
@@ -212,33 +218,19 @@ class AuthorMapper:
                 )
                 mappings[key] = mapping
             except (KeyError, TypeError):
-                logger.warning(f"Invalid author mapping for key: {key}")
+                logger.warning(f"Invalid {label} mapping for key: {key}")
 
         return mappings
 
     @staticmethod
+    def _parse_author_mappings(data: Any) -> dict[str, AuthorMapping]:
+        """Parse author mappings from dictionary."""
+        return AuthorMapper._parse_mappings(data, AuthorMapping, "author")
+
+    @staticmethod
     def _parse_committer_mappings(data: Any) -> dict[str, CommitterMapping]:
         """Parse committer mappings from dictionary."""
-        if not isinstance(data, dict):
-            return {}
-
-        mappings = {}
-        for key, value in data.items():
-            if not isinstance(value, dict):
-                continue
-
-            try:
-                mapping = CommitterMapping(
-                    original_name=value.get("original_name", ""),
-                    original_email=value.get("original_email", ""),
-                    new_name=value.get("new_name", ""),
-                    new_email=value.get("new_email", ""),
-                )
-                mappings[key] = mapping
-            except (KeyError, TypeError):
-                logger.warning(f"Invalid committer mapping for key: {key}")
-
-        return mappings
+        return AuthorMapper._parse_mappings(data, CommitterMapping, "committer")
 
     @staticmethod
     def _serialize_mappings(

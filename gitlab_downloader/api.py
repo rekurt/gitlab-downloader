@@ -76,14 +76,10 @@ def create_app() -> FastAPI:
     # while still allowing "null" origin needed for Electron's file:// protocol.
     api_token = os.environ.get("GITLAB_DUMP_API_TOKEN", "")
     if not api_token:
-        logger.warning(
-            "GITLAB_DUMP_API_TOKEN is not set — API is running without authentication"
-        )
+        logger.warning("GITLAB_DUMP_API_TOKEN is not set — API is running without authentication")
 
     @app.middleware("http")
-    async def verify_api_token(
-        request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def verify_api_token(request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Verify API token for all API requests."""
         if api_token and request.method != "OPTIONS":
             provided_token = request.headers.get("X-API-Token", "")
@@ -120,7 +116,7 @@ def create_app() -> FastAPI:
     return app
 
 
-async def run_api_server_async(host: str = "127.0.0.1", port: int = 8000) -> None:
+async def run_api_server_async(host: str = "127.0.0.1", port: int = 8001) -> None:
     """Run the API server asynchronously from within an event loop.
 
     Args:
@@ -152,7 +148,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description="GitLab Dump API server")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=8000, help="Port to bind to (default: 8000)")
+    parser.add_argument("--port", type=int, default=8001, help="Port to bind to (default: 8001)")
     return parser.parse_args(argv)
 
 
