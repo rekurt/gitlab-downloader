@@ -6,8 +6,6 @@
 const path = require('path');
 const fs = require('fs-extra');
 const os = require('os');
-const { execSync } = require('child_process');
-
 const PYTHON_BINARY_DIR = path.join(__dirname, '..', 'electron', 'python_binary');
 const BUILD_DIR = path.join(__dirname, '..', 'build');
 
