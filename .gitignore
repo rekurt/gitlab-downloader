@@ -6,6 +6,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.coverage
 .ruff_cache/
 .DS_Store
 AGENTS.md

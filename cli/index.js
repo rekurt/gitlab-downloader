@@ -85,11 +85,11 @@ export function optsToConfig(opts) {
     token: opts.token || null,
     group: opts.group || null,
     clonePath: opts.clonePath || DEFAULT_CLONE_PATH,
-    perPage: opts.perPage || DEFAULT_PER_PAGE,
-    requestTimeout: opts.timeout || DEFAULT_TIMEOUT,
-    maxRetries: opts.apiRetries || DEFAULT_API_RETRIES,
-    cloneRetries: opts.cloneRetries || DEFAULT_CLONE_RETRIES,
-    maxConcurrency: opts.concurrency || DEFAULT_CONCURRENCY,
+    perPage: opts.perPage ?? DEFAULT_PER_PAGE,
+    requestTimeout: opts.timeout ?? DEFAULT_TIMEOUT,
+    maxRetries: opts.apiRetries ?? DEFAULT_API_RETRIES,
+    cloneRetries: opts.cloneRetries ?? DEFAULT_CLONE_RETRIES,
+    maxConcurrency: opts.concurrency ?? DEFAULT_CONCURRENCY,
     dryRun: opts.dryRun || false,
     updateExisting: opts.update || false,
     logLevel: opts.logLevel || 'INFO',
@@ -180,7 +180,7 @@ export async function runClone(config) {
     });
     process.once('SIGTERM', () => ac.abort());
 
-    const results = await cloneAllRepositories(projects, updatedConfig, ac.signal);
+    const results = await cloneAllRepositories(projects, updatedConfig, { signal: ac.signal });
     const hasFailed = printSummary(results);
 
     if (updatedConfig.reportJson) {

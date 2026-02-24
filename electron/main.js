@@ -216,9 +216,15 @@ function setupIpcHandlers() {
     "save-author-mappings",
     async (_event, { configPath, authorMappings, committerMappings }) => {
       try {
+        const savePath =
+          configPath ||
+          path.join(
+            app.getPath("userData"),
+            "author_mappings.json",
+          );
         const lib = await getCoreLib();
         await lib.saveMappings(
-          configPath,
+          savePath,
           authorMappings || {},
           committerMappings || {},
         );
