@@ -7,7 +7,7 @@
   "author": "GitLab Dump Team",
   "license": "MIT",
   "scripts": {
-    "start": "electron .",
+    "start": "concurrently \"npm run webpack-dev\" \"npm run electron-dev\"",
     "dev": "concurrently \"npm run webpack-dev\" \"npm run electron-dev\"",
     "webpack-dev": "webpack serve --mode development",
     "electron-dev": "wait-on http://localhost:8000 && electron . --remote-debugging-port=9222",

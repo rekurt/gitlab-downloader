@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import RepoList from './components/RepoList';
-import MigrationWizard from './components/MigrationWizard';
-import './App.css';
+import React, { useEffect, useState } from "react";
+import RepoList from "./components/RepoList";
+import MigrationWizard from "./components/MigrationWizard";
+import "./App.css";
 
 function App() {
-  const [apiStatus, setApiStatus] = useState('checking');
-  const [apiEndpoint, setApiEndpoint] = useState('');
-  const [apiToken, setApiToken] = useState('');
-  const [clonePath, setClonePath] = useState('');
-  const [currentView, setCurrentView] = useState('repos');
+  const [apiStatus, setApiStatus] = useState("checking");
+  const [apiEndpoint, setApiEndpoint] = useState("");
+  const [apiToken, setApiToken] = useState("");
+  const [clonePath, setClonePath] = useState("");
+  const [currentView, setCurrentView] = useState("repos");
   const [selectedRepo, setSelectedRepo] = useState(null);
 
   // One-time initialization of config values (endpoint, token, clone path)
@@ -16,19 +16,21 @@ function App() {
     async function init() {
       try {
         if (!window.electronAPI) {
-          setApiEndpoint('http://127.0.0.1:8001');
-          setApiToken('');
-          setClonePath('');
+          setApiEndpoint("http://127.0.0.1:8001");
+          setApiToken("");
+          setClonePath("");
           return;
         }
-        const endpoint = await window.electronAPI.getApiEndpoint();
+        const [endpoint, token, path] = await Promise.all([
+          window.electronAPI.getApiEndpoint(),
+          window.electronAPI.getApiToken(),
+          window.electronAPI.getClonePath(),
+        ]);
         setApiEndpoint(endpoint);
-        const token = await window.electronAPI.getApiToken();
-        setApiToken(token || '');
-        const path = await window.electronAPI.getClonePath();
-        setClonePath(path || '');
+        setApiToken(token || "");
+        setClonePath(path || "");
       } catch (error) {
-        console.error('Failed to initialize config:', error);
+        console.error("Failed to initialize config:", error);
       }
     }
     init();
@@ -39,22 +41,22 @@ function App() {
     async function checkStatus() {
       try {
         if (!window.electronAPI) {
-          const endpoint = 'http://127.0.0.1:8001';
+          const endpoint = "http://127.0.0.1:8001";
           try {
             const res = await fetch(`${endpoint}/api/status`, {
               signal: AbortSignal.timeout(3000),
             });
-            setApiStatus(res.ok ? 'connected' : 'disconnected');
+            setApiStatus(res.ok ? "connected" : "disconnected");
           } catch {
-            setApiStatus('disconnected');
+            setApiStatus("disconnected");
           }
           return;
         }
         const status = await window.electronAPI.checkApiStatus();
-        setApiStatus(status ? 'connected' : 'disconnected');
+        setApiStatus(status ? "connected" : "disconnected");
       } catch (error) {
-        console.error('Failed to check API status:', error);
-        setApiStatus('error');
+        console.error("Failed to check API status:", error);
+        setApiStatus("error");
       }
     }
 
@@ -65,11 +67,11 @@ function App() {
 
   const handleMigrationStart = (repo) => {
     setSelectedRepo(repo);
-    setCurrentView('migration');
+    setCurrentView("migration");
   };
 
   const handleMigrationComplete = () => {
-    setCurrentView('repos');
+    setCurrentView("repos");
     setSelectedRepo(null);
   };
 
@@ -82,26 +84,24 @@ function App() {
             className={`status-indicator ${apiStatus}`}
             title={`API Status: ${apiStatus}`}
           />
-          {apiStatus === 'connected' && (
+          {apiStatus === "connected" && (
             <span className="status-text">Connected</span>
           )}
-          {apiStatus === 'disconnected' && (
+          {apiStatus === "disconnected" && (
             <span className="status-text">Disconnected</span>
           )}
-          {apiStatus === 'checking' && (
+          {apiStatus === "checking" && (
             <span className="status-text">Checking...</span>
           )}
-          {apiStatus === 'error' && (
-            <span className="status-text">Error</span>
-          )}
+          {apiStatus === "error" && <span className="status-text">Error</span>}
         </div>
       </header>
 
       <nav className="app-nav">
         <button
-          className={`nav-button ${currentView === 'repos' ? 'active' : ''}`}
+          className={`nav-button ${currentView === "repos" ? "active" : ""}`}
           onClick={() => {
-            setCurrentView('repos');
+            setCurrentView("repos");
             setSelectedRepo(null);
           }}
         >
@@ -110,15 +110,13 @@ function App() {
       </nav>
 
       <main className="app-main">
-        {apiStatus !== 'connected' && (
+        {apiStatus !== "connected" && (
           <div className="connection-notice">
-            <p>
-              ⚠️ API is not connected. Make sure the backend is running.
-            </p>
+            <p>⚠️ API is not connected. Make sure the backend is running.</p>
           </div>
         )}
 
-        {currentView === 'repos' && (
+        {currentView === "repos" && (
           <RepoList
             apiEndpoint={apiEndpoint}
             apiToken={apiToken}
@@ -128,14 +126,14 @@ function App() {
           />
         )}
 
-        {currentView === 'migration' && selectedRepo && (
+        {currentView === "migration" && selectedRepo && (
           <MigrationWizard
             apiEndpoint={apiEndpoint}
             apiToken={apiToken}
             repo={selectedRepo}
             onComplete={handleMigrationComplete}
             onCancel={() => {
-              setCurrentView('repos');
+              setCurrentView("repos");
               setSelectedRepo(null);
             }}
           />

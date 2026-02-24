@@ -87,7 +87,7 @@ npm run dev
 ```
 
 This command:
-1. Starts Webpack dev server on port 8001 with hot reload
+1. Starts Webpack dev server on port 8000 with hot reload
 2. Waits for the dev server to be ready
 3. Launches Electron with remote debugging enabled on port 9222
 
@@ -300,7 +300,7 @@ npm run webpack-dev
 ```
 
 **Electron window shows blank page**
-- Ensure Webpack dev server is running on port 8001
+- Ensure Webpack dev server is running on port 8000
 - Check `npm run webpack-dev` output for errors
 - Clear Electron cache: `rm -rf ~/.config/GitLab\ Dump/`
 
