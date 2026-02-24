@@ -71,14 +71,17 @@ function ProgressIndicator({
       <div className="progress-bar-container">
         <div className="progress-bar">
           <div
-            className="progress-fill"
+            className={`progress-fill${progress.progress < 0 ? ' indeterminate' : ''}`}
             style={{
-              width: `${progress.progress}%`,
+              width: progress.progress < 0 ? '100%' : `${progress.progress}%`,
               backgroundColor: statusColor,
+              opacity: progress.progress < 0 ? 0.4 : 1,
             }}
           />
         </div>
-        <span className="progress-percentage">{progress.progress}%</span>
+        <span className="progress-percentage">
+          {progress.progress < 0 ? '...' : `${progress.progress}%`}
+        </span>
       </div>
 
       {progress.current_task && (

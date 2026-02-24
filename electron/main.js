@@ -288,7 +288,7 @@ function setupIpcHandlers() {
           mainWindow.webContents.send("migration-progress", {
             migrationId,
             status: "running",
-            progress: 50,
+            progress: -1,
             current_task: msg,
             messages: messages.slice(-20),
           });
@@ -300,8 +300,8 @@ function setupIpcHandlers() {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send("migration-progress", {
             migrationId,
-            status: "running",
-            progress: 50,
+            status: "error",
+            progress: -1,
             current_task: msg,
             messages: messages.slice(-20),
           });
