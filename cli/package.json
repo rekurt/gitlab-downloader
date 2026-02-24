@@ -1,0 +1,22 @@
+{
+  "name": "gitlab-dump-cli",
+  "version": "0.1.0",
+  "description": "CLI tool for GitLab repository downloading and migration",
+  "type": "module",
+  "bin": {
+    "gitlab-dump": "./bin/gitlab-dump.js"
+  },
+  "scripts": {
+    "test": "echo \"No tests yet\"",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@gitlab-dump/core": "file:../lib",
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "dotenv": "^16.3.0",
+    "inquirer": "^9.2.0"
+  },
+  "devDependencies": {},
+  "license": "MIT"
+}
