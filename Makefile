@@ -1,36 +1,50 @@
-.PHONY: run dry_run install build docker_run venv lint format test typecheck ci binary binary_onefile binary_clean help clean electron-build coverage node-install lib-test cli-test electron-test node-test node-ci cli-run cli-dry-run
+.PHONY: help clean \
+       node-install lib-test cli-test electron-test node-test node-lint node-ci \
+       cli-run cli-dry-run electron-build \
+       docker-build docker-run
 
-IMAGE_NAME=fetch-repositories
-CLONE_PATH?=$(shell pwd)/repositories
-VENV_PATH=venv
+# ─── Configuration ───
+
+IMAGE_NAME  := fetch-repositories
+CLONE_PATH  ?= $(shell pwd)/repositories
+JEST        := node --experimental-vm-modules
 
 ifneq (,$(wildcard .env))
     include .env
     export $(shell sed 's/=.*//' .env)
 endif
 
-# ─── Node.js targets ───
+# ─── Node.js: Setup ───
 
 node-install:
 	@npm install --prefix lib
 	@npm install --prefix cli
 	@npm install --prefix electron
 
+# ─── Node.js: Testing ───
+
 lib-test:
-	@node --experimental-vm-modules lib/node_modules/.bin/jest --config lib/jest.config.js
+	@$(JEST) lib/node_modules/.bin/jest --config lib/jest.config.js
 
 cli-test:
-	@node --experimental-vm-modules cli/node_modules/.bin/jest --config cli/jest.config.js
+	@$(JEST) cli/node_modules/.bin/jest --config cli/jest.config.js
 
 electron-test:
-	@node --experimental-vm-modules electron/node_modules/.bin/jest --config electron/jest.config.js
+	@$(JEST) electron/node_modules/.bin/jest --config electron/jest.config.js
 
 node-test: lib-test cli-test electron-test
 
+# ─── Node.js: Linting ───
+
 node-lint:
-	@lib/node_modules/.bin/eslint --config lib/eslint.config.js lib/*.js cli/index.js cli/ui.js cli/bin/gitlab-dump.js
+	@lib/node_modules/.bin/eslint --config lib/eslint.config.js \
+		lib/*.js cli/index.js cli/ui.js cli/bin/gitlab-dump.js
+
+# ─── Node.js: CI ───
 
 node-ci: node-lint node-test
+
+# ─── Node.js: Run ───
 
 cli-run:
 	@node cli/bin/gitlab-dump.js
@@ -38,59 +52,18 @@ cli-run:
 cli-dry-run:
 	@node cli/bin/gitlab-dump.js --dry-run
 
+# ─── Electron ───
+
 electron-build:
 	@cd electron && npm run dist
 	@echo "Electron binary built successfully in electron/dist_electron"
 
-# ─── Python targets (legacy) ───
-
-run:
-	@$(VENV_PATH)/bin/gitlab-dump
-
-dry_run:
-	@$(VENV_PATH)/bin/gitlab-dump --dry-run
-
-interactive:
-	@$(VENV_PATH)/bin/gitlab-dump --interactive
-
-venv:
-	@[ -d $(VENV_PATH) ] || python3 -m venv $(VENV_PATH)
-	@$(VENV_PATH)/bin/pip install --upgrade pip
-	@$(VENV_PATH)/bin/pip install --no-cache-dir -e .[dev]
-
-install: venv
-
-lint:
-	@$(VENV_PATH)/bin/ruff check .
-
-format:
-	@$(VENV_PATH)/bin/ruff format .
-
-test:
-	@$(VENV_PATH)/bin/pytest
-
-typecheck:
-	@$(VENV_PATH)/bin/mypy gitlab_downloader
-
-ci: lint typecheck test
-
-binary:
-	@$(VENV_PATH)/bin/pip install --no-cache-dir pyinstaller
-	@$(VENV_PATH)/bin/pyinstaller --onedir --name gitlab-dump --exclude-module multiprocessing gitlab_downloader/__main__.py
-
-binary_onefile:
-	@$(VENV_PATH)/bin/pip install --no-cache-dir pyinstaller
-	@$(VENV_PATH)/bin/pyinstaller --onefile --name gitlab-dump --exclude-module multiprocessing gitlab_downloader/__main__.py
-
-binary_clean:
-	@rm -rf build dist *.spec
-
 # ─── Docker ───
 
-build:
+docker-build:
 	docker build -t $(IMAGE_NAME) .
 
-docker_run: build
+docker-run: docker-build
 	docker run --rm \
 		--env GITLAB_URL=$(GITLAB_URL) \
 		--env GITLAB_TOKEN=$(GITLAB_TOKEN) \
@@ -101,51 +74,36 @@ docker_run: build
 
 # ─── General ───
 
+clean:
+	@rm -rf lib/node_modules cli/node_modules electron/node_modules
+	@rm -rf electron/dist_electron
+	@echo "Cleaned: node_modules and build artifacts"
+
 help:
-	@echo "Available targets:"
+	@echo "Usage: make <target>"
 	@echo ""
-	@echo "  Node.js:"
-	@echo "  make node-install      - Install dependencies for lib, cli, and electron"
-	@echo "  make lib-test          - Run lib/ tests"
-	@echo "  make cli-test          - Run cli/ tests"
-	@echo "  make electron-test     - Run electron/ tests"
-	@echo "  make node-test         - Run all Node.js tests (lib + cli + electron)"
-	@echo "  make node-lint         - Run ESLint on Node.js source files"
-	@echo "  make node-ci           - Run Node.js CI pipeline (lint + tests)"
-	@echo "  make cli-run           - Run CLI application"
-	@echo "  make cli-dry-run       - Run CLI with --dry-run flag"
-	@echo "  make electron-build    - Build Electron GUI application binary"
+	@echo "  Setup:"
+	@echo "    node-install       Install dependencies for lib, cli, and electron"
 	@echo ""
-	@echo "  Python (legacy):"
-	@echo "  make install           - Create virtual environment and install dependencies"
-	@echo "  make run               - Run the Python CLI application"
-	@echo "  make dry_run           - Run Python CLI with --dry-run flag"
-	@echo "  make interactive       - Run Python CLI in interactive mode"
-	@echo "  make test              - Run Python test suite with pytest"
-	@echo "  make coverage          - Run Python tests with coverage report"
-	@echo "  make lint              - Check Python code style with ruff"
-	@echo "  make format            - Format Python code with ruff"
-	@echo "  make typecheck         - Run type checking with mypy"
-	@echo "  make ci                - Run Python linting, type checking, and tests"
-	@echo "  make binary            - Build standalone Python binary (onedir)"
-	@echo "  make binary_onefile    - Build single-file Python binary"
-	@echo "  make binary_clean      - Remove binary build artifacts"
+	@echo "  Testing:"
+	@echo "    lib-test           Run lib/ tests"
+	@echo "    cli-test           Run cli/ tests"
+	@echo "    electron-test      Run electron/ tests"
+	@echo "    node-test          Run all tests (lib + cli + electron)"
+	@echo ""
+	@echo "  Quality:"
+	@echo "    node-lint          Run ESLint on Node.js source files"
+	@echo "    node-ci            CI pipeline (lint + tests)"
+	@echo ""
+	@echo "  Run:"
+	@echo "    cli-run            Run CLI application"
+	@echo "    cli-dry-run        Run CLI with --dry-run flag"
+	@echo "    electron-build     Build Electron application binary"
+	@echo ""
+	@echo "  Docker:"
+	@echo "    docker-build       Build Docker image"
+	@echo "    docker-run         Run application in Docker container"
 	@echo ""
 	@echo "  General:"
-	@echo "  make clean             - Remove venv, node_modules, and build artifacts"
-	@echo "  make build             - Build Docker image"
-	@echo "  make docker_run        - Run application in Docker container"
-	@echo "  make help              - Show this help message"
-
-clean:
-	@rm -rf $(VENV_PATH)
-	@rm -rf build dist *.spec
-	@rm -rf lib/node_modules cli/node_modules electron/node_modules
-	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	@find . -type f -name "*.pyc" -delete
-	@echo "Cleaned: venv, node_modules, build artifacts, and cache files"
-
-coverage:
-	@$(VENV_PATH)/bin/pip install --no-cache-dir pytest-cov
-	@$(VENV_PATH)/bin/pytest --cov=gitlab_downloader --cov-report=html --cov-report=term
-	@echo "Coverage report generated in htmlcov/index.html"
+	@echo "    clean              Remove node_modules and build artifacts"
+	@echo "    help               Show this help message"

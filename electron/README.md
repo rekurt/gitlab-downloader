@@ -1,163 +1,158 @@
-# GitLab Dump Desktop Application
+# GitLab Dump — Десктопное приложение
 
-## Overview
+## Обзор
 
-This is the Electron-based desktop application for GitLab repository management and migration. It provides a user-friendly graphical interface for configuring and managing GitLab dump operations. The application uses the shared Node.js core library (`lib/`) directly via IPC, without any external backend process.
+Десктопное приложение на базе Electron для управления репозиториями GitLab и миграции данных. Предоставляет удобный графический интерфейс для настройки и выполнения операций GitLab Dump. Использует общую Node.js-библиотеку (`lib/`) напрямую через IPC, без внешнего серверного процесса.
 
-The application supports Windows (portable executable), macOS (app bundle), and Linux (AppImage) distributions.
+Поддерживаемые платформы: Windows (портативный .exe), macOS (app bundle), Linux (AppImage).
 
-## Architecture
+## Архитектура
 
-### Components
+### Компоненты
 
-The application consists of two main layers:
+Приложение состоит из двух основных слоёв:
 
-1. **Main Process** (`main.js`): Electron main process that manages windows, handles IPC communication, and calls `lib/` modules directly
-2. **Renderer Process** (`src/`): React application UI that runs in a Chromium window
+1. **Main Process** (`main.js`): основной процесс Electron — управляет окнами, IPC и напрямую вызывает модули `lib/`
+2. **Renderer Process** (`src/`): React-приложение, работающее в окне Chromium
 
-### Communication Flow
+### Схема взаимодействия
 
 ```
 Renderer (React UI)
-        ↓ (IPC via preload.js)
+        ↓ (IPC через preload.js)
 Main Process (Electron)
-        ↓ (direct function calls)
+        ↓ (прямые вызовы функций)
 @gitlab-dump/core (lib/)
 ```
 
-The renderer process communicates with the main process via IPC (Inter-Process Communication). The main process imports and calls `lib/` modules directly — no HTTP server, no external process.
+Renderer-процесс общается с main-процессом через IPC (Inter-Process Communication). Main-процесс импортирует и вызывает модули `lib/` напрямую — без HTTP-сервера и внешних процессов.
 
-### Security
+### Безопасность
 
-The application uses a preload script (`preload.js`) to establish a secure bridge between the main and renderer processes. Only whitelisted IPC channels are allowed, preventing unauthorized access to system resources.
+Приложение использует preload-скрипт (`preload.js`) для создания безопасного моста между main- и renderer-процессами. Разрешены только IPC-каналы из белого списка, что предотвращает несанкционированный доступ к системным ресурсам.
 
-## Directory Structure
+## Структура директорий
 
 ```
 electron/
-├── main.js                 # Electron main process (IPC handlers → lib/)
-├── preload.js             # Secure IPC bridge to renderer
-├── env.js                 # Environment configuration
-├── webpack.config.js      # Webpack bundling configuration
-├── package.json           # Dependencies and npm scripts
-├── electron-builder.config.js  # Distribution packaging config
-├── src/                   # React application source
-│   ├── index.js          # Entry point
-│   ├── App.js            # Main component
-│   ├── App.css           # Main styles
-│   ├── index.html        # HTML template
-│   ├── components/       # React components
+├── main.js                 # Основной процесс Electron (IPC-обработчики → lib/)
+├── preload.js             # Безопасный IPC-мост к renderer
+├── env.js                 # Конфигурация окружения
+├── webpack.config.js      # Конфигурация Webpack
+├── package.json           # Зависимости и npm-скрипты
+├── electron-builder.config.js  # Конфигурация сборки дистрибутивов
+├── src/                   # Исходники React-приложения
+│   ├── index.js          # Точка входа
+│   ├── App.js            # Главный компонент
+│   ├── App.css           # Основные стили
+│   ├── index.html        # HTML-шаблон
+│   ├── components/       # React-компоненты
 │   │   ├── AuthorMapper.js
 │   │   ├── MigrationWizard.js
 │   │   ├── ProgressIndicator.js
 │   │   └── RepoList.js
-│   └── styles/           # Component-specific styles
-├── __tests__/            # Jest test files
-├── dist/                 # Built Webpack output
-├── dist_electron/        # Electron builder output
-└── node_modules/         # npm dependencies
+│   └── styles/           # Стили компонентов
+├── __tests__/            # Jest-тесты
+├── dist/                 # Результат сборки Webpack
+├── dist_electron/        # Результат сборки electron-builder
+└── node_modules/         # npm-зависимости
 ```
 
-## Setup & Development
+## Установка и разработка
 
-### Prerequisites
+### Требования
 
-- **Node.js**: 16.x or higher (check with `node --version`)
-- **npm**: 8.x or higher (check with `npm --version`)
+- **Node.js**: 16.x или выше (`node --version`)
+- **npm**: 8.x или выше (`npm --version`)
 
-### Installation
+### Установка
 
-From the project root:
+Из корня проекта:
 
 ```bash
-# Install all dependencies (lib, cli, electron)
+# Установить все зависимости (lib, cli, electron)
 make node-install
 ```
 
-Or from the `electron/` directory:
+Или из директории `electron/`:
 
 ```bash
 npm install
 ```
 
-### Development Mode
+### Режим разработки
 
-To run both the Webpack dev server and Electron during development:
+Запуск Webpack dev server и Electron одновременно:
 
 ```bash
 npm run dev
 ```
 
-This command:
-1. Starts Webpack dev server on port 8000 with hot reload
-2. Waits for the dev server to be ready
-3. Launches Electron with remote debugging enabled on port 9222
+Эта команда:
+1. Запускает Webpack dev server на порту 8000 с горячей перезагрузкой
+2. Ждёт готовности dev server
+3. Запускает Electron с удалённой отладкой на порту 9222
 
-#### Development Features
+#### Возможности при разработке
 
-- **Hot Reload**: React components update without restarting the app
-- **Remote Debugging**: Chrome DevTools available at `localhost:9222`
-- **Fast Iteration**: Combined Webpack and Electron watches for changes
+- **Горячая перезагрузка**: React-компоненты обновляются без перезапуска
+- **Удалённая отладка**: Chrome DevTools доступны по адресу `localhost:9222`
+- **Быстрая итерация**: Webpack и Electron отслеживают изменения файлов
 
-### Individual Commands
-
-If you prefer to run components separately:
+### Раздельный запуск компонентов
 
 ```bash
-# Terminal 1: Start Webpack dev server
+# Терминал 1: Webpack dev server
 npm run webpack-dev
 
-# Terminal 2: Start Electron (after webpack is ready)
+# Терминал 2: Electron (после готовности Webpack)
 npm run electron-dev
 ```
 
-## Building
+## Сборка
 
-### Production Build
+### Production-сборка
 
-To create optimized production bundle:
+Создание оптимизированного бандла:
 
 ```bash
 npm run build
 ```
 
-This runs Webpack in production mode, generating minified code in `dist/`.
+Запускает Webpack в production-режиме, генерируя минифицированный код в `dist/`.
 
-### Creating Distributions
+### Создание дистрибутивов
 
-The application uses `electron-builder` for creating platform-specific binaries. No external backend is required — all logic is bundled via `lib/`.
+Приложение использует `electron-builder` для создания платформенно-специфичных бинарников. Внешний бэкенд не требуется — вся логика в `lib/`.
 
-#### Platform-Specific Distributions
+#### Сборка для конкретных платформ
 
-**All platforms:**
+**Все платформы:**
 ```bash
 npm run dist
 ```
-Creates native installers for all platforms (requires build tools for each platform).
 
-**Windows only (portable .exe):**
+**Только Windows (портативный .exe):**
 ```bash
 npm run dist-win
 ```
-Creates: `GitLab Dump-X.Y.Z-win-x64.exe`
+Результат: `GitLab Dump-X.Y.Z-win-x64.exe`
 
-**macOS only (.dmg and .zip):**
+**Только macOS (.dmg и .zip):**
 ```bash
 npm run dist-mac
 ```
-Creates: `GitLab Dump-X.Y.Z.dmg` and `.zip`
+Результат: `GitLab Dump-X.Y.Z.dmg` и `.zip`
 
-**Linux only (AppImage):**
+**Только Linux (AppImage):**
 ```bash
 npm run dist-linux
 ```
-Creates: `GitLab Dump-X.Y.Z.AppImage`
+Результат: `GitLab Dump-X.Y.Z.AppImage`
 
-### Signing & Notarization
+### Подписание и нотаризация
 
-For production releases with code signing:
-
-Set environment variables before building:
+Для production-релизов с подписью кода установите переменные окружения перед сборкой.
 
 **Windows:**
 ```bash
@@ -174,7 +169,7 @@ export MAC_IDENTITY="Developer ID Application: Name"
 npm run dist-mac
 ```
 
-For macOS notarization (required for distribution outside App Store):
+Для нотаризации macOS (обязательна для распространения вне App Store):
 ```bash
 export MAC_NOTARIZE=true
 export APPLE_TEAM_ID=your_team_id
@@ -183,158 +178,158 @@ export APPLE_ID_PASSWORD=your_app_password
 npm run dist-mac
 ```
 
-## UI Components
+## UI-компоненты
 
 ### AuthorMapper
-Maps GitLab users to Git author identities for proper commit attribution during migration.
+Маппинг пользователей GitLab на Git-авторов для корректной атрибуции коммитов при миграции.
 
 ### MigrationWizard
-Step-by-step wizard guiding users through the migration process:
-- Repository selection
-- Credential configuration
-- Migration options
-- Progress tracking
+Пошаговый визард для миграции:
+- Выбор репозиториев
+- Настройка учётных данных
+- Параметры миграции
+- Отслеживание прогресса
 
 ### ProgressIndicator
-Real-time progress tracking with status updates, error handling, and completion notifications. Receives updates via IPC events from the main process.
+Отслеживание прогресса в реальном времени с обновлениями статуса, обработкой ошибок и уведомлениями о завершении. Получает обновления через IPC-события от main-процесса.
 
 ### RepoList
-Browsable list of available repositories scanned from the local clone path, with filtering and selection.
+Список доступных репозиториев, просканированных из локальной директории клонов, с фильтрацией и выбором.
 
-## IPC Channels
+## IPC-каналы
 
-### Renderer → Main (via preload)
+### Renderer → Main (через preload)
 
-**Invoke handlers (request-response):**
-- `get-clone-path`: Get the directory where repositories are stored
-- `get-repos`: Scan clone path and list git repositories
-- `get-author-mappings`: Load author/committer mappings from a config file
-- `save-author-mappings`: Save author/committer mappings to a config file
-- `get-config`: Load migration config from a repository
-- `save-config`: Save migration config to a repository
-- `start-migration`: Start an async migration task, returns migrationId
-- `cancel-migration`: Cancel a running migration by ID
-- `request-shutdown`: Request graceful application shutdown
+**Invoke-обработчики (запрос-ответ):**
+- `get-clone-path`: получить директорию хранения репозиториев
+- `get-repos`: просканировать директорию и получить список git-репозиториев
+- `get-author-mappings`: загрузить маппинг авторов/коммитеров из конфигурации
+- `save-author-mappings`: сохранить маппинг авторов/коммитеров
+- `get-config`: загрузить конфигурацию миграции из репозитория
+- `save-config`: сохранить конфигурацию миграции в репозиторий
+- `start-migration`: запустить асинхронную миграцию, возвращает migrationId
+- `cancel-migration`: отменить запущенную миграцию по ID
+- `request-shutdown`: запросить корректное завершение приложения
 
-### Main → Renderer (events)
+### Main → Renderer (события)
 
-- `migration-progress`: Real-time migration progress updates
+- `migration-progress`: обновления прогресса миграции в реальном времени
 
-### Window Control Channels
+### Каналы управления окном
 
-- `app-quit`: Quit the application
-- `app-minimize`: Minimize the window
-- `app-maximize`: Toggle maximize state
+- `app-quit`: закрыть приложение
+- `app-minimize`: свернуть окно
+- `app-maximize`: переключить состояние максимизации
 
-## Environment Configuration
+## Конфигурация окружения
 
-Configuration is handled via `env.js`:
+Конфигурация через `env.js`:
 
 ```javascript
 {
-  isDev: boolean,           // Development mode indicator
-  LOG_LEVEL: 'debug',      // 'debug' in dev, 'info' in production
-  DEBUG: boolean           // Debug mode enabled
+  isDev: boolean,           // Режим разработки
+  LOG_LEVEL: 'debug',      // 'debug' в dev, 'info' в production
+  DEBUG: boolean           // Отладочный режим
 }
 ```
 
-## Build Configuration
+## Конфигурация сборки
 
-### Electron Builder Settings
+### Настройки Electron Builder
 
-See `electron-builder.config.js` for platform-specific configurations:
+См. `electron-builder.config.js` для платформенных конфигураций:
 
-- **Windows**: Portable executable targeting x64 and ia32 architectures
-- **macOS**: App bundle with DMG and ZIP distribution formats
-- **Linux**: AppImage for universal Linux distribution
+- **Windows**: портативный исполняемый файл для архитектур x64 и ia32
+- **macOS**: app bundle с форматами DMG и ZIP
+- **Linux**: AppImage для универсального распространения
 
-### Webpack Configuration
+### Конфигурация Webpack
 
-`webpack.config.js` handles:
-- React component bundling with Babel
-- CSS module processing
-- HTML template generation via HtmlWebpackPlugin
-- Development server configuration
+`webpack.config.js` обрабатывает:
+- Бандлинг React-компонентов через Babel
+- Обработка CSS-модулей
+- Генерация HTML-шаблонов через HtmlWebpackPlugin
+- Конфигурация dev-сервера
 
-## Troubleshooting
+## Устранение неполадок
 
-### Common Issues
+### Частые проблемы
 
-**Webpack dev server not starting**
+**Webpack dev server не запускается**
 ```bash
-# Clear cache and reinstall
+# Очистить кэш и переустановить
 rm -rf node_modules package-lock.json
 npm install
 npm run webpack-dev
 ```
 
-**Electron window shows blank page**
-- Ensure Webpack dev server is running on port 8000
-- Check `npm run webpack-dev` output for errors
-- Clear Electron cache: `rm -rf ~/.config/GitLab\ Dump/`
+**Electron показывает пустую страницу**
+- Убедитесь, что Webpack dev server запущен на порту 8000
+- Проверьте вывод `npm run webpack-dev` на наличие ошибок
+- Очистите кэш Electron: `rm -rf ~/.config/GitLab\ Dump/`
 
-**IPC handlers not responding**
-- Check main.js console output for errors
-- Verify `lib/` modules are properly installed: `cd ../lib && npm install`
-- Use DevTools (F12) to inspect IPC calls in the renderer
+**IPC-обработчики не отвечают**
+- Проверьте вывод консоли main.js на наличие ошибок
+- Убедитесь, что модули `lib/` установлены: `cd ../lib && npm install`
+- Используйте DevTools (F12) для инспекции IPC-вызовов в renderer
 
-**Port 8000 already in use**
+**Порт 8000 уже занят**
 ```bash
-# Find process using port 8000
+# Найти процесс на порту 8000
 lsof -i :8000
-# Kill process if needed
+# Завершить процесс при необходимости
 kill -9 <PID>
 ```
 
-### Debug Mode
+### Режим отладки
 
-Enable additional logging:
+Включить дополнительное логирование:
 ```bash
 DEBUG=gitlab-dump* npm run dev
 ```
 
-Remote debugging available at `localhost:9222` when running with `npm run electron-dev`.
+Удалённая отладка доступна по адресу `localhost:9222` при запуске через `npm run electron-dev`.
 
-## Testing
+## Тестирование
 
-Run tests:
+Запуск тестов:
 ```bash
 npm test
 ```
 
-Or from the project root:
+Или из корня проекта:
 ```bash
 make electron-test
 ```
 
-## Performance Tips
+## Советы по производительности
 
-1. **Production Builds**: Always use `npm run dist` instead of dev mode for release
-2. **Bundle Size**: Check Webpack bundle stats before shipping major updates
-3. **Memory**: Large repository migrations should be run with adequate system memory (2GB+ recommended)
-4. **Network**: Stable connection required for large migrations (consider throttling recovery)
+1. **Production-сборки**: всегда используйте `npm run dist` вместо dev-режима для релизов
+2. **Размер бандла**: проверяйте статистику Webpack перед выпуском крупных обновлений
+3. **Память**: для миграции больших репозиториев рекомендуется 2GB+ оперативной памяти
+4. **Сеть**: для больших миграций необходимо стабильное подключение
 
-## Contributing
+## Участие в разработке
 
-When modifying the Electron application:
+При изменении Electron-приложения:
 
-1. Test development workflow: `npm run dev`
-2. Test production build: `npm run build`
-3. Verify Webpack bundling: Check `dist/bundle.js` size and validity
-4. Test distribution build on target platforms before release
-5. Update this README if adding new components or significant features
+1. Протестируйте workflow разработки: `npm run dev`
+2. Протестируйте production-сборку: `npm run build`
+3. Проверьте бандлинг Webpack: убедитесь в корректности `dist/bundle.js`
+4. Протестируйте сборку дистрибутива на целевых платформах
+5. Обновите этот README при добавлении новых компонентов или значимых изменений
 
-## Dependencies
+## Зависимости
 
-- **React 18.2**: UI framework
-- **Electron 27**: Desktop framework
-- **Webpack 5**: Module bundler
-- **Babel 7**: JavaScript transpiler
-- **electron-builder 24**: Distribution packaging
-- **@gitlab-dump/core**: Shared core library (lib/)
+- **React 18.2**: UI-фреймворк
+- **Electron 27**: десктопный фреймворк
+- **Webpack 5**: бандлер модулей
+- **Babel 7**: JavaScript-транспилятор
+- **electron-builder 24**: сборка дистрибутивов
+- **@gitlab-dump/core**: общая core-библиотека (lib/)
 
-See `package.json` for complete dependency list and versions.
+Полный список зависимостей и версий см. в `package.json`.
 
-## License
+## Лицензия
 
-MIT - See main project LICENSE file
+MIT — см. файл LICENSE в корне проекта
