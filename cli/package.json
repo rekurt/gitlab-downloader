@@ -7,7 +7,7 @@
     "gitlab-dump": "./bin/gitlab-dump.js"
   },
   "scripts": {
-    "test": "echo \"No tests yet\"",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -17,6 +17,9 @@
     "dotenv": "^16.3.0",
     "inquirer": "^9.2.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "jest": "^29.7.0"
+  },
   "license": "MIT"
 }

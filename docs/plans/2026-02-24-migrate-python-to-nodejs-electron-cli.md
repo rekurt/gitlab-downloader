@@ -161,16 +161,16 @@ Communication changes:
 - Modify: `cli/bin/gitlab-dump.js`
 - Modify: `cli/package.json`
 
-- [ ] CLI argument parsing with commander: --url, --token, --group, --clone-path, --dry-run, --update, --interactive, --interactive-menu, --concurrency, --version, --help
-- [ ] Port interactive mode: prompt for missing values using inquirer
-- [ ] Port interactive menu: clone/migrate/history/exit using inquirer
-- [ ] Port clone wizard: connection setup, group selection, clone execution
-- [ ] Port migration wizard: repo selection, author mapping, execution with progress
-- [ ] Port history view: list completed migrations
-- [ ] Colored terminal output with chalk
-- [ ] .env file support with dotenv
-- [ ] Write tests for CLI argument parsing and core workflows
-- [ ] Run tests - must pass before task 8
+- [x] CLI argument parsing with commander: --url, --token, --group, --clone-path, --dry-run, --update, --interactive, --interactive-menu, --concurrency, --version, --help
+- [x] Port interactive mode: prompt for missing values using inquirer
+- [x] Port interactive menu: clone/migrate/history/exit using inquirer
+- [x] Port clone wizard: connection setup, group selection, clone execution
+- [x] Port migration wizard: repo selection, author mapping, execution with progress
+- [x] Port history view: list completed migrations
+- [x] Colored terminal output with chalk
+- [x] .env file support with dotenv
+- [x] Write tests for CLI argument parsing and core workflows
+- [x] Run tests - must pass before task 8
 
 ### Task 8: Rewrite Electron main process (IPC handlers)
 

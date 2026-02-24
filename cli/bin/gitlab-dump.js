@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
-// Placeholder entry point for gitlab-dump CLI.
-// Will be implemented in Task 7.
+import { main } from '../index.js';
 
-console.log('gitlab-dump CLI - not yet implemented');
-process.exit(0);
+main(process.argv).then(
+  (code) => process.exit(code),
+  (err) => {
+    console.error(err.message || err);
+    process.exit(1);
+  }
+);
