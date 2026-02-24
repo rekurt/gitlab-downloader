@@ -5,6 +5,7 @@ function ProgressIndicator({
   migrationId,
   onComplete,
   onError,
+  onCancel,
 }) {
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState(null);
@@ -100,6 +101,20 @@ function ProgressIndicator({
             ))}
           </ul>
         </div>
+      )}
+
+      {!isFinished && (
+        <button
+          className="btn-cancel-migration"
+          onClick={async () => {
+            if (window.electronAPI) {
+              await window.electronAPI.cancelMigration(migrationId);
+              if (onCancel) onCancel();
+            }
+          }}
+        >
+          Cancel Migration
+        </button>
       )}
 
       {isFinished && (

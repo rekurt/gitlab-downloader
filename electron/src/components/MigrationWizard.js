@@ -167,6 +167,10 @@ function MigrationWizard({ repo, onComplete, onCancel }) {
             migrationId={migrationId}
             onComplete={handleMigrationComplete}
             onError={handleMigrationError}
+            onCancel={() => {
+              setMigrationId(null);
+              setStep(2);
+            }}
           />
         )}
 
