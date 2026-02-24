@@ -1,0 +1,305 @@
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+
+// We need to mock Electron modules before requiring main.js
+jest.mock('electron', () => ({
+  app: {
+    on: jest.fn(),
+    quit: jest.fn(),
+  },
+  BrowserWindow: jest.fn().mockImplementation(() => ({
+    loadURL: jest.fn(),
+    on: jest.fn(),
+    webContents: {
+      openDevTools: jest.fn(),
+      send: jest.fn(),
+    },
+    isDestroyed: jest.fn().mockReturnValue(false),
+  })),
+  Menu: {
+    buildFromTemplate: jest.fn().mockReturnValue({}),
+    setApplicationMenu: jest.fn(),
+  },
+  ipcMain: {
+    handle: jest.fn(),
+  },
+}));
+
+jest.mock('electron-is-dev', () => false);
+
+const { findGitRepos, resolveClonePath } = require('../main');
+
+describe('findGitRepos', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'electron-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('finds repos with .git directories', () => {
+    // Create a fake repo
+    const repoDir = path.join(tmpDir, 'my-repo');
+    fs.mkdirSync(path.join(repoDir, '.git'), { recursive: true });
+
+    const repos = findGitRepos(tmpDir);
+    expect(repos).toHaveLength(1);
+    expect(repos[0].name).toBe('my-repo');
+    expect(repos[0].path).toBe(repoDir);
+  });
+
+  test('finds nested repos', () => {
+    const groupDir = path.join(tmpDir, 'group');
+    const repoDir = path.join(groupDir, 'subgroup', 'repo');
+    fs.mkdirSync(path.join(repoDir, '.git'), { recursive: true });
+
+    const repos = findGitRepos(tmpDir);
+    expect(repos).toHaveLength(1);
+    expect(repos[0].name).toBe('repo');
+  });
+
+  test('returns empty array for non-existent path', () => {
+    const repos = findGitRepos('/nonexistent/path/12345');
+    expect(repos).toEqual([]);
+  });
+
+  test('returns empty array for empty directory', () => {
+    const repos = findGitRepos(tmpDir);
+    expect(repos).toEqual([]);
+  });
+
+  test('does not recurse into .git directories', () => {
+    const repoDir = path.join(tmpDir, 'repo');
+    fs.mkdirSync(path.join(repoDir, '.git', 'refs'), { recursive: true });
+
+    const repos = findGitRepos(tmpDir);
+    expect(repos).toHaveLength(1);
+    expect(repos[0].path).toBe(repoDir);
+  });
+
+  test('finds multiple repos at same level', () => {
+    fs.mkdirSync(path.join(tmpDir, 'repo1', '.git'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, 'repo2', '.git'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, 'repo3', '.git'), { recursive: true });
+
+    const repos = findGitRepos(tmpDir);
+    expect(repos).toHaveLength(3);
+    const names = repos.map((r) => r.name).sort();
+    expect(names).toEqual(['repo1', 'repo2', 'repo3']);
+  });
+
+  test('reads remote origin URL from git config', () => {
+    const repoDir = path.join(tmpDir, 'repo');
+    const gitDir = path.join(repoDir, '.git');
+    fs.mkdirSync(gitDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(gitDir, 'config'),
+      '[remote "origin"]\n\turl = https://gitlab.com/group/repo.git\n',
+    );
+
+    const repos = findGitRepos(tmpDir);
+    expect(repos).toHaveLength(1);
+    expect(repos[0].url).toBe('https://gitlab.com/group/repo.git');
+  });
+
+  test('handles missing git config gracefully', () => {
+    const repoDir = path.join(tmpDir, 'repo');
+    fs.mkdirSync(path.join(repoDir, '.git'), { recursive: true });
+
+    const repos = findGitRepos(tmpDir);
+    expect(repos).toHaveLength(1);
+    expect(repos[0].url).toBe('');
+  });
+
+  test('respects maxDepth parameter', () => {
+    // Create a deeply nested repo
+    const deepPath = path.join(tmpDir, 'a', 'b', 'c', 'repo');
+    fs.mkdirSync(path.join(deepPath, '.git'), { recursive: true });
+
+    // With maxDepth 2, should not find repo at depth 4
+    const repos = findGitRepos(tmpDir, 2);
+    expect(repos).toHaveLength(0);
+
+    // With maxDepth 5, should find it
+    const repos2 = findGitRepos(tmpDir, 5);
+    expect(repos2).toHaveLength(1);
+  });
+
+  test('skips node_modules directories', () => {
+    fs.mkdirSync(path.join(tmpDir, 'node_modules', 'some-pkg', '.git'), {
+      recursive: true,
+    });
+    fs.mkdirSync(path.join(tmpDir, 'real-repo', '.git'), { recursive: true });
+
+    const repos = findGitRepos(tmpDir);
+    expect(repos).toHaveLength(1);
+    expect(repos[0].name).toBe('real-repo');
+  });
+
+  test('skips hidden directories (except .git)', () => {
+    fs.mkdirSync(path.join(tmpDir, '.hidden', 'repo', '.git'), {
+      recursive: true,
+    });
+    fs.mkdirSync(path.join(tmpDir, 'visible-repo', '.git'), {
+      recursive: true,
+    });
+
+    const repos = findGitRepos(tmpDir);
+    expect(repos).toHaveLength(1);
+    expect(repos[0].name).toBe('visible-repo');
+  });
+
+  test('includes last_updated from FETCH_HEAD if available', () => {
+    const repoDir = path.join(tmpDir, 'repo');
+    const gitDir = path.join(repoDir, '.git');
+    fs.mkdirSync(gitDir, { recursive: true });
+    fs.writeFileSync(path.join(gitDir, 'FETCH_HEAD'), 'dummy');
+
+    const repos = findGitRepos(tmpDir);
+    expect(repos).toHaveLength(1);
+    expect(repos[0].last_updated).toBeTruthy();
+    // Should be a valid ISO date
+    expect(new Date(repos[0].last_updated).getTime()).toBeGreaterThan(0);
+  });
+
+  test('falls back to HEAD for last_updated', () => {
+    const repoDir = path.join(tmpDir, 'repo');
+    const gitDir = path.join(repoDir, '.git');
+    fs.mkdirSync(gitDir, { recursive: true });
+    fs.writeFileSync(path.join(gitDir, 'HEAD'), 'ref: refs/heads/main');
+
+    const repos = findGitRepos(tmpDir);
+    expect(repos).toHaveLength(1);
+    expect(repos[0].last_updated).toBeTruthy();
+  });
+});
+
+describe('resolveClonePath', () => {
+  const originalEnv = process.env.CLONE_PATH;
+
+  afterEach(() => {
+    if (originalEnv !== undefined) {
+      process.env.CLONE_PATH = originalEnv;
+    } else {
+      delete process.env.CLONE_PATH;
+    }
+  });
+
+  test('returns default repositories path when CLONE_PATH not set', () => {
+    delete process.env.CLONE_PATH;
+    const result = resolveClonePath();
+    expect(result).toBe(path.resolve(os.homedir(), 'repositories'));
+  });
+
+  test('resolves CLONE_PATH from env', () => {
+    process.env.CLONE_PATH = '/tmp/my-repos';
+    const result = resolveClonePath();
+    expect(result).toBe('/tmp/my-repos');
+  });
+
+  test('expands tilde in CLONE_PATH', () => {
+    process.env.CLONE_PATH = '~/gitlab-repos';
+    const result = resolveClonePath();
+    expect(result).toBe(path.join(os.homedir(), 'gitlab-repos'));
+  });
+
+  test('resolves relative CLONE_PATH against homedir', () => {
+    process.env.CLONE_PATH = 'my-repos';
+    const result = resolveClonePath();
+    expect(result).toBe(path.resolve(os.homedir(), 'my-repos'));
+  });
+});
+
+describe('setupIpcHandlers', () => {
+  const { ipcMain } = require('electron');
+
+  beforeEach(() => {
+    ipcMain.handle.mockClear();
+  });
+
+  test('registers all expected IPC channels', () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const registeredChannels = ipcMain.handle.mock.calls.map(
+      (call) => call[0],
+    );
+    expect(registeredChannels).toContain('get-clone-path');
+    expect(registeredChannels).toContain('get-repos');
+    expect(registeredChannels).toContain('get-author-mappings');
+    expect(registeredChannels).toContain('save-author-mappings');
+    expect(registeredChannels).toContain('get-config');
+    expect(registeredChannels).toContain('save-config');
+    expect(registeredChannels).toContain('start-migration');
+    expect(registeredChannels).toContain('cancel-migration');
+    expect(registeredChannels).toContain('request-shutdown');
+  });
+
+  test('get-clone-path handler returns resolved path', () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const getClonePathCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'get-clone-path',
+    );
+    expect(getClonePathCall).toBeTruthy();
+
+    const handler = getClonePathCall[1];
+    const result = handler();
+    expect(typeof result).toBe('string');
+    expect(path.isAbsolute(result)).toBe(true);
+  });
+
+  test('get-repos handler returns repositories object', () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const getReposCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'get-repos',
+    );
+    expect(getReposCall).toBeTruthy();
+
+    const handler = getReposCall[1];
+    // Call with a non-existent path to get empty result
+    const result = handler(null, '/nonexistent/path/12345');
+    expect(result).toEqual({ repositories: [] });
+  });
+
+  test('get-repos handler accepts custom clone path', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ipc-test-'));
+    try {
+      fs.mkdirSync(path.join(tmpDir, 'test-repo', '.git'), {
+        recursive: true,
+      });
+
+      const { setupIpcHandlers } = require('../main');
+      setupIpcHandlers();
+
+      const getReposCall = ipcMain.handle.mock.calls.find(
+        (c) => c[0] === 'get-repos',
+      );
+      const handler = getReposCall[1];
+      const result = handler(null, tmpDir);
+      expect(result.repositories).toHaveLength(1);
+      expect(result.repositories[0].name).toBe('test-repo');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('cancel-migration handler returns error for unknown migration', () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const cancelCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'cancel-migration',
+    );
+    const handler = cancelCall[1];
+    const result = handler(null, 'nonexistent-id');
+    expect(result).toEqual({ success: false, error: 'Migration not found' });
+  });
+});

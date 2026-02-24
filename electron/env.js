@@ -7,8 +7,6 @@ const isDev = require("electron-is-dev");
 
 module.exports = {
   isDev,
-  API_PORT: process.env.API_PORT || 8001,
-  API_HOST: process.env.API_HOST || "127.0.0.1",
   LOG_LEVEL: isDev ? "debug" : "info",
   DEBUG: isDev,
 };

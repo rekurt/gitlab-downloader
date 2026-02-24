@@ -1,165 +1,102 @@
 const { app, BrowserWindow, Menu, ipcMain } = require("electron");
 const path = require("path");
 const isDev = require("electron-is-dev");
-const { spawn } = require("child_process");
-const crypto = require("crypto");
 const os = require("os");
 const fs = require("fs");
 
 let mainWindow;
-let apiProcess = null;
-const API_PORT = Number.parseInt(process.env.API_PORT || "8001", 10);
-const API_HOST = "127.0.0.1";
-// Generate a random token to protect mutating API endpoints from CSRF
-const API_TOKEN = crypto.randomBytes(32).toString("base64url");
 
 /**
- * Get the path to the Python API executable
- * In production, this will be embedded in the app bundle
- * In development, this should point to the Python backend
+ * Lazily loaded core library modules (ESM).
+ * We use dynamic import() because lib/ is an ESM package.
  */
-function getPythonExecutablePath() {
-  if (isDev) {
-    // In development, use the Python from the virtual environment
-    const platform = os.platform();
-    if (platform === "win32") {
-      return path.join(__dirname, "..", "venv", "Scripts", "python.exe");
-    } else {
-      return path.join(__dirname, "..", "venv", "bin", "python");
-    }
-  } else {
-    // In production, the Python binary will be embedded
-    const resourcesPath = path.join(process.resourcesPath, "python");
-    const binaryName = os.platform() === "win32" ? "python.exe" : "python";
-    return path.join(resourcesPath, binaryName);
+let _coreLib = null;
+async function getCoreLib() {
+  if (!_coreLib) {
+    _coreLib = await import("@gitlab-dump/core");
   }
+  return _coreLib;
 }
 
 /**
- * Wait for API to be ready with health checks
+ * Find git repositories recursively under a base directory.
+ * Returns an array of { name, path, url, last_updated } objects
+ * for the renderer's RepoList component.
  */
-async function waitForApiReady(maxRetries = 10) {
-  for (let i = 0; i < maxRetries; i++) {
+function findGitRepos(basePath, maxDepth = 10) {
+  const repos = [];
+
+  function walk(dir, depth) {
+    if (depth > maxDepth) return;
     try {
-      const response = await fetch(
-        `http://${API_HOST}:${API_PORT}/api/status`,
-        {
-          signal: AbortSignal.timeout(1000),
-          headers: { "X-API-Token": API_TOKEN },
-        },
-      );
-      if (response.ok) {
-        console.log("API backend is ready");
-        return true;
+      const gitDir = path.join(dir, ".git");
+      if (fs.existsSync(gitDir)) {
+        let url = "";
+        try {
+          const configPath = path.join(gitDir, "config");
+          const configContent = fs.readFileSync(configPath, "utf-8");
+          const match = configContent.match(
+            /\[remote "origin"\][^[]*url\s*=\s*(.+)/m,
+          );
+          if (match) url = match[1].trim();
+        } catch {
+          /* ignore */
+        }
+
+        let lastUpdated = null;
+        try {
+          const stats = fs.statSync(path.join(gitDir, "FETCH_HEAD"));
+          lastUpdated = stats.mtime.toISOString();
+        } catch {
+          try {
+            const stats = fs.statSync(path.join(gitDir, "HEAD"));
+            lastUpdated = stats.mtime.toISOString();
+          } catch {
+            /* ignore */
+          }
+        }
+
+        repos.push({
+          name: path.basename(dir),
+          path: dir,
+          url,
+          last_updated: lastUpdated,
+        });
+        return; // don't recurse into .git repos
+      }
+
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+        if (entry.name === "node_modules" || entry.name.startsWith("."))
+          continue;
+        const full = path.join(dir, entry.name);
+        walk(full, depth + 1);
       }
     } catch {
-      // API not ready yet
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Permission errors or broken symlinks
     }
   }
-  throw new Error("API backend failed to start within timeout");
+
+  if (fs.existsSync(basePath)) {
+    walk(basePath, 0);
+  }
+  return repos;
 }
 
 /**
- * Start the Python API backend process
+ * Resolve clone path from env, expanding ~ and resolving relative paths.
  */
-async function startPythonBackend() {
-  return new Promise((resolve, reject) => {
-    try {
-      const pythonPath = getPythonExecutablePath();
-
-      // Check if Python executable exists
-      if (!fs.existsSync(pythonPath)) {
-        const error = new Error(`Python executable not found at ${pythonPath}`);
-        console.error(error.message);
-        reject(error);
-        return;
-      }
-
-      console.log(`Starting Python backend with: ${pythonPath}`);
-
-      // Start the Python API server
-      // In dev mode, use -m to run the module; in production, the binary is a standalone executable
-      const args = isDev
-        ? [
-            "-m",
-            "gitlab_downloader.api",
-            "--host",
-            API_HOST,
-            "--port",
-            API_PORT.toString(),
-          ]
-        : ["--host", API_HOST, "--port", API_PORT.toString()];
-      apiProcess = spawn(pythonPath, args, {
-        env: { ...process.env, GITLAB_DUMP_API_TOKEN: API_TOKEN },
-        cwd: os.homedir(),
-      });
-
-      // Set up process error handler first
-      apiProcess.on("error", (err) => {
-        console.error("Failed to start Python backend:", err);
-        reject(err);
-      });
-
-      // Log stdout and stderr
-      if (apiProcess.stdout) {
-        apiProcess.stdout.on("data", (data) => {
-          console.log(`[Python Backend] ${data.toString().trim()}`);
-        });
-      }
-
-      if (apiProcess.stderr) {
-        apiProcess.stderr.on("data", (data) => {
-          console.error(`[Python Backend Error] ${data.toString().trim()}`);
-        });
-      }
-
-      // Track whether the startup promise has been settled
-      let settled = false;
-
-      // Handle process exit — reject if it happens before API is ready
-      apiProcess.on("exit", (code, signal) => {
-        if (code === 0 || code === null) {
-          console.log(`Python backend exited normally (signal: ${signal})`);
-        } else {
-          console.error(
-            `Python backend exited with code ${code} (signal: ${signal})`,
-          );
-        }
-        if (!settled) {
-          settled = true;
-          reject(
-            new Error(
-              `Python backend exited unexpectedly during startup: code=${code}, signal=${signal}`,
-            ),
-          );
-        }
-      });
-
-      // Wait for API to be ready
-      waitForApiReady()
-        .then(() => {
-          settled = true;
-          resolve(true);
-        })
-        .catch((err) => {
-          settled = true;
-          reject(err);
-        });
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-/**
- * Stop the Python API backend process
- */
-function stopPythonBackend() {
-  if (apiProcess) {
-    apiProcess.kill();
-    apiProcess = null;
+function resolveClonePath() {
+  let clonePath = process.env.CLONE_PATH || "repositories";
+  if (
+    clonePath.startsWith("~/") ||
+    clonePath.startsWith("~\\") ||
+    clonePath === "~"
+  ) {
+    clonePath = path.join(os.homedir(), clonePath.slice(1));
   }
+  return path.resolve(os.homedir(), clonePath);
 }
 
 /**
@@ -237,121 +174,252 @@ function createMenu() {
 }
 
 /**
+ * Active migration abort controllers, keyed by migration ID.
+ */
+const activeMigrations = new Map();
+
+/**
  * IPC handlers for frontend communication
  */
 function setupIpcHandlers() {
-  // Get API endpoint
-  ipcMain.handle("get-api-endpoint", () => {
-    console.log("get-api-endpoint request");
-    return `http://${API_HOST}:${API_PORT}`;
+  // Get clone path
+  ipcMain.handle("get-clone-path", () => {
+    return resolveClonePath();
   });
 
-  // Get API token for authenticating mutating requests
-  ipcMain.handle("get-api-token", () => {
-    return API_TOKEN;
+  // Get list of git repositories under clone path
+  ipcMain.handle("get-repos", (_event, clonePath) => {
+    const resolvedPath = clonePath || resolveClonePath();
+    const repos = findGitRepos(resolvedPath);
+    return { repositories: repos };
   });
 
-  // Check API status
-  ipcMain.handle("check-api-status", async () => {
+  // Get author/committer mappings from a config file
+  ipcMain.handle("get-author-mappings", async (_event, configPath) => {
     try {
-      const response = await fetch(
-        `http://${API_HOST}:${API_PORT}/api/status`,
-        {
-          signal: AbortSignal.timeout(5000),
-          headers: { "X-API-Token": API_TOKEN },
-        },
-      );
-      const isOk = response.ok;
-      console.log(`check-api-status: ${isOk}`);
-      return isOk;
+      const lib = await getCoreLib();
+      if (configPath) {
+        const mappings = await lib.loadMappings(configPath);
+        return { success: true, data: mappings };
+      }
+      return {
+        success: true,
+        data: { authorMappings: {}, committerMappings: {} },
+      };
     } catch (err) {
-      console.error("check-api-status failed:", err);
-      return false;
+      return { success: false, error: err.message };
     }
+  });
+
+  // Save author/committer mappings to a config file
+  ipcMain.handle(
+    "save-author-mappings",
+    async (_event, { configPath, authorMappings, committerMappings }) => {
+      try {
+        const lib = await getCoreLib();
+        await lib.saveMappings(
+          configPath,
+          authorMappings || {},
+          committerMappings || {},
+        );
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+  );
+
+  // Get migration config from a repository path
+  ipcMain.handle("get-config", async (_event, repoPath) => {
+    try {
+      const lib = await getCoreLib();
+      const config = await lib.discoverConfig(repoPath);
+      if (config) {
+        return { success: true, data: config };
+      }
+      return { success: true, data: null };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Save migration config to a repository
+  ipcMain.handle("save-config", async (_event, { repoPath, config }) => {
+    try {
+      const lib = await getCoreLib();
+      await lib.saveConfigToRepo(repoPath, config);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Start a migration - runs asynchronously, sends progress via IPC events
+  ipcMain.handle("start-migration", async (event, migrationConfig) => {
+    const migrationId = `mig_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    try {
+      const lib = await getCoreLib();
+      const ac = new AbortController();
+      activeMigrations.set(migrationId, ac);
+
+      const { repoPath, authorMappings, committerMappings } = migrationConfig;
+
+      const config = {
+        source_repos_path: repoPath,
+        target_hosting_url: migrationConfig.targetHostingUrl || "",
+        target_token: migrationConfig.targetToken || "",
+        author_mappings: authorMappings || {},
+        committer_mappings: committerMappings || {},
+      };
+
+      const executor = new lib.MigrationExecutor(config);
+      const messages = [];
+
+      executor.on("progress", (msg) => {
+        messages.push(msg);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("migration-progress", {
+            migrationId,
+            status: "running",
+            progress: 50,
+            current_task: msg,
+            messages: messages.slice(-20),
+          });
+        }
+      });
+
+      executor.on("error", (msg) => {
+        messages.push(`Error: ${msg}`);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("migration-progress", {
+            migrationId,
+            status: "running",
+            progress: 50,
+            current_task: msg,
+            messages: messages.slice(-20),
+          });
+        }
+      });
+
+      // Run migration asynchronously
+      const runMigration = async () => {
+        try {
+          const success = await executor.migrateRepository(repoPath, {
+            authorMappings,
+            committerMappings,
+            signal: ac.signal,
+          });
+
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send("migration-progress", {
+              migrationId,
+              status: success ? "completed" : "failed",
+              progress: 100,
+              current_task: success
+                ? "Migration completed"
+                : "Migration failed",
+              messages: messages.slice(-20),
+              error: success ? null : "Migration encountered errors",
+            });
+          }
+        } catch (err) {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send("migration-progress", {
+              migrationId,
+              status: "failed",
+              progress: 100,
+              current_task: "Migration failed",
+              messages: messages.slice(-20),
+              error: err.message,
+            });
+          }
+        } finally {
+          activeMigrations.delete(migrationId);
+        }
+      };
+
+      // Fire and forget - progress sent via IPC events
+      runMigration();
+
+      return { success: true, migrationId };
+    } catch (err) {
+      activeMigrations.delete(migrationId);
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Cancel a running migration
+  ipcMain.handle("cancel-migration", (_event, migrationId) => {
+    const ac = activeMigrations.get(migrationId);
+    if (ac) {
+      ac.abort();
+      activeMigrations.delete(migrationId);
+      return { success: true };
+    }
+    return { success: false, error: "Migration not found" };
   });
 
   // Request graceful shutdown
   ipcMain.handle("request-shutdown", async () => {
-    console.log("Shutdown requested from renderer");
-    stopPythonBackend();
+    // Abort all active migrations
+    for (const [, ac] of activeMigrations) {
+      ac.abort();
+    }
+    activeMigrations.clear();
     app.quit();
     return { success: true };
-  });
-
-  // Get clone path (where repositories are stored)
-  // Resolve relative paths against user's home directory (backend cwd) to ensure
-  // the frontend and backend agree on the same absolute path
-  ipcMain.handle("get-clone-path", () => {
-    let clonePath = process.env.CLONE_PATH || "repositories";
-    // Expand leading ~ to user's home directory (shell doesn't expand ~ in env vars)
-    if (
-      clonePath.startsWith("~/") ||
-      clonePath.startsWith("~\\") ||
-      clonePath === "~"
-    ) {
-      clonePath = path.join(os.homedir(), clonePath.slice(1));
-    }
-    return path.resolve(os.homedir(), clonePath);
-  });
-
-  // Get backend status
-  ipcMain.handle("get-backend-status", () => {
-    const status = {
-      running: apiProcess !== null && !apiProcess.killed,
-      pid: apiProcess?.pid || null,
-      host: API_HOST,
-      port: API_PORT,
-    };
-    return status;
   });
 }
 
 /**
  * App event handlers
  */
-app.on("ready", async () => {
-  try {
-    // Start the Python backend
-    await startPythonBackend();
-    console.log(`Python backend started on ${API_HOST}:${API_PORT}`);
-
-    // Create the window
-    createWindow();
-    createMenu();
-    setupIpcHandlers();
-  } catch (err) {
-    console.error("Failed to start application:", err);
-    app.quit();
-  }
+app.on("ready", () => {
+  createWindow();
+  createMenu();
+  setupIpcHandlers();
 });
 
 app.on("window-all-closed", () => {
-  // On macOS, applications stay active until the user quits explicitly
   if (process.platform !== "darwin") {
     app.quit();
   }
 });
 
 app.on("activate", () => {
-  // On macOS, re-create a window when the dock icon is clicked
   if (mainWindow === null) {
     createWindow();
   }
 });
 
-// Handle app termination
+// Handle app termination - abort any running migrations
 process.on("exit", () => {
-  stopPythonBackend();
+  for (const [, ac] of activeMigrations) {
+    ac.abort();
+  }
+  activeMigrations.clear();
 });
 
-// Handle SIGTERM (for graceful shutdown)
 process.on("SIGTERM", () => {
-  stopPythonBackend();
+  for (const [, ac] of activeMigrations) {
+    ac.abort();
+  }
+  activeMigrations.clear();
   app.quit();
 });
 
-// Handle SIGINT (Ctrl+C)
 process.on("SIGINT", () => {
-  stopPythonBackend();
+  for (const [, ac] of activeMigrations) {
+    ac.abort();
+  }
+  activeMigrations.clear();
   app.quit();
 });
+
+// Exported for testing
+module.exports = {
+  findGitRepos,
+  resolveClonePath,
+  setupIpcHandlers,
+};

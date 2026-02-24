@@ -180,20 +180,20 @@ Communication changes:
 - Modify: `electron/env.js`
 - Modify: `electron/package.json`
 
-- [ ] Remove all Python backend spawning, health check, and process management code from main.js
-- [ ] Add IPC handlers that call lib/ modules directly:
+- [x] Remove all Python backend spawning, health check, and process management code from main.js
+- [x] Add IPC handlers that call lib/ modules directly:
   - get-repos: call findGitRepos() to scan clone path
   - get-config / save-config: call authorMapper load/save
   - start-migration: call migrationExecutor, send progress via IPC events
   - get-clone-path: read from env/config
-- [ ] Update preload.js: replace HTTP-based channels with new IPC channels
+- [x] Update preload.js: replace HTTP-based channels with new IPC channels
   - Remove: getApiEndpoint, getApiToken, checkApiStatus
   - Add: getRepos(clonePath), startMigration(config), onMigrationProgress(callback), saveAuthorMappings(mappings), getAuthorMappings(), getConfig(repoPath), saveConfig(config)
-- [ ] Remove API token generation and HTTP-related code
-- [ ] Update electron/package.json: add lib/ dependency, remove axios
-- [ ] Update electron-builder.config.js: remove Python binary embedding
-- [ ] Write tests for IPC handlers
-- [ ] Run tests - must pass before task 9
+- [x] Remove API token generation and HTTP-related code
+- [x] Update electron/package.json: add lib/ dependency, remove axios
+- [x] Update electron-builder.config.js: remove Python binary embedding
+- [x] Write tests for IPC handlers
+- [x] Run tests - must pass before task 9
 
 ### Task 9: Rewrite Electron renderer (React components)
 

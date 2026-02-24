@@ -15,13 +15,7 @@ module.exports = {
     'dist/**/*',
     'node_modules/**/*',
   ],
-  extraResources: [
-    {
-      from: 'python_binary',
-      to: 'python',
-      filter: ['**/*'],
-    },
-  ],
+  extraResources: [],
   // Windows configuration - single portable exe
   win: {
     target: [
@@ -37,7 +31,7 @@ module.exports = {
   portable: {
     artifactName: '${productName}-${version}-${os}-${arch}.${ext}',
   },
-  // macOS configuration - app bundle with embedded binary
+  // macOS configuration
   mac: {
     target: ['dmg', 'zip'],
     category: 'public.app-category.utilities',

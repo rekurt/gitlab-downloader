@@ -4,24 +4,64 @@ const { contextBridge, ipcRenderer } = require('electron');
 const listenerMap = new Map();
 
 /**
- * Expose safe APIs to the renderer process
- * This preload script establishes a secure bridge between the main and renderer processes
+ * Expose safe APIs to the renderer process.
+ * This preload script establishes a secure bridge between the main and renderer processes.
+ * All communication uses IPC directly to lib/ modules (no HTTP/Python backend).
  */
 contextBridge.exposeInMainWorld('electronAPI', {
   /**
-   * Get the API endpoint URL
+   * Get clone path (where repositories are stored)
    */
-  getApiEndpoint: () => ipcRenderer.invoke('get-api-endpoint'),
+  getClonePath: () => ipcRenderer.invoke('get-clone-path'),
 
   /**
-   * Get the API token for authenticating mutating requests
+   * Get list of git repositories under clone path
+   * @param {string} [clonePath] - Optional override for clone path
+   * @returns {Promise<{repositories: Array}>}
    */
-  getApiToken: () => ipcRenderer.invoke('get-api-token'),
+  getRepos: (clonePath) => ipcRenderer.invoke('get-repos', clonePath),
 
   /**
-   * Check if the API backend is running
+   * Get author/committer mappings from a config file
+   * @param {string} [configPath] - Path to the config file
+   * @returns {Promise<{success: boolean, data?: object, error?: string}>}
    */
-  checkApiStatus: () => ipcRenderer.invoke('check-api-status'),
+  getAuthorMappings: (configPath) => ipcRenderer.invoke('get-author-mappings', configPath),
+
+  /**
+   * Save author/committer mappings to a config file
+   * @param {object} params - { configPath, authorMappings, committerMappings }
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  saveAuthorMappings: (params) => ipcRenderer.invoke('save-author-mappings', params),
+
+  /**
+   * Get migration config from a repository path
+   * @param {string} repoPath - Path to the repository
+   * @returns {Promise<{success: boolean, data?: object, error?: string}>}
+   */
+  getConfig: (repoPath) => ipcRenderer.invoke('get-config', repoPath),
+
+  /**
+   * Save migration config to a repository
+   * @param {object} params - { repoPath, config }
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  saveConfig: (params) => ipcRenderer.invoke('save-config', params),
+
+  /**
+   * Start a migration task
+   * @param {object} config - Migration configuration
+   * @returns {Promise<{success: boolean, migrationId?: string, error?: string}>}
+   */
+  startMigration: (config) => ipcRenderer.invoke('start-migration', config),
+
+  /**
+   * Cancel a running migration
+   * @param {string} migrationId
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  cancelMigration: (migrationId) => ipcRenderer.invoke('cancel-migration', migrationId),
 
   /**
    * Request graceful shutdown
@@ -29,36 +69,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   requestShutdown: () => ipcRenderer.invoke('request-shutdown'),
 
   /**
-   * Get clone path (where repositories are stored)
-   */
-  getClonePath: () => ipcRenderer.invoke('get-clone-path'),
-
-  /**
-   * Get backend process status
-   */
-  getBackendStatus: () => ipcRenderer.invoke('get-backend-status'),
-
-  /**
-   * Send a message to the main process
-   */
-  send: (channel, args) => {
-    // Whitelist allowed channels
-    const validChannels = ['app-quit', 'app-minimize', 'app-maximize'];
-    if (validChannels.includes(channel)) {
-      ipcRenderer.send(channel, args);
-    }
-  },
-
-  /**
    * Listen for messages from the main process
    */
   on: (channel, func) => {
-    // Whitelist allowed channels
     const validChannels = [
-      'backend-status',
-      'backend-error',
       'migration-progress',
-      'migration-complete',
     ];
     if (validChannels.includes(channel)) {
       const wrapper = (event, ...args) => func(...args);
@@ -72,10 +87,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   off: (channel, func) => {
     const validChannels = [
-      'backend-status',
-      'backend-error',
       'migration-progress',
-      'migration-complete',
     ];
     if (validChannels.includes(channel)) {
       const wrapper = listenerMap.get(func);
@@ -91,13 +103,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   once: (channel, func) => {
     const validChannels = [
-      'backend-status',
-      'backend-error',
       'migration-progress',
-      'migration-complete',
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.once(channel, (event, ...args) => func(...args));
     }
+  },
+
+  /**
+   * Convenience: listen for migration progress updates
+   * @param {function} callback - Called with progress data
+   * @returns {function} - Cleanup function to remove listener
+   */
+  onMigrationProgress: (callback) => {
+    const wrapper = (event, data) => callback(data);
+    ipcRenderer.on('migration-progress', wrapper);
+    return () => {
+      ipcRenderer.removeListener('migration-progress', wrapper);
+    };
   },
 });
