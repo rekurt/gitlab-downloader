@@ -83,16 +83,16 @@ Communication changes:
 **Files:**
 - Create: `lib/client.js`
 
-- [ ] Implement fetchJson(): single HTTP request with retry logic (exponential backoff with jitter, max 120s)
-- [ ] Implement fetchPaginated(): pagination with per_page param and Link header parsing
-- [ ] Implement rate limit handling: parse RateLimit-Remaining/Reset headers, calculate delay
-- [ ] Implement fetchGroupMetadata(): get group info by ID or path (URL-encode path)
-- [ ] Implement getAllProjects(): recursive BFS traversal of group/subgroups, collect all projects
-- [ ] Implement getUserProjects(): fetch projects accessible to current user
-- [ ] Add timeout support (default 30s) using AbortController
-- [ ] Retry on 429 and 5xx status codes (default 3 retries)
-- [ ] Write tests with mocked HTTP responses
-- [ ] Run tests - must pass before task 3
+- [x] Implement fetchJson(): single HTTP request with retry logic (exponential backoff with jitter, max 120s)
+- [x] Implement fetchPaginated(): pagination with per_page param and Link header parsing
+- [x] Implement rate limit handling: parse RateLimit-Remaining/Reset headers, calculate delay
+- [x] Implement fetchGroupMetadata(): get group info by ID or path (URL-encode path)
+- [x] Implement getAllProjects(): recursive BFS traversal of group/subgroups, collect all projects
+- [x] Implement getUserProjects(): fetch projects accessible to current user
+- [x] Add timeout support (default 30s) using AbortController
+- [x] Retry on 429 and 5xx status codes (default 3 retries)
+- [x] Write tests with mocked HTTP responses
+- [x] Run tests - must pass before task 3
 
 ### Task 3: Authentication (OAuth device flow + token)
 
