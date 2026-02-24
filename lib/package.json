@@ -11,7 +11,9 @@
     "./utils": "./utils.js",
     "./client": "./client.js",
     "./auth": "./auth.js",
-    "./cloner": "./cloner.js"
+    "./cloner": "./cloner.js",
+    "./author-mapper": "./author-mapper.js",
+    "./migration": "./migration.js"
   },
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
@@ -19,6 +21,7 @@
   },
   "dependencies": {
     "dotenv": "^16.3.0",
+    "js-yaml": "^4.1.0",
     "zod": "^3.22.0"
   },
   "devDependencies": {

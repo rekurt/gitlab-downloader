@@ -131,16 +131,16 @@ Communication changes:
 - Create: `lib/migration.js`
 - Create: `lib/author-mapper.js`
 
-- [ ] Port AuthorMapper: load/save mappings from JSON/YAML files (js-yaml)
-- [ ] Port MigrationExecutor: git filter-branch with --env-filter for author/committer rewriting
-- [ ] Generate bash env-filter script with proper shell escaping
-- [ ] Combined author+committer pass to preserve backup refs
-- [ ] Config file discovery (JSON/YAML/YML)
-- [ ] Progress callback support for UI updates (EventEmitter pattern)
-- [ ] 1 hour timeout for filter-branch operations
-- [ ] Secure file permissions (0o600) for config files
-- [ ] Write tests for mapping and migration logic
-- [ ] Run tests - must pass before task 6
+- [x] Port AuthorMapper: load/save mappings from JSON/YAML files (js-yaml)
+- [x] Port MigrationExecutor: git filter-branch with --env-filter for author/committer rewriting
+- [x] Generate bash env-filter script with proper shell escaping
+- [x] Combined author+committer pass to preserve backup refs
+- [x] Config file discovery (JSON/YAML/YML)
+- [x] Progress callback support for UI updates (EventEmitter pattern)
+- [x] 1 hour timeout for filter-branch operations
+- [x] Secure file permissions (0o600) for config files
+- [x] Write tests for mapping and migration logic
+- [x] Run tests - must pass before task 6
 
 ### Task 6: Reporting
 
