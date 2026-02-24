@@ -147,11 +147,11 @@ Communication changes:
 **Files:**
 - Create: `lib/reporting.js`
 
-- [ ] Implement printSummary(): success/updated/skipped/failed statistics
-- [ ] Implement printDryRun(): tabular preview of planned operations
-- [ ] Implement writeJsonReport(): write JSON report file (generated_at, group, projects_count, summary, results)
-- [ ] Write tests for reporting functions
-- [ ] Run tests - must pass before task 7
+- [x] Implement printSummary(): success/updated/skipped/failed statistics
+- [x] Implement printDryRun(): tabular preview of planned operations
+- [x] Implement writeJsonReport(): write JSON report file (generated_at, group, projects_count, summary, results)
+- [x] Write tests for reporting functions
+- [x] Run tests - must pass before task 7
 
 ### Task 7: Standalone CLI application
 

@@ -13,7 +13,8 @@
     "./auth": "./auth.js",
     "./cloner": "./cloner.js",
     "./author-mapper": "./author-mapper.js",
-    "./migration": "./migration.js"
+    "./migration": "./migration.js",
+    "./reporting": "./reporting.js"
   },
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
