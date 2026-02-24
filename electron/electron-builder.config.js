@@ -12,10 +12,10 @@ module.exports = {
   files: [
     'main.js',
     'preload.js',
+    'env.js',
     'dist/**/*',
     'node_modules/**/*',
   ],
-  extraResources: [],
   // Windows configuration - single portable exe
   win: {
     target: [
@@ -24,8 +24,6 @@ module.exports = {
         arch: ['x64', 'ia32'],
       },
     ],
-    certificateFile: process.env.WIN_CERT_FILE || undefined,
-    certificatePassword: process.env.WIN_CERT_PASSWORD || undefined,
     signingHashAlgorithms: ['sha256'],
   },
   portable: {
@@ -36,14 +34,10 @@ module.exports = {
     target: ['dmg', 'zip'],
     category: 'public.app-category.utilities',
     icon: 'assets/icon.icns',
-    certificateFile: process.env.MAC_CERT_FILE || undefined,
-    certificatePassword: process.env.MAC_CERT_PASSWORD || undefined,
     identity: process.env.MAC_IDENTITY || undefined,
     notarize: process.env.MAC_NOTARIZE === 'true'
       ? {
         teamId: process.env.APPLE_TEAM_ID,
-        appleId: process.env.APPLE_ID,
-        appleIdPassword: process.env.APPLE_ID_PASSWORD,
       }
       : false,
   },

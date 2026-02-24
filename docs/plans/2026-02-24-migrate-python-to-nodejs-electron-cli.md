@@ -224,14 +224,14 @@ Communication changes:
 - Modify: `Makefile`
 - Delete: `electron/scripts/prepare-python-dist.js`
 
-- [ ] Remove all Python build scripts from electron/package.json (build-python, embed-python, prebuild-portable)
-- [ ] Update electron-builder.config.js: remove extraResources for python_binary
-- [ ] Delete electron/scripts/prepare-python-dist.js
-- [ ] Update Makefile: add targets for lib tests, cli tests, cli build; remove python-specific targets where replaced
-- [ ] Add npm workspace config or update package references
-- [ ] Verify electron build works without Python: npm run build && npm run dist
-- [ ] Run full test suite
-- [ ] Run tests - must pass before task 11
+- [x] Remove all Python build scripts from electron/package.json (build-python, embed-python, prebuild-portable)
+- [x] Update electron-builder.config.js: remove extraResources for python_binary
+- [x] Delete electron/scripts/prepare-python-dist.js
+- [x] Update Makefile: add targets for lib tests, cli tests, cli build; remove python-specific targets where replaced
+- [x] Add npm workspace config or update package references
+- [x] Verify electron build works without Python: npm run build && npm run dist
+- [x] Run full test suite
+- [x] Run tests - must pass before task 11
 
 ### Task 11: Verify acceptance criteria
 

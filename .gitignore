@@ -22,5 +22,8 @@ migration_config.yml
 node_modules/
 package-lock.json
 
+# Electron build output
+dist_electron/
+
 # ralphex progress logs
 .ralphex/progress/

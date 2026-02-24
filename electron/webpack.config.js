@@ -2,6 +2,7 @@ const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 
 module.exports = {
+  context: path.resolve(__dirname),
   entry: path.resolve(__dirname, "src/index.js"),
   output: {
     path: path.resolve(__dirname, "dist"),
@@ -14,15 +15,18 @@ module.exports = {
         test: /\.(js|jsx)$/,
         exclude: /node_modules/,
         use: {
-          loader: "babel-loader",
+          loader: require.resolve("babel-loader"),
           options: {
-            presets: ["@babel/preset-env", "@babel/preset-react"],
+            presets: [
+              require.resolve("@babel/preset-env"),
+              require.resolve("@babel/preset-react"),
+            ],
           },
         },
       },
       {
         test: /\.css$/,
-        use: ["style-loader", "css-loader"],
+        use: [require.resolve("style-loader"), require.resolve("css-loader")],
       },
     ],
   },

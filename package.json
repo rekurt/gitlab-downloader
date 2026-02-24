@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "name": "gitlab-dump",
+  "description": "GitLab repository downloader and migration tool",
+  "scripts": {
+    "test:lib": "node --experimental-vm-modules lib/node_modules/.bin/jest --config lib/jest.config.js",
+    "test:cli": "node --experimental-vm-modules cli/node_modules/.bin/jest --config cli/jest.config.js",
+    "test:electron": "node --experimental-vm-modules electron/node_modules/.bin/jest --config electron/jest.config.js",
+    "test": "npm run test:lib && npm run test:cli && npm run test:electron",
+    "cli": "node cli/bin/gitlab-dump.js"
+  }
+}
