@@ -27,7 +27,10 @@ electron-test:
 
 node-test: lib-test cli-test electron-test
 
-node-ci: node-test
+node-lint:
+	@lib/node_modules/.bin/eslint --config lib/eslint.config.js lib/*.js cli/index.js cli/ui.js cli/bin/gitlab-dump.js
+
+node-ci: node-lint node-test
 
 cli-run:
 	@node cli/bin/gitlab-dump.js
@@ -107,7 +110,8 @@ help:
 	@echo "  make cli-test          - Run cli/ tests"
 	@echo "  make electron-test     - Run electron/ tests"
 	@echo "  make node-test         - Run all Node.js tests (lib + cli + electron)"
-	@echo "  make node-ci           - Run Node.js CI pipeline (tests)"
+	@echo "  make node-lint         - Run ESLint on Node.js source files"
+	@echo "  make node-ci           - Run Node.js CI pipeline (lint + tests)"
 	@echo "  make cli-run           - Run CLI application"
 	@echo "  make cli-dry-run       - Run CLI with --dry-run flag"
 	@echo "  make electron-build    - Build Electron GUI application binary"

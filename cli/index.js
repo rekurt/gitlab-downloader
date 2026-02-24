@@ -156,12 +156,12 @@ export async function runClone(config) {
 
     let projects;
     if (updatedConfig.group) {
-      const groupMeta = await fetchGroupMetadata(null, updatedConfig);
+      const groupMeta = await fetchGroupMetadata(updatedConfig);
       const rootFullPath =
         groupMeta.full_path || groupMeta.path || String(updatedConfig.group);
-      projects = await getAllProjects(null, updatedConfig, rootFullPath);
+      projects = await getAllProjects(updatedConfig, rootFullPath);
     } else {
-      projects = await getUserProjects(null, updatedConfig);
+      projects = await getUserProjects(updatedConfig);
     }
 
     showInfo(`Found ${projects.length} repositories`);

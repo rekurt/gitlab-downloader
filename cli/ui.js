@@ -1,5 +1,4 @@
 import chalk from 'chalk';
-import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { homedir } from 'node:os';

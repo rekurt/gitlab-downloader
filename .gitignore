@@ -21,6 +21,7 @@ migration_config.yml
 # Node.js
 node_modules/
 package-lock.json
+coverage/
 
 # Electron build output
 dist_electron/

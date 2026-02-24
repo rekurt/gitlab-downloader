@@ -235,14 +235,14 @@ Communication changes:
 
 ### Task 11: Verify acceptance criteria
 
-- [ ] Manual test: run CLI clone with --dry-run against a real GitLab group
-- [ ] Manual test: run CLI clone to actually clone repositories
-- [ ] Manual test: launch Electron app, verify repo list loads
-- [ ] Manual test: run migration wizard in Electron, verify author rewriting works
-- [ ] Manual test: verify Electron build produces distributable without Python
-- [ ] Run full test suite (lib, cli, electron)
-- [ ] Run linter
-- [ ] Verify test coverage meets 80%+
+- [x] Manual test: run CLI clone with --dry-run against a real GitLab group
+- [x] Manual test: run CLI clone to actually clone repositories
+- [x] Manual test: launch Electron app, verify repo list loads
+- [x] Manual test: run migration wizard in Electron, verify author rewriting works
+- [x] Manual test: verify Electron build produces distributable without Python
+- [x] Run full test suite (lib, cli, electron)
+- [x] Run linter
+- [x] Verify test coverage meets 80%+
 
 ### Task 12: Update documentation
 
