@@ -205,15 +205,15 @@ Communication changes:
 - Modify: `electron/src/components/ProgressIndicator.js`
 - Delete: `electron/src/services/api.js`
 
-- [ ] Update App.js: remove apiEndpoint/apiToken state, remove health check polling, simplify initialization
-- [ ] Update RepoList.js: replace HTTP fetch with window.electronAPI.getRepos(clonePath)
-- [ ] Update MigrationWizard.js: replace HTTP POST with window.electronAPI.startMigration(config), listen for progress via window.electronAPI.onMigrationProgress()
-- [ ] Update AuthorMapper.js: replace HTTP calls with window.electronAPI.saveAuthorMappings() / getAuthorMappings()
-- [ ] Update ProgressIndicator.js: replace HTTP polling with IPC event listener (window.electronAPI.onMigrationProgress)
-- [ ] Delete electron/src/services/api.js (no longer needed)
-- [ ] Verify all components work with new IPC-based communication
-- [ ] Write/update tests for React components
-- [ ] Run tests - must pass before task 10
+- [x] Update App.js: remove apiEndpoint/apiToken state, remove health check polling, simplify initialization
+- [x] Update RepoList.js: replace HTTP fetch with window.electronAPI.getRepos(clonePath)
+- [x] Update MigrationWizard.js: replace HTTP POST with window.electronAPI.startMigration(config), listen for progress via window.electronAPI.onMigrationProgress()
+- [x] Update AuthorMapper.js: replace HTTP calls with window.electronAPI.saveAuthorMappings() / getAuthorMappings()
+- [x] Update ProgressIndicator.js: replace HTTP polling with IPC event listener (window.electronAPI.onMigrationProgress)
+- [x] Delete electron/src/services/api.js (no longer needed)
+- [x] Verify all components work with new IPC-based communication
+- [x] Write/update tests for React components
+- [x] Run tests - must pass before task 10
 
 ### Task 10: Update build and packaging configuration
 

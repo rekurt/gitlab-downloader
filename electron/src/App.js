@@ -4,65 +4,25 @@ import MigrationWizard from "./components/MigrationWizard";
 import "./App.css";
 
 function App() {
-  const [apiStatus, setApiStatus] = useState("checking");
-  const [apiEndpoint, setApiEndpoint] = useState("");
-  const [apiToken, setApiToken] = useState("");
   const [clonePath, setClonePath] = useState("");
   const [currentView, setCurrentView] = useState("repos");
   const [selectedRepo, setSelectedRepo] = useState(null);
+  const [ready, setReady] = useState(false);
 
-  // One-time initialization of config values (endpoint, token, clone path)
   useEffect(() => {
     async function init() {
       try {
-        if (!window.electronAPI) {
-          setApiEndpoint("http://127.0.0.1:8001");
-          setApiToken("");
-          setClonePath("");
-          return;
+        if (window.electronAPI) {
+          const path = await window.electronAPI.getClonePath();
+          setClonePath(path || "");
         }
-        const [endpoint, token, path] = await Promise.all([
-          window.electronAPI.getApiEndpoint(),
-          window.electronAPI.getApiToken(),
-          window.electronAPI.getClonePath(),
-        ]);
-        setApiEndpoint(endpoint);
-        setApiToken(token || "");
-        setClonePath(path || "");
       } catch (error) {
         console.error("Failed to initialize config:", error);
+      } finally {
+        setReady(true);
       }
     }
     init();
-  }, []);
-
-  // Periodic health check — only updates apiStatus, not config state
-  useEffect(() => {
-    async function checkStatus() {
-      try {
-        if (!window.electronAPI) {
-          const endpoint = "http://127.0.0.1:8001";
-          try {
-            const res = await fetch(`${endpoint}/api/status`, {
-              signal: AbortSignal.timeout(3000),
-            });
-            setApiStatus(res.ok ? "connected" : "disconnected");
-          } catch {
-            setApiStatus("disconnected");
-          }
-          return;
-        }
-        const status = await window.electronAPI.checkApiStatus();
-        setApiStatus(status ? "connected" : "disconnected");
-      } catch (error) {
-        console.error("Failed to check API status:", error);
-        setApiStatus("error");
-      }
-    }
-
-    checkStatus();
-    const interval = setInterval(checkStatus, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleMigrationStart = (repo) => {
@@ -79,22 +39,6 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>GitLab Dump Desktop</h1>
-        <div className="header-status">
-          <span
-            className={`status-indicator ${apiStatus}`}
-            title={`API Status: ${apiStatus}`}
-          />
-          {apiStatus === "connected" && (
-            <span className="status-text">Connected</span>
-          )}
-          {apiStatus === "disconnected" && (
-            <span className="status-text">Disconnected</span>
-          )}
-          {apiStatus === "checking" && (
-            <span className="status-text">Checking...</span>
-          )}
-          {apiStatus === "error" && <span className="status-text">Error</span>}
-        </div>
       </header>
 
       <nav className="app-nav">
@@ -110,26 +54,22 @@ function App() {
       </nav>
 
       <main className="app-main">
-        {apiStatus !== "connected" && (
+        {!ready && (
           <div className="connection-notice">
-            <p>⚠️ API is not connected. Make sure the backend is running.</p>
+            <p>Loading...</p>
           </div>
         )}
 
-        {currentView === "repos" && (
+        {ready && currentView === "repos" && (
           <RepoList
-            apiEndpoint={apiEndpoint}
-            apiToken={apiToken}
             clonePath={clonePath}
             onSelectRepo={setSelectedRepo}
             onMigrationStart={handleMigrationStart}
           />
         )}
 
-        {currentView === "migration" && selectedRepo && (
+        {ready && currentView === "migration" && selectedRepo && (
           <MigrationWizard
-            apiEndpoint={apiEndpoint}
-            apiToken={apiToken}
             repo={selectedRepo}
             onComplete={handleMigrationComplete}
             onCancel={() => {

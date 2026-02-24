@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import '../styles/AuthorMapper.css';
 
-function AuthorMapper({ apiEndpoint, apiToken, onSave, onCancel }) {
+function AuthorMapper({ onSave, onCancel }) {
   const [mappings, setMappings] = useState([
     {
       type: 'author',
@@ -95,22 +95,16 @@ function AuthorMapper({ apiEndpoint, apiToken, onSave, onCancel }) {
           return acc;
         }, {});
 
-      // Try to persist mappings to disk (best-effort, don't block wizard)
-      try {
-        const persistHeaders = { 'Content-Type': 'application/json' };
-        if (apiToken) {
-          persistHeaders['X-API-Token'] = apiToken;
+      // Try to persist mappings to disk via IPC (best-effort)
+      if (window.electronAPI) {
+        try {
+          await window.electronAPI.saveAuthorMappings({
+            authorMappings,
+            committerMappings,
+          });
+        } catch {
+          // Saving to disk is optional; mappings are passed in-memory to migration
         }
-        await fetch(`${apiEndpoint}/api/author-mappings`, {
-          method: 'POST',
-          headers: persistHeaders,
-          body: JSON.stringify({
-            author_mappings: authorMappings,
-            committer_mappings: committerMappings,
-          }),
-        });
-      } catch {
-        // Saving to disk is optional; mappings are passed in-memory to migration
       }
 
       if (onSave) {

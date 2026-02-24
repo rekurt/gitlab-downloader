@@ -1,4 +1,20 @@
 module.exports = {
-  testMatch: ['**/__tests__/**/*.test.js'],
-  testEnvironment: 'node',
+  projects: [
+    {
+      displayName: 'main',
+      testMatch: ['<rootDir>/__tests__/main.test.js'],
+      testEnvironment: 'node',
+    },
+    {
+      displayName: 'components',
+      testMatch: ['<rootDir>/__tests__/components/**/*.test.js'],
+      testEnvironment: 'jsdom',
+      transform: {
+        '^.+\\.jsx?$': 'babel-jest',
+      },
+      moduleNameMapper: {
+        '\\.css$': '<rootDir>/__tests__/__mocks__/styleMock.js',
+      },
+    },
+  ],
 };

@@ -3,7 +3,7 @@ import AuthorMapper from './AuthorMapper';
 import ProgressIndicator from './ProgressIndicator';
 import '../styles/MigrationWizard.css';
 
-function MigrationWizard({ apiEndpoint, apiToken, repo, onComplete, onCancel }) {
+function MigrationWizard({ repo, onComplete, onCancel }) {
   const [step, setStep] = useState(1);
   const [mappings, setMappings] = useState(null);
   const [migrationId, setMigrationId] = useState(null);
@@ -20,27 +20,21 @@ function MigrationWizard({ apiEndpoint, apiToken, repo, onComplete, onCancel }) 
       setLoading(true);
       setError(null);
 
-      const headers = { 'Content-Type': 'application/json' };
-      if (apiToken) {
-        headers['X-API-Token'] = apiToken;
+      if (!window.electronAPI) {
+        throw new Error('Electron API not available');
       }
 
-      const response = await fetch(`${apiEndpoint}/api/migrate`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          repo_path: repo.path,
-          author_mappings: mappings?.authorMappings || {},
-          committer_mappings: mappings?.committerMappings || {},
-        }),
+      const result = await window.electronAPI.startMigration({
+        repoPath: repo.path,
+        authorMappings: mappings?.authorMappings || {},
+        committerMappings: mappings?.committerMappings || {},
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to start migration: ${response.statusText}`);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to start migration');
       }
 
-      const data = await response.json();
-      setMigrationId(data.migration_id);
+      setMigrationId(result.migrationId);
       setStep(3);
     } catch (err) {
       setError(err.message);
@@ -51,8 +45,6 @@ function MigrationWizard({ apiEndpoint, apiToken, repo, onComplete, onCancel }) 
 
   const handleMigrationComplete = () => {
     setStep(4);
-    // Don't call onComplete here - let user see the success screen first.
-    // The "Close" button on step 4 calls onCancel which navigates back.
   };
 
   const handleMigrationError = (errMsg) => {
@@ -95,8 +87,6 @@ function MigrationWizard({ apiEndpoint, apiToken, repo, onComplete, onCancel }) 
       <div className="wizard-content">
         {step === 1 && (
           <AuthorMapper
-            apiEndpoint={apiEndpoint}
-            apiToken={apiToken}
             onSave={handleMappingsSave}
             onCancel={onCancel}
           />
@@ -174,8 +164,6 @@ function MigrationWizard({ apiEndpoint, apiToken, repo, onComplete, onCancel }) 
 
         {step === 3 && (
           <ProgressIndicator
-            apiEndpoint={apiEndpoint}
-            apiToken={apiToken}
             migrationId={migrationId}
             onComplete={handleMigrationComplete}
             onError={handleMigrationError}

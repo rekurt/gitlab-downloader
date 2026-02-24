@@ -2,86 +2,50 @@ import React, { useState, useEffect, useRef } from 'react';
 import '../styles/ProgressIndicator.css';
 
 function ProgressIndicator({
-  apiEndpoint,
-  apiToken,
   migrationId,
   onComplete,
   onError,
 }) {
   const [progress, setProgress] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFinished, setIsFinished] = useState(false);
 
-  // Use refs for callbacks to avoid restarting the polling interval
   const onCompleteRef = useRef(onComplete);
   const onErrorRef = useRef(onError);
   onCompleteRef.current = onComplete;
   onErrorRef.current = onError;
 
   useEffect(() => {
-    if (!migrationId) {
-      setLoading(false);
+    if (!migrationId || !window.electronAPI) {
       return;
     }
 
-    let intervalId = null;
+    const cleanup = window.electronAPI.onMigrationProgress((data) => {
+      if (data.migrationId !== migrationId) return;
 
-    const pollProgress = async () => {
-      try {
-        const progressHeaders = {};
-        if (apiToken) {
-          progressHeaders['X-API-Token'] = apiToken;
-        }
-        const response = await fetch(
-          `${apiEndpoint}/api/migration-progress/${migrationId}`,
-          { headers: progressHeaders }
-        );
-        if (!response.ok) {
-          throw new Error(`Failed to fetch progress: ${response.statusText}`);
-        }
+      setProgress(data);
 
-        const data = await response.json();
-        setProgress(data);
-
-        if (data.status === 'completed') {
-          setIsFinished(true);
-          setLoading(false);
-          if (intervalId) clearInterval(intervalId);
-          if (onCompleteRef.current) {
-            onCompleteRef.current(data);
-          }
-        } else if (data.status === 'failed') {
-          setIsFinished(true);
-          setLoading(false);
-          setError(data.error || 'Migration failed');
-          if (intervalId) clearInterval(intervalId);
-          if (onErrorRef.current) {
-            onErrorRef.current(data.error || 'Migration failed');
-          }
-        } else {
-          setLoading(false);
+      if (data.status === 'completed') {
+        setIsFinished(true);
+        if (onCompleteRef.current) {
+          onCompleteRef.current(data);
         }
-      } catch (err) {
-        setError(err.message);
-        setLoading(false);
-        if (intervalId) clearInterval(intervalId);
+      } else if (data.status === 'failed') {
+        setIsFinished(true);
+        setError(data.error || 'Migration failed');
         if (onErrorRef.current) {
-          onErrorRef.current(err.message);
+          onErrorRef.current(data.error || 'Migration failed');
         }
       }
-    };
+    });
 
-    intervalId = setInterval(pollProgress, 1000);
-    pollProgress();
-
-    return () => { if (intervalId) clearInterval(intervalId); };
-  }, [migrationId, apiEndpoint, apiToken]);
+    return cleanup;
+  }, [migrationId]);
 
   if (!progress) {
     return (
       <div className="progress-container">
-        <div className="progress-loading">Loading progress...</div>
+        <div className="progress-loading">Waiting for progress...</div>
       </div>
     );
   }

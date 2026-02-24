@@ -1,49 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/RepoList.css';
 
-function RepoList({ apiEndpoint, apiToken, clonePath, onSelectRepo, onMigrationStart }) {
+function RepoList({ clonePath, onSelectRepo, onMigrationStart }) {
   const [repos, setRepos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedRepo, setSelectedRepo] = useState(null);
 
-  useEffect(() => {
-    const fetchRepos = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const fetchRepos = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        const headers = {};
-        if (apiToken) {
-          headers['X-API-Token'] = apiToken;
-        }
-        const params = new URLSearchParams();
-        if (clonePath) {
-          params.set('clone_path', clonePath);
-        }
-        const response = await fetch(`${apiEndpoint}/api/repos?${params}`, { headers });
-        if (!response.ok) {
-          throw new Error(`Failed to fetch repositories: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        setRepos(data.repositories || []);
-      } catch (err) {
-        setError(err.message);
+      if (!window.electronAPI) {
         setRepos([]);
-      } finally {
-        setLoading(false);
+        return;
       }
-    };
 
-    if (apiEndpoint) {
-      fetchRepos();
-      const interval = setInterval(fetchRepos, 10000);
-      return () => clearInterval(interval);
-    } else {
+      const data = await window.electronAPI.getRepos(clonePath || undefined);
+      setRepos(data.repositories || []);
+    } catch (err) {
+      setError(err.message);
+      setRepos([]);
+    } finally {
       setLoading(false);
     }
-  }, [apiEndpoint, apiToken, clonePath]);
+  };
+
+  useEffect(() => {
+    fetchRepos();
+    const interval = setInterval(fetchRepos, 10000);
+    return () => clearInterval(interval);
+  }, [clonePath]);
 
   const handleSelectRepo = (repo) => {
     setSelectedRepo(repo);
@@ -71,7 +59,7 @@ function RepoList({ apiEndpoint, apiToken, clonePath, onSelectRepo, onMigrationS
       <div className="repo-list-container">
         <div className="repo-list-error">
           <p>Error loading repositories: {error}</p>
-          <button onClick={() => window.location.reload()}>Retry</button>
+          <button onClick={fetchRepos}>Retry</button>
         </div>
       </div>
     );
