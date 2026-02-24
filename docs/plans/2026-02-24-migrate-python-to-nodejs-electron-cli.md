@@ -113,17 +113,17 @@ Communication changes:
 **Files:**
 - Create: `lib/cloner.js`
 
-- [ ] Implement runGitCommand(): execute git via child_process.spawn with output capture
-- [ ] Implement cloneRepository(): clone single repo (with retry, backoff)
-- [ ] Implement cloneAllRepositories(): concurrent cloning with concurrency limit (p-limit or custom semaphore)
-- [ ] Implement buildCloneTarget(): calculate target directory preserving group structure
-- [ ] Two git auth modes: url mode (oauth2:token@ in URL) and credential_helper mode
-- [ ] Update existing repos with git pull --ff-only
-- [ ] Path validation to prevent directory traversal
-- [ ] Sanitize git output to remove credentials
-- [ ] Graceful shutdown support via AbortController
-- [ ] Write tests for clone operations (mock git commands)
-- [ ] Run tests - must pass before task 5
+- [x] Implement runGitCommand(): execute git via child_process.spawn with output capture
+- [x] Implement cloneRepository(): clone single repo (with retry, backoff)
+- [x] Implement cloneAllRepositories(): concurrent cloning with concurrency limit (p-limit or custom semaphore)
+- [x] Implement buildCloneTarget(): calculate target directory preserving group structure
+- [x] Two git auth modes: url mode (oauth2:token@ in URL) and credential_helper mode
+- [x] Update existing repos with git pull --ff-only
+- [x] Path validation to prevent directory traversal
+- [x] Sanitize git output to remove credentials
+- [x] Graceful shutdown support via AbortController
+- [x] Write tests for clone operations (mock git commands)
+- [x] Run tests - must pass before task 5
 
 ### Task 5: Migration and author mapping
 

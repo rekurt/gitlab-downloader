@@ -10,7 +10,8 @@
     "./config": "./config.js",
     "./utils": "./utils.js",
     "./client": "./client.js",
-    "./auth": "./auth.js"
+    "./auth": "./auth.js",
+    "./cloner": "./cloner.js"
   },
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
