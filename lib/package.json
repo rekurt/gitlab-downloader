@@ -9,7 +9,8 @@
     "./constants": "./constants.js",
     "./config": "./config.js",
     "./utils": "./utils.js",
-    "./client": "./client.js"
+    "./client": "./client.js",
+    "./auth": "./auth.js"
   },
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/.bin/jest",

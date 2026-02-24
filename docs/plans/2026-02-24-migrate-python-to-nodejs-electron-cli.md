@@ -99,14 +99,14 @@ Communication changes:
 **Files:**
 - Create: `lib/auth.js`
 
-- [ ] Implement token-based auth: simple passthrough of GITLAB_TOKEN
-- [ ] Implement OAuth Device Flow (RFC 8628): deviceAuthorize(), pollDeviceToken(), refreshToken()
-- [ ] Token cache: read/write to ~/.config/gitlab-dump/oauth_token.json with 0o600 permissions
-- [ ] Cache validation: check instance URL, client ID, scope match; auto-refresh expired tokens
-- [ ] resolveAccessToken(): main entry point that chooses token vs oauth based on config
-- [ ] Handle slow_down response during polling (increase interval)
-- [ ] Write tests for auth flows (mock OAuth endpoints)
-- [ ] Run tests - must pass before task 4
+- [x] Implement token-based auth: simple passthrough of GITLAB_TOKEN
+- [x] Implement OAuth Device Flow (RFC 8628): deviceAuthorize(), pollDeviceToken(), refreshToken()
+- [x] Token cache: read/write to ~/.config/gitlab-dump/oauth_token.json with 0o600 permissions
+- [x] Cache validation: check instance URL, client ID, scope match; auto-refresh expired tokens
+- [x] resolveAccessToken(): main entry point that chooses token vs oauth based on config
+- [x] Handle slow_down response during polling (increase interval)
+- [x] Write tests for auth flows (mock OAuth endpoints)
+- [x] Run tests - must pass before task 4
 
 ### Task 4: Git clone/pull operations
 
