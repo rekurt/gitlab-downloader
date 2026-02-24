@@ -2,26 +2,32 @@
 
 Язык: **Русский (основной)** | [English](README.en.md)
 
-`Gitlab Downloader` — асинхронная утилита для получения и клонирования всех репозиториев из GitLab-группы и её подгрупп с сохранением структуры директорий.
+`Gitlab Downloader` — утилита для получения и клонирования всех репозиториев из GitLab-группы и её подгрупп с сохранением структуры директорий. Построена на Node.js.
 
 ## Возможности
 - Рекурсивный обход групп и подгрупп.
-- Асинхронное клонирование с ограничением конкурентности.
+- Клонирование с ограничением конкурентности.
 - Retry для API и `git clone`.
 - Итоговый отчёт (`success`, `updated`, `skipped`, `failed`).
 - `--dry-run` для проверки без клонирования.
 - `--update` для `git pull --ff-only` в уже существующих репозиториях.
+- Интерактивный режим с визардами для клонирования и миграции.
+- OAuth Device Flow для авторизации через браузер.
+- Миграция авторов/коммитеров через git filter-branch.
 
 ## Установка
+
 ```bash
-python3 -m venv venv
-venv/bin/pip install -e .[dev]
+# Установить зависимости для всех компонентов (lib, cli, electron)
+make node-install
 ```
 
-или:
+или вручную:
 
 ```bash
-make install
+npm install --prefix lib
+npm install --prefix cli
+npm install --prefix electron
 ```
 
 ## Использование
@@ -30,17 +36,30 @@ make install
 `GITLAB_GROUP` опционален: если не задан, будут загружены проекты текущего пользователя (membership).
 
 ```bash
-gitlab-dump --help
-gitlab-dump --version
-gitlab-dump --url https://gitlab.com --token <token> --group <group>
-gitlab-dump --url https://gitlab.com --token <token>
-gitlab-dump --dry-run --url https://gitlab.com --token <token> --group <group>
-gitlab-dump --update --url https://gitlab.com --token <token> --group <group>
+node cli/bin/gitlab-dump.js --help
+node cli/bin/gitlab-dump.js --version
+node cli/bin/gitlab-dump.js --url https://gitlab.com --token <token> --group <group>
+node cli/bin/gitlab-dump.js --url https://gitlab.com --token <token>
+node cli/bin/gitlab-dump.js --dry-run --url https://gitlab.com --token <token> --group <group>
+node cli/bin/gitlab-dump.js --update --url https://gitlab.com --token <token> --group <group>
+```
+
+Или через Makefile:
+```bash
+make cli-run
+make cli-dry-run
+```
+
+### Интерактивный режим
+
+```bash
+node cli/bin/gitlab-dump.js --interactive          # Интерактивная настройка
+node cli/bin/gitlab-dump.js --interactive-menu     # Полное интерактивное меню (клонирование/миграция)
 ```
 
 ### OAuth Device Flow
 ```bash
-gitlab-dump \
+node cli/bin/gitlab-dump.js \
   --url https://gitlab.com \
   --auth-method oauth \
   --oauth-client-id <client_id> \
@@ -51,7 +70,7 @@ CLI покажет ссылку и код для входа в браузере,
 ### Git Credential Helper
 Для `clone/pull` без токена в URL:
 ```bash
-gitlab-dump \
+node cli/bin/gitlab-dump.js \
   --url https://gitlab.com \
   --auth-method token \
   --token <token> \
@@ -65,7 +84,7 @@ gitlab-dump \
 Проверить, какие репозитории будут загружены без реального клонирования:
 
 ```bash
-gitlab-dump \
+node cli/bin/gitlab-dump.js \
   --url https://gitlab.com \
   --token <token> \
   --group my-group \
@@ -78,7 +97,7 @@ gitlab-dump \
 Если репозитории уже клонированы ранее, используйте `--update` для получения последних изменений:
 
 ```bash
-gitlab-dump \
+node cli/bin/gitlab-dump.js \
   --url https://gitlab.com \
   --token <token> \
   --group my-group \
@@ -92,7 +111,7 @@ gitlab-dump \
 Клонирование репозиториев с приватного GitLab инстанса (например, корпоративный сервер):
 
 ```bash
-gitlab-dump \
+node cli/bin/gitlab-dump.js \
   --url https://gitlab.internal.company.com \
   --token <private-token> \
   --group engineering \
@@ -103,7 +122,7 @@ gitlab-dump \
 Если вам не нужна группа, экспортируйте только проекты, к которым вы имеете доступ:
 
 ```bash
-gitlab-dump \
+node cli/bin/gitlab-dump.js \
   --url https://gitlab.com \
   --token <token> \
   --clone-path ./my-projects
@@ -114,7 +133,7 @@ gitlab-dump \
 
 ```bash
 # Первый запуск — будет предложен вход через браузер
-gitlab-dump \
+node cli/bin/gitlab-dump.js \
   --url https://gitlab.com \
   --auth-method oauth \
   --oauth-client-id <client_id> \
@@ -122,7 +141,7 @@ gitlab-dump \
   --group frontend-team
 
 # Последующие запуски используют сохранённый token
-gitlab-dump \
+node cli/bin/gitlab-dump.js \
   --url https://gitlab.com \
   --git-auth-mode credential_helper \
   --group frontend-team \
@@ -138,8 +157,8 @@ export GITLAB_TOKEN=glpat-xxxxxxxxxxxx
 export GITLAB_GROUP=my-organization
 export CLONE_PATH=/data/repositories
 
-gitlab-dump --dry-run
-gitlab-dump --update
+node cli/bin/gitlab-dump.js --dry-run
+node cli/bin/gitlab-dump.js --update
 ```
 
 ### Файл .env конфигурации
@@ -153,12 +172,10 @@ GITLAB_GROUP=my-group
 CLONE_PATH=./repositories
 ```
 
-Затем в скрипте:
+Затем:
 
 ```bash
-#!/bin/bash
-source .env
-gitlab-dump --update
+node cli/bin/gitlab-dump.js --update
 ```
 
 ### Batch обработка с логированием
@@ -166,7 +183,7 @@ gitlab-dump --update
 
 ```bash
 mkdir -p logs/$(date +%Y-%m-%d)
-gitlab-dump \
+node cli/bin/gitlab-dump.js \
   --url https://gitlab.com \
   --token <token> \
   --group production \
@@ -182,7 +199,7 @@ echo "Sync completed at $(date)" >> logs/sync_history.txt
 
 ```bash
 # Шаг 1: Клонировать исходные репозитории
-gitlab-dump \
+node cli/bin/gitlab-dump.js \
   --url https://old-gitlab.company.com \
   --token <old-token> \
   --group team \
@@ -200,7 +217,7 @@ done
 
 ## Графический интерфейс (GUI)
 
-`Gitlab Downloader` поставляется с кроссплатформенным графическим интерфейсом на базе Electron и React для управления загрузкой репозиториев и миграцией данных.
+`Gitlab Downloader` поставляется с кроссплатформенным графическим интерфейсом на базе Electron и React для управления загрузкой репозиториев и миграцией данных. GUI использует общую библиотеку `lib/` напрямую через IPC, без внешнего серверного процесса.
 
 ### Функциональность GUI
 - Визуальное управление конфигурацией GitLab подключения
@@ -240,93 +257,51 @@ npm run dist-win      # для Windows
 npm run dist-linux    # для Linux
 ```
 
-Скомпилированные приложения будут в директории `electron/dist/`.
+Скомпилированные приложения будут в директории `electron/dist_electron/`.
 
 Требования для сборки:
 - Node.js 16+
-- npm или yarn
-- Python 3.10+ (для встроенного Python бекенда)
+- npm
 
 ## Локальная разработка
 
 ### Настройка среды разработки
 
-Для полной разработки проекта с CLI, REST API и Electron GUI необходимо:
-
-1. Установить зависимости Python:
 ```bash
-make install
+# Установить зависимости всех Node.js пакетов
+make node-install
 ```
 
-2. Установить зависимости Electron/Node.js:
-```bash
-cd electron
-npm install
-cd ..
-```
+### Запуск компонентов
 
-### Запуск всех компонентов
-
-#### Вариант 1: В отдельных терминалах (рекомендуется)
-
-Терминал 1 — Python REST API:
-```bash
-# Активировать виртуальное окружение (если необходимо)
-source venv/bin/activate
-
-# Запустить REST API на локальном сервере
-python -m gitlab_downloader.api
-```
-API будет доступна по адресу: `http://localhost:8000`
-
-Терминал 2 — Electron GUI (в режиме разработки):
+Терминал 1 — GUI:
 ```bash
 cd electron
 npm run dev
 ```
 GUI будет открыта с горячей перезагрузкой при изменении кода.
 
-Терминал 3 — Использование CLI:
+Терминал 2 — CLI:
 ```bash
-# В основной директории проекта
-gitlab-dump --help
-gitlab-dump --url https://gitlab.com --token <token> --group my-group
-```
-
-#### Вариант 2: Запуск API в фоне
-
-```bash
-# Запустить API в фоне
-python -m gitlab_downloader.api &
-
-# Затем в том же терминале запустить GUI
-cd electron
-npm run dev
-
-# Или использовать CLI
-gitlab-dump --url https://gitlab.com --token <token> --group my-group
+node cli/bin/gitlab-dump.js --help
+node cli/bin/gitlab-dump.js --url https://gitlab.com --token <token> --group my-group
 ```
 
 ### Проверка кода и тесты
 
 Запуск линтера:
 ```bash
-make lint
-```
-
-Форматирование кода:
-```bash
-make format
+make node-lint
 ```
 
 Запуск тестов:
 ```bash
-make test
+make node-test
 ```
 
-Проверка покрытия кода тестами:
+Запуск CI pipeline:
 ```bash
-make coverage
+make node-ci
 ```
 
 ### Общий рабочий процесс разработчика
@@ -338,20 +313,17 @@ git checkout -b feature/my-feature
 
 2. Установить зависимости:
 ```bash
-make install
-cd electron && npm install && cd ..
+make node-install
 ```
 
-3. Запустить компоненты (в отдельных терминалах):
-   - REST API: `python -m gitlab_downloader.api`
+3. Запустить компоненты:
    - GUI: `cd electron && npm run dev`
-   - CLI: `gitlab-dump ...` с нужными параметрами
+   - CLI: `node cli/bin/gitlab-dump.js ...` с нужными параметрами
 
 4. Внести изменения в код и проверить их:
 ```bash
-make lint      # проверить синтаксис
-make format    # форматировать код
-make test      # запустить тесты
+make node-lint      # проверить синтаксис
+make node-test      # запустить тесты
 ```
 
 5. Создать коммит:
@@ -364,21 +336,15 @@ git commit -m "feat: описание изменения"
 
 ### Troubleshooting
 
-**API не запускается**
-- Убедитесь, что Python 3.10+ установлен: `python --version`
-- Проверьте, что виртуальное окружение активировано
-- Проверьте, что зависимости установлены: `make install`
-
 **GUI не запускается**
 - Убедитесь, что Node.js 16+ установлен: `node --version`
-- Проверьте, что npm зависимости установлены: `cd electron && npm install`
+- Проверьте, что npm зависимости установлены: `make node-install`
 - Очистите кэш npm: `npm cache clean --force`
-- Удалите `node_modules` и переустановите: `rm -rf node_modules && npm install`
+- Удалите `node_modules` и переустановите: `make clean && make node-install`
 
 **CLI команды не работают**
-- Убедитесь, что пакет установлен в режиме разработки: `pip install -e .[dev]`
-- Проверьте, что виртуальное окружение активировано
-- Используйте `python -m gitlab_downloader --help` для справки
+- Проверьте, что зависимости установлены: `npm install --prefix cli`
+- Используйте `node cli/bin/gitlab-dump.js --help` для справки
 
 **Проблемы с Git credentials при тестировании**
 - Используйте реальные учётные данные только при локальном тестировании
@@ -398,40 +364,23 @@ docker run --rm \
 
 ## Development
 ```bash
-make lint
-make format
-make test
+make node-lint
+make node-test
+make node-ci
 ```
 
-## Сборка бинарника
-Быстрая локальная сборка (рекомендуется, `onedir`):
+## Сборка бинарников
+
+### Electron приложение
 ```bash
-make binary
+make electron-build
 ```
 
-Упакованный единый файл (медленнее старт, `onefile`):
-```bash
-make binary_onefile
-```
+Артефакты: `electron/dist_electron/` с платформенно-специфичными инсталляторами.
 
-Артефакты:
-- `onedir` (быстро): `dist/gitlab-dump/`
-- `onefile` (удобно переносить):
-  - macOS/Linux: `dist/gitlab-dump`
-  - Windows: `dist/gitlab-dump.exe`
-
-Очистка артефактов:
-```bash
-make binary_clean
-```
-
-Важно: `onefile` заметно медленнее на старте из-за распаковки. Для частого запуска используйте `make binary`. Для разных ОС нужно собирать на соответствующей ОС (Linux на Linux, macOS на macOS, Windows на Windows). Для автоматизации используйте CI matrix.
+Для разных ОС нужно собирать на соответствующей ОС (Linux на Linux, macOS на macOS, Windows на Windows). Для автоматизации используйте CI matrix.
 
 ## Требования
-- Python 3.10+
+- Node.js 16+
 - Git
 - Токен GitLab с правами `read_api` и `read_repository`
-
-Для использования GUI (графический интерфейс):
-- Node.js 16+
-- npm или yarn

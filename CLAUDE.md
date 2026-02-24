@@ -4,85 +4,94 @@ This document serves as a comprehensive reference for developers and AI agents w
 
 ## Project Overview
 
-Gitlab Downloader is an asynchronous utility for downloading and cloning all repositories from a GitLab group and its subgroups while preserving the directory structure. The project includes three main components:
+Gitlab Downloader is a utility for downloading and cloning all repositories from a GitLab group and its subgroups while preserving the directory structure. The project is built entirely in Node.js and includes three main components:
 
-1. **CLI Application** - Command-line interface for batch repository operations
-2. **REST API Server** - FastAPI-based server for programmatic access
-3. **Electron GUI** - Desktop application for interactive repository management
+1. **Core Library** (`lib/`) - Shared Node.js modules for GitLab API, cloning, migration, and auth
+2. **CLI Application** (`cli/`) - Standalone command-line interface using the core library
+3. **Electron GUI** (`electron/`) - Desktop application using the core library via IPC
 
 ## Project Structure
 
 ```
-gitlab-downloader/
-├── gitlab_downloader/          # Main Python package
-│   ├── __init__.py
-│   ├── __main__.py             # CLI entry point
-│   ├── app.py                  # Main application logic
-│   ├── api.py                  # FastAPI application setup (runnable via python -m)
-│   ├── api_routes.py           # API endpoint definitions
-│   ├── api_schemas.py          # Pydantic models for API
-│   ├── auth.py                 # Authentication (OAuth, token-based)
-│   ├── client.py               # GitLab API client
-│   ├── cloner.py               # Git clone/pull logic
-│   ├── config.py               # Configuration management
-│   ├── models.py               # Data models
-│   ├── migration.py            # Repository migration logic
-│   ├── author_mapper.py        # Git author mapping
-│   ├── constants.py            # Project constants
-│   ├── utils.py                # Utility functions
-│   ├── cli_ui.py               # CLI UI components
-│   ├── logging_config.py       # Logging configuration
-│   └── reporting.py            # Report generation
-├── electron/                   # Electron GUI application
-│   ├── main.js                 # Electron main process
-│   ├── preload.js              # Electron preload script
-│   ├── src/                    # React frontend
-│   │   ├── App.js              # Main React component
-│   │   ├── App.css             # App styling
-│   │   ├── components/         # React components
-│   │   ├── services/           # API client services
-│   │   └── styles/             # CSS modules
-│   ├── package.json            # Node dependencies
-│   ├── webpack.config.js       # Webpack configuration
-│   ├── electron-builder.config.js  # Electron build config
-│   └── README.md               # Electron-specific documentation
-├── build/                      # Build scripts
-├── docs/                       # Documentation
-├── tests/                      # Test suite
-├── Makefile                    # Development commands
-├── pyproject.toml              # Python project configuration
-├── .env.example                # Environment template
-├── .gitignore                  # Git ignore rules
-├── Dockerfile                  # Docker configuration
-├── README.MD                   # Russian documentation (primary)
-├── README.en.md                # English documentation (secondary)
-├── AGENTS.md                   # Agent-specific documentation
-└── CLAUDE.md                   # This file
+gitlab-dump/
+├── lib/                           # Shared Node.js core library (no Electron deps)
+│   ├── package.json               # @gitlab-dump/core package
+│   ├── index.js                   # Re-exports all modules
+│   ├── client.js                  # GitLab API client (pagination, retry, rate limit)
+│   ├── cloner.js                  # Git clone/pull with concurrency control
+│   ├── auth.js                    # OAuth device flow + token auth
+│   ├── migration.js               # Git author/committer rewriting (filter-branch)
+│   ├── author-mapper.js           # Author mapping load/save (JSON/YAML)
+│   ├── config.js                  # Configuration model + validation (Zod)
+│   ├── constants.js               # Default values and limits
+│   ├── utils.js                   # Path sanitization, URL building, credential stripping
+│   ├── reporting.js               # Summary/dry-run/JSON report generation
+│   └── __tests__/                 # Jest tests for all modules
+├── cli/                           # Standalone CLI (no Electron dependency)
+│   ├── package.json               # gitlab-dump-cli package
+│   ├── bin/
+│   │   └── gitlab-dump.js         # CLI entry point
+│   ├── index.js                   # CLI logic (arg parsing, interactive mode)
+│   ├── ui.js                      # Terminal UI (prompts, tables, colored output)
+│   └── __tests__/                 # Jest tests
+├── electron/                      # Electron GUI (uses lib/ directly via IPC)
+│   ├── main.js                    # Main process (IPC handlers calling lib/)
+│   ├── preload.js                 # IPC bridge (secure channel whitelist)
+│   ├── env.js                     # Environment configuration
+│   ├── src/
+│   │   ├── App.js                 # Main React component
+│   │   ├── App.css                # App styling
+│   │   ├── components/            # React components (IPC-based, no HTTP)
+│   │   └── styles/                # CSS modules
+│   ├── package.json               # Node dependencies
+│   ├── webpack.config.js          # Webpack configuration
+│   ├── electron-builder.config.js # Electron build config
+│   ├── __tests__/                 # Jest tests
+│   └── README.md                  # Electron-specific documentation
+├── gitlab_downloader/             # Legacy Python package (preserved for reference)
+├── tests/                         # Legacy Python test suite
+├── docs/                          # Documentation and plans
+├── package.json                   # Root workspace package
+├── Makefile                       # Development commands
+├── pyproject.toml                 # Legacy Python project configuration
+├── .env.example                   # Environment template
+├── .gitignore                     # Git ignore rules
+├── Dockerfile                     # Docker configuration
+├── README.MD                      # Russian documentation (primary)
+├── README.en.md                   # English documentation (secondary)
+├── AGENTS.md                      # Agent-specific documentation
+└── CLAUDE.md                      # This file
 ```
 
 ## Key Technologies
 
-- **Python**: 3.10+ (async-first design)
-- **FastAPI**: Web framework for REST API
-- **aiohttp**: Async HTTP client for GitLab API
-- **GitLab API**: REST API v4 for repository management
+- **Node.js**: JavaScript runtime (ES modules)
+- **Zod**: Schema validation for configuration
+- **js-yaml**: YAML parsing for author mappings
+- **commander**: CLI argument parsing
+- **inquirer**: Interactive terminal prompts
+- **chalk**: Terminal colored output
+- **dotenv**: Environment variable loading
 - **Electron**: Cross-platform desktop GUI framework
 - **React**: Frontend UI library for Electron app
-- **Node.js**: JavaScript runtime for Electron and build tools
-- **PyInstaller**: Python binary packaging
+- **Webpack**: Module bundler for Electron renderer
 - **electron-builder**: Electron application packaging
-- **pytest**: Testing framework
-- **mypy**: Static type checking
-- **ruff**: Code linting and formatting
+- **Jest**: Testing framework
+- **ESLint**: Code linting
 
 ## Configuration Files
 
-### pyproject.toml
-Main Python project configuration:
-- Package metadata and dependencies
-- Entry point: `gitlab-dump = "gitlab_downloader.app:run"`
-- Optional dev dependencies: pytest, ruff, mypy
-- Requires Python >= 3.10
+### package.json (root)
+Root workspace package with scripts for running tests across all packages.
+
+### lib/package.json
+Core library: `@gitlab-dump/core`, type: module (ESM).
+
+### cli/package.json
+CLI application: `gitlab-dump-cli`, depends on `@gitlab-dump/core` via file reference.
+
+### electron/package.json
+Desktop application: `gitlab-dump-desktop`, depends on `@gitlab-dump/core` via file reference.
 
 ### .env and .env.example
 Environment variables (required or optional):
@@ -96,21 +105,33 @@ Environment variables (required or optional):
 
 ### Makefile
 Development commands:
-- `make install` - Create venv and install dependencies
-- `make run` - Run CLI application
-- `make dry_run` - Run with --dry-run flag
-- `make test` - Run test suite
-- `make lint` - Check code with ruff
-- `make format` - Format code with ruff
+
+Node.js targets:
+- `make node-install` - Install dependencies for lib, cli, and electron
+- `make lib-test` - Run lib/ tests
+- `make cli-test` - Run cli/ tests
+- `make electron-test` - Run electron/ tests
+- `make node-test` - Run all Node.js tests (lib + cli + electron)
+- `make node-lint` - Run ESLint on Node.js source files
+- `make node-ci` - Node.js CI pipeline (lint + tests)
+- `make cli-run` - Run CLI application
+- `make cli-dry-run` - Run CLI with --dry-run flag
+- `make electron-build` - Build Electron GUI application binary
+
+Legacy Python targets (still available):
+- `make install` - Create venv and install Python dependencies
+- `make run` - Run Python CLI application
+- `make test` - Run Python test suite with pytest
+- `make lint` - Check Python code with ruff
+- `make format` - Format Python code with ruff
 - `make typecheck` - Run mypy type checking
-- `make ci` - Run linting, typecheck, and tests
-- `make binary` - Build standalone binary (onedir)
-- `make binary_onefile` - Build single-file binary
-- `make clean` - Remove venv and build artifacts
+- `make ci` - Run Python linting, typecheck, and tests
+- `make binary` - Build standalone Python binary (onedir)
+- `make binary_onefile` - Build single-file Python binary
+
+General:
+- `make clean` - Remove venv, node_modules, and build artifacts
 - `make help` - Show all available targets
-- `make interactive` - Run CLI in interactive mode
-- `make electron-build` - Build Electron GUI application
-- `make coverage` - Run tests with coverage report
 
 ### electron-builder.config.js
 Electron packaging configuration:
@@ -124,96 +145,57 @@ Container configuration for running the application in Docker.
 
 ## Code Conventions and Style
 
-### Python Code Style
-- Use type hints throughout (mypy strict mode)
-- Follow PEP 8 conventions
-- Use async/await for I/O operations
-- Document public functions and classes with docstrings
-- Use f-strings for string formatting
-- Maximum line length: 100 characters (Ruff default)
+### JavaScript Code Style
+- ES modules (import/export) throughout
+- Use JSDoc for function documentation
+- camelCase for functions and variables
+- PascalCase for classes
+- UPPER_SNAKE_CASE for constants
+- Maximum line length: 100 characters
 
 ### Error Handling
-- Use specific exception types (avoid bare except)
-- Log errors with appropriate levels (WARNING, ERROR, CRITICAL)
-- Provide context in exception messages for debugging
-- Clean up resources in finally blocks or use context managers
+- Use specific exception types (avoid bare catch)
+- Provide context in error messages for debugging
+- Clean up resources in finally blocks
+- Use AbortController for cancellable operations
 
 ### Naming Conventions
-- Classes: PascalCase (e.g., `MigrationExecutor`)
-- Functions/methods: snake_case (e.g., `fetch_group_metadata`)
+- Classes: PascalCase (e.g., `AuthorMapper`)
+- Functions/methods: camelCase (e.g., `fetchGroupMetadata`)
 - Constants: UPPER_SNAKE_CASE (e.g., `MAX_RETRIES`)
-- Private attributes: prefix with underscore (e.g., `_internal_state`)
-
-### Async Patterns
-- Use asyncio for concurrent operations
-- Use `asyncio.gather()` for parallel tasks
-- Use locks (`asyncio.Lock`) for shared state access
-- Always await async functions; don't fire-and-forget
-- Document async functions in docstrings
+- Private attributes: prefix with underscore (e.g., `_internalState`)
 
 ### Frontend (Electron/React)
 - Functional components with hooks
-- Use native fetch API for API calls
+- IPC communication via `window.electronAPI` (preload bridge)
 - CSS modules for styling
-- Service classes for API communication (see `src/services/`)
-
-## REST API Endpoints
-
-The API server runs on the configured host/port (default: localhost:8001) and provides the following endpoints:
-
-### Status and Configuration
-- `GET /api/status` - Get application status and version
-- `GET /api/config` - Get current configuration
-- `POST /api/config` - Update configuration
-
-### Repository Operations
-- `GET /api/repos` - List available repositories
-  Response: `RepositoriesListResponse` with repository list and metadata
-
-### Author and Committer Mapping
-- `GET /api/author-mappings` - Get author mapping rules
-- `POST /api/author-mappings` - Add/update author mapping rule
-  Request: `AuthorMappingRequest` (original_name, original_email, new_name, new_email)
-
-### Migration Operations
-- `POST /api/migrate` - Start a migration task
-  Request: `MigrationStartRequest` with configuration
-  Returns: Migration task ID
-- `GET /api/migration-progress/{migration_id}` - Get migration progress
-  Response: `MigrationProgressResponse` with status and statistics
-
-All API responses follow the Pydantic model schema definitions in `api_schemas.py`.
+- No HTTP calls — all data flows through IPC
 
 ## Running the Application
 
 ### CLI Mode
 ```bash
-gitlab-dump --help                           # Show help
-gitlab-dump --version                        # Show version
-gitlab-dump --url <url> --token <token> --group <group>  # Clone repositories
-gitlab-dump --dry-run --url <url> --token <token>        # Preview without cloning
-gitlab-dump --update --url <url> --token <token>         # Update existing repos
-gitlab-dump --interactive                                # Interactive setup mode
-gitlab-dump --interactive-menu                           # Rich interactive menu (clone/migrate)
+node cli/bin/gitlab-dump.js --help
+node cli/bin/gitlab-dump.js --version
+node cli/bin/gitlab-dump.js --url <url> --token <token> --group <group>
+node cli/bin/gitlab-dump.js --dry-run --url <url> --token <token>
+node cli/bin/gitlab-dump.js --update --url <url> --token <token>
+node cli/bin/gitlab-dump.js --interactive
+node cli/bin/gitlab-dump.js --interactive-menu
 ```
 
-### API Server Mode
+Or via Makefile:
 ```bash
-gitlab-dump --api-server --api-host 0.0.0.0 --api-port 8080
-```
-
-### API Server (Direct Module)
-Used by Electron GUI to start the backend:
-```bash
-python -m gitlab_downloader.api --host 127.0.0.1 --port 8001
+make cli-run
+make cli-dry-run
 ```
 
 ### Electron GUI
 ```bash
 cd electron
-npm install                    # Install dependencies
-npm run dev                    # Run in development mode
-npm run dist                   # Build for distribution
+npm install
+npm run dev       # Development mode with hot reload
+npm run dist      # Build for distribution
 ```
 
 ### Docker
@@ -224,71 +206,58 @@ make docker_run               # Run in Docker container
 
 ## Testing
 
-Run tests with pytest:
+Run tests with Jest:
 ```bash
-make test                      # Run all tests
-make coverage                  # Run with coverage report
+make node-test                 # Run all Node.js tests
+make lib-test                  # Run lib/ tests only
+make cli-test                  # Run cli/ tests only
+make electron-test             # Run electron/ tests only
 ```
 
 Test suite includes:
-- Unit tests for core modules
-- Async operation tests
-- API endpoint tests
+- Unit tests for all core library modules
+- CLI argument parsing and workflow tests
+- Electron IPC handler tests
+- React component tests
 - Mock responses for external services
 
-Test files are located in the `tests/` directory matching package structure.
+Test files are located in `__tests__/` directories within each package.
 
 ## Building Binaries
-
-### Python Binary (PyInstaller)
-```bash
-make binary                    # Build standalone onedir binary
-make binary_onefile           # Build single-file executable
-make binary_clean             # Remove binary artifacts
-```
 
 ### Electron Binary
 ```bash
 make electron-build           # Build platform-appropriate binary
 ```
 
-Outputs:
-- Python: `dist/gitlab-dump/` or `dist/gitlab-dump.exe`
-- Electron: `electron/dist/` with platform-specific installers
+Output: `electron/dist_electron/` with platform-specific installers
 
 ## Important Architectural Patterns
 
-### Asynchronous Design
-The Python application uses asyncio throughout for:
-- Concurrent repository operations
-- Non-blocking I/O for API calls and git operations
-- Graceful shutdown with signal handlers
-- Task progress tracking
+### Communication Flow
+- **CLI**: `cli/` imports and calls `lib/` modules directly
+- **Electron**: Renderer → IPC (preload.js) → Main process → `lib/` modules
 
-### Client Architecture
-- `client.py` handles GitLab API communication
-- `auth.py` manages authentication (OAuth Device Flow or token-based)
-- `cloner.py` orchestrates git clone/pull operations
-- Configurable concurrency limits to prevent overwhelming servers
+### Core Library (lib/)
+- `client.js` handles GitLab API communication (pagination, retry, rate limits)
+- `auth.js` manages authentication (OAuth Device Flow or token-based)
+- `cloner.js` orchestrates git clone/pull operations with concurrency control
+- `migration.js` handles git author/committer rewriting via filter-branch
+- `author-mapper.js` loads/saves author mapping configuration (JSON/YAML)
+- `config.js` provides Zod-based configuration validation
+- `reporting.js` generates summary, dry-run, and JSON reports
 
 ### Configuration Management
-- Centralized `config.py` with `GitlabConfig` dataclass (defined in `models.py`)
-- Environment variable support via `.env`
+- Centralized `config.js` with Zod schema validation
+- Environment variable support via dotenv
 - CLI argument overrides environment variables
 - Validation at startup
 
-### API Design
-- Pydantic models for request/response validation
-- Structured schemas in `api_schemas.py`
-- Error responses with HTTP status codes
-- OpenAPI/Swagger documentation available at `/docs`
-
-### Frontend-Backend Communication
-- Electron GUI starts API backend via `python -m gitlab_downloader.api --host --port`
-- Electron GUI communicates with API via REST endpoints
-- Custom APIClient class using native fetch API with base URL configuration
-- Service classes encapsulate API logic
-- Proper error handling and user feedback
+### Electron IPC Design
+- Preload script exposes whitelisted IPC channels via `contextBridge`
+- Main process registers `ipcMain.handle()` for each channel
+- Migration progress delivered via `webContents.send()` events
+- Active migrations tracked with AbortControllers for cancellation
 
 ## Troubleshooting
 
@@ -304,27 +273,14 @@ The Python application uses asyncio throughout for:
 - Ensure sufficient disk space for cloning
 - Verify Unix file permissions for clone path
 
-### API Server Issues
-- Check port is not already in use
-- Verify firewall allows access to configured port
-- Check logs for detailed error messages
-- Ensure backend API is running before Electron GUI connects
-
 ### Electron/GUI Problems
 - Ensure Node.js and npm are installed
 - Check Node version compatibility (16+)
-- Verify API server is running on expected host/port
 - Check browser console for React errors (F12 in dev mode)
-- Review main.js for Electron configuration issues
-
-### Type Checking Failures
-- Run `make typecheck` to identify issues
-- Add type hints for function parameters and returns
-- Use Optional[Type] for nullable values
-- Check mypy configuration in pyproject.toml
+- Review main.js console output for IPC handler errors
 
 ### Performance Issues
-- Reduce `MAX_CONCURRENT_CLONES` in config
+- Reduce concurrency limit in config
 - Check system resource usage (CPU, memory, disk I/O)
 - Enable logging to identify bottlenecks
 - Consider pagination for large group operations
@@ -332,40 +288,37 @@ The Python application uses asyncio throughout for:
 ## Code Quality Standards
 
 ### Before Committing
-1. Run `make format` to auto-format code
-2. Run `make lint` to check for style issues
-3. Run `make typecheck` for type errors
-4. Run `make test` to ensure tests pass
-5. Update documentation if APIs change
+1. Run `make node-lint` to check for style issues
+2. Run `make node-test` to ensure tests pass
+3. Update documentation if APIs change
 
 ### CI Pipeline
-The `make ci` target runs:
-1. Ruff linter
-2. mypy type checker
-3. pytest test suite
+The `make node-ci` target runs:
+1. ESLint linter
+2. Jest test suite (lib + cli + electron)
 
 All checks must pass before merging to main branch.
 
 ## Common Development Tasks
 
-### Adding a New API Endpoint
-1. Define request/response models in `api_schemas.py`
-2. Add route handler in `api_routes.py`
-3. Include proper error handling and validation
-4. Add tests in `tests/test_api.py`
-5. Document in this file's REST API section
+### Adding a New lib/ Module
+1. Create the module file in `lib/`
+2. Export it from `lib/index.js`
+3. Add export path to `lib/package.json` exports map
+4. Write tests in `lib/__tests__/`
+5. Document in this file
 
 ### Adding CLI Arguments
-1. Add argument definition in `config.py` parse_args()
-2. Add field to `Config` dataclass
+1. Add option to commander in `cli/index.js`
+2. Add corresponding config field in `lib/config.js` if needed
 3. Update `.env.example` if environment variable supported
 4. Add help text for --help output
 
-### Modifying Authentication
-1. Update logic in `auth.py`
-2. Update config handling in `config.py`
-3. Test with both OAuth and token methods
-4. Update documentation in README files
+### Adding IPC Channels (Electron)
+1. Add handler in `electron/main.js` via `ipcMain.handle()`
+2. Expose in `electron/preload.js` via `contextBridge`
+3. Use in React components via `window.electronAPI`
+4. Write tests in `electron/__tests__/`
 
 ### Frontend Changes (Electron)
 1. Modify React components in `electron/src/components/`
@@ -384,7 +337,7 @@ Keep both versions in sync for consistency.
 ## References
 
 - GitLab API Documentation: https://docs.gitlab.com/ee/api/
-- FastAPI Documentation: https://fastapi.tiangolo.com/
 - Electron Documentation: https://www.electronjs.org/docs
 - React Documentation: https://react.dev/
-- Python asyncio: https://docs.python.org/3/library/asyncio.html
+- Zod Documentation: https://zod.dev/
+- Commander.js: https://github.com/tj/commander.js/

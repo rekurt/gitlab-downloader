@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is the Electron-based desktop application for GitLab repository management and migration. It provides a user-friendly graphical interface for configuring and managing GitLab dump operations, while communicating with the Python backend via REST API.
+This is the Electron-based desktop application for GitLab repository management and migration. It provides a user-friendly graphical interface for configuring and managing GitLab dump operations. The application uses the shared Node.js core library (`lib/`) directly via IPC, without any external backend process.
 
 The application supports Windows (portable executable), macOS (app bundle), and Linux (AppImage) distributions.
 
@@ -10,23 +10,22 @@ The application supports Windows (portable executable), macOS (app bundle), and 
 
 ### Components
 
-The application consists of three main layers:
+The application consists of two main layers:
 
-1. **Main Process** (`main.js`): Electron main process that manages windows, handles IPC communication, and spawns the Python backend process
+1. **Main Process** (`main.js`): Electron main process that manages windows, handles IPC communication, and calls `lib/` modules directly
 2. **Renderer Process** (`src/`): React application UI that runs in a Chromium window
-3. **Python Backend**: CLI tool exposing REST API on port 8001
 
 ### Communication Flow
 
 ```
 Renderer (React UI)
-        ↓ (IPC & HTTP)
+        ↓ (IPC via preload.js)
 Main Process (Electron)
-        ↓ (spawns)
-Python Backend (FastAPI)
+        ↓ (direct function calls)
+@gitlab-dump/core (lib/)
 ```
 
-The renderer process communicates with the main process via IPC (Inter-Process Communication), which in turn manages the Python API backend and exposes endpoints to the renderer via the preload script.
+The renderer process communicates with the main process via IPC (Inter-Process Communication). The main process imports and calls `lib/` modules directly — no HTTP server, no external process.
 
 ### Security
 
@@ -36,11 +35,12 @@ The application uses a preload script (`preload.js`) to establish a secure bridg
 
 ```
 electron/
-├── main.js                 # Electron main process
+├── main.js                 # Electron main process (IPC handlers → lib/)
 ├── preload.js             # Secure IPC bridge to renderer
 ├── env.js                 # Environment configuration
 ├── webpack.config.js      # Webpack bundling configuration
 ├── package.json           # Dependencies and npm scripts
+├── electron-builder.config.js  # Distribution packaging config
 ├── src/                   # React application source
 │   ├── index.js          # Entry point
 │   ├── App.js            # Main component
@@ -51,9 +51,8 @@ electron/
 │   │   ├── MigrationWizard.js
 │   │   ├── ProgressIndicator.js
 │   │   └── RepoList.js
-│   ├── services/         # API service layer
-│   │   └── api.js        # REST API client
 │   └── styles/           # Component-specific styles
+├── __tests__/            # Jest test files
 ├── dist/                 # Built Webpack output
 ├── dist_electron/        # Electron builder output
 └── node_modules/         # npm dependencies
@@ -65,18 +64,21 @@ electron/
 
 - **Node.js**: 16.x or higher (check with `node --version`)
 - **npm**: 8.x or higher (check with `npm --version`)
-- **Python**: 3.10+ (for the backend API)
-- **Virtual Environment**: Backend should be running in `venv/`
 
 ### Installation
 
-From the `electron/` directory:
+From the project root:
+
+```bash
+# Install all dependencies (lib, cli, electron)
+make node-install
+```
+
+Or from the `electron/` directory:
 
 ```bash
 npm install
 ```
-
-This installs all Electron, React, Webpack, and build tool dependencies.
 
 ### Development Mode
 
@@ -90,8 +92,6 @@ This command:
 1. Starts Webpack dev server on port 8000 with hot reload
 2. Waits for the dev server to be ready
 3. Launches Electron with remote debugging enabled on port 9222
-
-The Python backend must be running separately (see main project README).
 
 #### Development Features
 
@@ -125,18 +125,7 @@ This runs Webpack in production mode, generating minified code in `dist/`.
 
 ### Creating Distributions
 
-The application uses `electron-builder` for creating platform-specific binaries. Before building, the Python backend must be embedded (see below).
-
-#### Build Prerequisites
-
-```bash
-# From electron/ directory, ensure Python backend binary is embedded
-npm run prebuild-portable
-```
-
-This:
-1. Runs Webpack production build
-2. Embeds the Python binary into the app bundle
+The application uses `electron-builder` for creating platform-specific binaries. No external backend is required — all logic is bundled via `lib/`.
 
 #### Platform-Specific Distributions
 
@@ -207,25 +196,35 @@ Step-by-step wizard guiding users through the migration process:
 - Progress tracking
 
 ### ProgressIndicator
-Real-time progress tracking with status updates, error handling, and completion notifications.
+Real-time progress tracking with status updates, error handling, and completion notifications. Receives updates via IPC events from the main process.
 
 ### RepoList
-Browsable list of available repositories from the GitLab instance with filtering and selection.
+Browsable list of available repositories scanned from the local clone path, with filtering and selection.
 
-## REST API Endpoints
+## IPC Channels
 
-The application expects the Python backend to provide the following endpoints on `http://127.0.0.1:8001`:
+### Renderer → Main (via preload)
 
-- `GET /api/status` - Backend health check
-- `GET /api/repos` - List available repositories
-- `GET /api/author-mappings` - Get saved author mappings
-- `POST /api/author-mappings` - Save author mappings
-- `POST /api/migrate` - Start migration operation
-- `GET /api/migration-progress/{migration_id}` - Get migration progress
-- `POST /api/config` - Save migration configuration
-- `GET /api/config` - Retrieve migration configuration
+**Invoke handlers (request-response):**
+- `get-clone-path`: Get the directory where repositories are stored
+- `get-repos`: Scan clone path and list git repositories
+- `get-author-mappings`: Load author/committer mappings from a config file
+- `save-author-mappings`: Save author/committer mappings to a config file
+- `get-config`: Load migration config from a repository
+- `save-config`: Save migration config to a repository
+- `start-migration`: Start an async migration task, returns migrationId
+- `cancel-migration`: Cancel a running migration by ID
+- `request-shutdown`: Request graceful application shutdown
 
-See the main project documentation for complete API specification.
+### Main → Renderer (events)
+
+- `migration-progress`: Real-time migration progress updates
+
+### Window Control Channels
+
+- `app-quit`: Quit the application
+- `app-minimize`: Minimize the window
+- `app-maximize`: Toggle maximize state
 
 ## Environment Configuration
 
@@ -234,17 +233,9 @@ Configuration is handled via `env.js`:
 ```javascript
 {
   isDev: boolean,           // Development mode indicator
-  API_PORT: 8001,          // Backend API port
-  API_HOST: '127.0.0.1',   // Backend API host
   LOG_LEVEL: 'debug',      // 'debug' in dev, 'info' in production
   DEBUG: boolean           // Debug mode enabled
 }
-```
-
-Override at runtime with environment variables:
-```bash
-API_PORT=8001 npm run dev
-API_HOST=192.168.1.100 npm run dev
 ```
 
 ## Build Configuration
@@ -265,28 +256,6 @@ See `electron-builder.config.js` for platform-specific configurations:
 - HTML template generation via HtmlWebpackPlugin
 - Development server configuration
 
-## IPC Channels
-
-### Main → Renderer
-
-- `backend-status`: Backend process status update
-- `backend-error`: Backend process error message
-- `migration-progress`: Migration progress update
-- `migration-complete`: Migration operation completed
-
-### Renderer → Main (via preload)
-
-- `get-api-endpoint`: Get the API endpoint URL
-- `check-api-status`: Check if API backend is running
-- `request-shutdown`: Request graceful application shutdown
-- `get-backend-status`: Get current backend status
-
-### Window Control Channels
-
-- `app-quit`: Quit the application
-- `app-minimize`: Minimize the window
-- `app-maximize`: Toggle maximize state
-
 ## Troubleshooting
 
 ### Common Issues
@@ -304,19 +273,10 @@ npm run webpack-dev
 - Check `npm run webpack-dev` output for errors
 - Clear Electron cache: `rm -rf ~/.config/GitLab\ Dump/`
 
-**Backend not connecting**
-- Verify Python backend is running on port 8001
-- Check main.js logs for Python process startup errors
-- Test API manually: `curl http://127.0.0.1:8001/api/status`
-
-**High CPU usage after build**
-- This is typically the embedded Python binary indexing files on first run
-- Wait for CPU usage to normalize (usually completes within a few minutes)
-
-**Built executable won't run**
-- Ensure Python binary is properly embedded: `npm run prebuild-portable`
-- Check system architecture matches build target (x64 vs ia32)
-- On Linux, verify AppImage dependencies: `ldd GitLab\ Dump-*.AppImage`
+**IPC handlers not responding**
+- Check main.js console output for errors
+- Verify `lib/` modules are properly installed: `cd ../lib && npm install`
+- Use DevTools (F12) to inspect IPC calls in the renderer
 
 **Port 8000 already in use**
 ```bash
@@ -334,6 +294,18 @@ DEBUG=gitlab-dump* npm run dev
 ```
 
 Remote debugging available at `localhost:9222` when running with `npm run electron-dev`.
+
+## Testing
+
+Run tests:
+```bash
+npm test
+```
+
+Or from the project root:
+```bash
+make electron-test
+```
 
 ## Performance Tips
 
@@ -359,6 +331,7 @@ When modifying the Electron application:
 - **Webpack 5**: Module bundler
 - **Babel 7**: JavaScript transpiler
 - **electron-builder 24**: Distribution packaging
+- **@gitlab-dump/core**: Shared core library (lib/)
 
 See `package.json` for complete dependency list and versions.
 

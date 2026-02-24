@@ -246,8 +246,8 @@ Communication changes:
 
 ### Task 12: Update documentation
 
-- [ ] Update electron/README.md: remove Python backend references, document new architecture
-- [ ] Update CLAUDE.md: update project structure, remove Python API references, add lib/ and cli/ sections
-- [ ] Update root README.MD: update installation and usage for Node.js CLI
-- [ ] Update root README.en.md: same changes in English
-- [ ] Move this plan to `docs/plans/completed/`
+- [x] Update electron/README.md: remove Python backend references, document new architecture
+- [x] Update CLAUDE.md: update project structure, remove Python API references, add lib/ and cli/ sections
+- [x] Update root README.MD: update installation and usage for Node.js CLI
+- [x] Update root README.en.md: same changes in English
+- [x] Move this plan to `docs/plans/completed/`
