@@ -40,6 +40,17 @@ import {
 const VERSION = '0.1.0';
 
 /**
+ * Parse an environment variable as integer, returning defaultValue if absent or NaN.
+ * Unlike `parseInt(v) || default`, this correctly handles 0 as a valid value.
+ */
+function envIntOrDefault(envName, defaultValue) {
+  const raw = process.env[envName];
+  if (raw === undefined || raw === '') return defaultValue;
+  const parsed = parseInt(raw, 10);
+  return Number.isNaN(parsed) ? defaultValue : parsed;
+}
+
+/**
  * Build commander program with all CLI options.
  * @returns {Command}
  */
@@ -58,11 +69,11 @@ export function buildProgram() {
     .option('--update', 'Update existing repositories with git pull', false)
     .option('--interactive', 'Prompt for missing configuration values', false)
     .option('--interactive-menu', 'Launch rich interactive menu', false)
-    .option('--concurrency <n>', 'Maximum concurrent clone operations', (v) => parseInt(v, 10), parseInt(process.env.MAX_CONCURRENCY, 10) || DEFAULT_CONCURRENCY)
-    .option('--per-page <n>', 'Items per API page', (v) => parseInt(v, 10), parseInt(process.env.PER_PAGE, 10) || DEFAULT_PER_PAGE)
-    .option('--timeout <seconds>', 'API request timeout in seconds', (v) => parseInt(v, 10), parseInt(process.env.REQUEST_TIMEOUT, 10) || DEFAULT_TIMEOUT)
-    .option('--api-retries <n>', 'Number of API retry attempts', (v) => parseInt(v, 10), parseInt(process.env.MAX_RETRIES, 10) || DEFAULT_API_RETRIES)
-    .option('--clone-retries <n>', 'Number of clone retry attempts', (v) => parseInt(v, 10), parseInt(process.env.CLONE_RETRIES, 10) || DEFAULT_CLONE_RETRIES)
+    .option('--concurrency <n>', 'Maximum concurrent clone operations', (v) => parseInt(v, 10), envIntOrDefault('MAX_CONCURRENCY', DEFAULT_CONCURRENCY))
+    .option('--per-page <n>', 'Items per API page', (v) => parseInt(v, 10), envIntOrDefault('PER_PAGE', DEFAULT_PER_PAGE))
+    .option('--timeout <seconds>', 'API request timeout in seconds', (v) => parseInt(v, 10), envIntOrDefault('REQUEST_TIMEOUT', DEFAULT_TIMEOUT))
+    .option('--api-retries <n>', 'Number of API retry attempts', (v) => parseInt(v, 10), envIntOrDefault('MAX_RETRIES', DEFAULT_API_RETRIES))
+    .option('--clone-retries <n>', 'Number of clone retry attempts', (v) => parseInt(v, 10), envIntOrDefault('CLONE_RETRIES', DEFAULT_CLONE_RETRIES))
     .option('--auth-method <method>', 'Authentication method (token|oauth)', process.env.AUTH_METHOD || 'oauth')
     .option('--git-auth-mode <mode>', 'Git credential mode (url|credential_helper)', process.env.GIT_AUTH_MODE || 'url')
     .option('--oauth-client-id <id>', 'OAuth application client ID', process.env.GITLAB_OAUTH_CLIENT_ID)
@@ -300,6 +311,12 @@ export async function main(argv) {
     const filled = await fillInteractive(rawConfig);
     const config = parseConfig(filled);
     return runClone(config);
+  }
+
+  // Auto-fallback: if auth method is oauth but no client ID and a token is provided, use token auth
+  if (rawConfig.authMethod === 'oauth' && !rawConfig.oauthClientId && rawConfig.token) {
+    showWarning('OAuth client ID not set but token provided. Falling back to token authentication.');
+    rawConfig.authMethod = 'token';
   }
 
   // Standard clone mode - validate required fields

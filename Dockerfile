@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM node:20-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
@@ -8,12 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN useradd -m -u 10001 appuser
 
 WORKDIR /app
-COPY pyproject.toml .
-COPY gitlab_downloader ./gitlab_downloader
-RUN pip install --no-cache-dir .
+COPY lib ./lib
+COPY cli ./cli
+RUN npm install --prefix lib && npm install --prefix cli
 
-ENV PYTHONUNBUFFERED=1
 USER appuser
 
-ENTRYPOINT ["gitlab-dump"]
+ENTRYPOINT ["node", "cli/bin/gitlab-dump.js"]
 CMD []
