@@ -181,7 +181,7 @@ function MigrationWizard({ repo, onComplete, onCancel }) {
             <p>The migration has been completed successfully!</p>
             <button
               className="btn-finish"
-              onClick={onCancel}
+              onClick={onComplete}
             >
               Close
             </button>

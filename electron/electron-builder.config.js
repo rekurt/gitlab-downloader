@@ -15,6 +15,8 @@ module.exports = {
     'env.js',
     'dist/**/*',
     'node_modules/**/*',
+    '!node_modules/@gitlab-dump/core',
+    { from: '../lib', to: 'node_modules/@gitlab-dump/core', filter: ['**/*', '!node_modules', '!__tests__'] },
   ],
   // Windows configuration - single portable exe
   win: {
