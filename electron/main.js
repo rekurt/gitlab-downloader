@@ -534,7 +534,10 @@ function setupIpcHandlers() {
       return { success: false, error: "Path is required" };
     }
     try {
-      const resolvedBase = path.resolve(resolveClonePath());
+      const store = getStore();
+      const settings = store.get("settings", {});
+      const clonePath = settings.clonePath || resolveClonePath();
+      const resolvedBase = path.resolve(clonePath);
       const resolvedTarget = path.resolve(targetPath);
       if (!resolvedTarget.startsWith(resolvedBase + path.sep) && resolvedTarget !== resolvedBase) {
         return { success: false, error: "Path is outside clone directory" };
@@ -642,15 +645,6 @@ function setupIpcHandlers() {
         gitAuthMode: settings.gitAuthMode || "url",
       });
 
-      // Normalize group_path from path_with_namespace to ensure consistent
-      // clone paths regardless of how projects were fetched (group vs user mode)
-      for (const project of projects) {
-        const pwn = String(project.path_with_namespace || "");
-        project.group_path = pwn.includes("/")
-          ? pwn.slice(0, pwn.lastIndexOf("/"))
-          : "";
-      }
-
       const ac = new AbortController();
       activeCloneAc = ac;
 
@@ -707,14 +701,6 @@ function setupIpcHandlers() {
       const clonePath = settings.clonePath || resolveClonePath();
 
       const config = { clonePath };
-
-      // Normalize group_path (same logic as clone-repositories)
-      for (const project of projects) {
-        const pwn = String(project.path_with_namespace || "");
-        project.group_path = pwn.includes("/")
-          ? pwn.slice(0, pwn.lastIndexOf("/"))
-          : "";
-      }
 
       const targets = projects.map((project) => {
         const { repoName, targetPath } = lib.buildCloneTarget(project, config);

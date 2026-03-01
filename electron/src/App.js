@@ -111,6 +111,20 @@ function App() {
           }}
         />
       )}
+
+      {currentView === "migration" && !selectedRepo && (
+        <div className="p-6 text-center">
+          <p className="mb-4 text-gray-500">
+            Select a repository to migrate from the Repositories tab.
+          </p>
+          <button
+            className="text-blue-500 underline"
+            onClick={() => setCurrentView("repos")}
+          >
+            Go to Repositories
+          </button>
+        </div>
+      )}
     </AppLayout>
   );
 }

@@ -56,9 +56,20 @@ function RepoList({ clonePath, onSelectRepo, onMigrationStart }) {
   const handleUpdate = async (repo) => {
     setUpdatingRepos((prev) => new Set([...prev, repo.path]));
     try {
+      // Derive path_with_namespace from remote URL
+      // e.g. https://host/rubx/crypto-gateway.git → rubx/crypto-gateway
+      let pwn = repo.name;
+      if (repo.url) {
+        try {
+          const urlPath = new URL(repo.url).pathname;
+          pwn = urlPath.replace(/^\/+/, '').replace(/\.git$/, '');
+        } catch {
+          // fallback to repo.name
+        }
+      }
       const project = {
         name: repo.name,
-        path_with_namespace: repo.name,
+        path_with_namespace: pwn,
         http_url_to_repo: repo.url,
       };
       await window.electronAPI.cloneRepositories({
