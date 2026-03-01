@@ -47,23 +47,23 @@ describe('MigrationWizard', () => {
   test('renders wizard header with repo name', () => {
     render(<MigrationWizard repo={mockRepo} onComplete={jest.fn()} onCancel={jest.fn()} />);
     expect(screen.getByText('Migration Wizard')).toBeInTheDocument();
-    expect(screen.getByText('Repository: test-repo')).toBeInTheDocument();
+    expect(screen.getByText(/test-repo/)).toBeInTheDocument();
   });
 
-  test('renders step indicators', () => {
+  test('renders Ant Design Steps with all step titles', () => {
     render(<MigrationWizard repo={mockRepo} onComplete={jest.fn()} onCancel={jest.fn()} />);
-    expect(screen.getByText('Configure Authors')).toBeInTheDocument();
+    expect(screen.getByText('Author Mappings')).toBeInTheDocument();
     expect(screen.getByText('Review & Confirm')).toBeInTheDocument();
-    expect(screen.getByText('Migration In Progress')).toBeInTheDocument();
+    expect(screen.getByText('Progress')).toBeInTheDocument();
     expect(screen.getByText('Complete')).toBeInTheDocument();
   });
 
-  test('starts on step 1 with AuthorMapper', () => {
+  test('starts on step 0 with AuthorMapper', () => {
     render(<MigrationWizard repo={mockRepo} onComplete={jest.fn()} onCancel={jest.fn()} />);
     expect(screen.getByTestId('author-mapper')).toBeInTheDocument();
   });
 
-  test('advances to step 2 after saving mappings', () => {
+  test('advances to step 1 (review) after saving mappings', () => {
     render(<MigrationWizard repo={mockRepo} onComplete={jest.fn()} onCancel={jest.fn()} />);
     fireEvent.click(screen.getByText('Mock Save Mappings'));
 
@@ -75,7 +75,16 @@ describe('MigrationWizard', () => {
     render(<MigrationWizard repo={mockRepo} onComplete={jest.fn()} onCancel={jest.fn()} />);
     fireEvent.click(screen.getByText('Mock Save Mappings'));
 
-    expect(screen.getByText('Author Mappings')).toBeInTheDocument();
+    // "Author Mappings" appears in both the Steps header and the review section
+    const matches = screen.getAllByText('Author Mappings');
+    expect(matches.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('shows warning about git history modification', () => {
+    render(<MigrationWizard repo={mockRepo} onComplete={jest.fn()} onCancel={jest.fn()} />);
+    fireEvent.click(screen.getByText('Mock Save Mappings'));
+
+    expect(screen.getByText(/modify git history/)).toBeInTheDocument();
   });
 
   test('start migration calls IPC', async () => {
@@ -95,7 +104,7 @@ describe('MigrationWizard', () => {
     });
   });
 
-  test('advances to step 3 after migration starts', async () => {
+  test('advances to step 2 (progress) after migration starts', async () => {
     render(<MigrationWizard repo={mockRepo} onComplete={jest.fn()} onCancel={jest.fn()} />);
     fireEvent.click(screen.getByText('Mock Save Mappings'));
 
@@ -123,7 +132,7 @@ describe('MigrationWizard', () => {
     });
   });
 
-  test('advances to step 4 on migration complete', async () => {
+  test('advances to step 3 (complete) on migration complete', async () => {
     render(<MigrationWizard repo={mockRepo} onComplete={jest.fn()} onCancel={jest.fn()} />);
     fireEvent.click(screen.getByText('Mock Save Mappings'));
 
@@ -137,13 +146,32 @@ describe('MigrationWizard', () => {
 
     fireEvent.click(screen.getByText('Mock Complete'));
     expect(screen.getByText('Migration Complete')).toBeInTheDocument();
+    expect(screen.getByText(/completed successfully/)).toBeInTheDocument();
   });
 
-  test('back button goes from step 2 to step 1', () => {
+  test('previous button goes from step 1 to step 0', () => {
     render(<MigrationWizard repo={mockRepo} onComplete={jest.fn()} onCancel={jest.fn()} />);
     fireEvent.click(screen.getByText('Mock Save Mappings'));
-    fireEvent.click(screen.getByText('Back'));
+    fireEvent.click(screen.getByText('Previous'));
     expect(screen.getByTestId('author-mapper')).toBeInTheDocument();
+  });
+
+  test('close button in complete step calls onComplete', async () => {
+    const onComplete = jest.fn();
+    render(<MigrationWizard repo={mockRepo} onComplete={onComplete} onCancel={jest.fn()} />);
+    fireEvent.click(screen.getByText('Mock Save Mappings'));
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Start Migration'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('progress-indicator')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Mock Complete'));
+    fireEvent.click(screen.getByText('Close'));
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
   test('handles missing electronAPI', async () => {

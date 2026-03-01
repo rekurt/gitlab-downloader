@@ -125,7 +125,7 @@ describe('ProgressIndicator', () => {
     expect(onError).toHaveBeenCalledWith('Migration failed');
   });
 
-  test('shows progress bar with correct width', () => {
+  test('shows progress bar with correct percentage', () => {
     render(<ProgressIndicator migrationId="mig_123" onComplete={jest.fn()} onError={jest.fn()} />);
 
     act(() => {

@@ -175,28 +175,28 @@ Transform the Electron application from a migration-only tool into a full-cycle 
 - Modify: `electron/src/components/AuthorMapper.js`
 - Modify: `electron/src/components/ProgressIndicator.js`
 
-- [ ] Rewrite `MigrationWizard` with Ant Design `Steps` component:
+- [x] Rewrite `MigrationWizard` with Ant Design `Steps` component:
   - Step 1: Author Mappings
   - Step 2: Review & Confirm
   - Step 3: Progress
   - Step 4: Complete
   - Navigation with Ant Design `Button` (Previous/Next/Start/Close)
-- [ ] On wizard mount: call `getAuthorMappings` IPC to pre-load existing mappings, call `getConfig` IPC to discover repo migration config
-- [ ] Rewrite `AuthorMapper` with Ant Design `Form`:
+- [x] On wizard mount: call `getAuthorMappings` IPC to pre-load existing mappings, call `getConfig` IPC to discover repo migration config
+- [x] Rewrite `AuthorMapper` with Ant Design `Form`:
   - Dynamic form list (`Form.List`) for mapping entries
   - Each entry: type select (author/committer), original name/email inputs, new name/email inputs, remove button
   - "Add Mapping" button
   - Form validation (all fields required)
-- [ ] Rewrite `ProgressIndicator` with Ant Design components:
+- [x] Rewrite `ProgressIndicator` with Ant Design components:
   - `Progress` component (percentage mode when progress >= 0, indeterminate when < 0)
   - `Typography.Text` for current task
   - `Timeline` or scrollable `List` for message log
   - `Button` danger for cancel
-- [ ] Rewrite Step 2 (Review) with Ant Design `Descriptions` or `Table` showing mappings read-only
-- [ ] Rewrite Step 4 (Complete) with Ant Design `Result` (success icon + message)
-- [ ] Remove old CSS imports
-- [ ] Update existing MigrationWizard, AuthorMapper, ProgressIndicator tests
-- [ ] Run project test suite - must pass before task 8
+- [x] Rewrite Step 2 (Review) with Ant Design `Descriptions` or `Table` showing mappings read-only
+- [x] Rewrite Step 4 (Complete) with Ant Design `Result` (success icon + message)
+- [x] Remove old CSS imports
+- [x] Update existing MigrationWizard, AuthorMapper, ProgressIndicator tests
+- [x] Run project test suite - must pass before task 8
 
 ### Task 8: Verify acceptance criteria
 

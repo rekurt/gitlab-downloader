@@ -1,5 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
+import {
+  Progress,
+  Typography,
+  List,
+  Button,
+  Tag,
+  Alert,
+} from 'antd';
+import { StopOutlined } from '@ant-design/icons';
 
+const { Title, Text } = Typography;
+
+const STATUS_CONFIG = {
+  pending: { color: 'orange', label: 'PENDING' },
+  running: { color: 'blue', label: 'RUNNING' },
+  completed: { color: 'green', label: 'COMPLETED' },
+  failed: { color: 'red', label: 'FAILED' },
+};
 
 function ProgressIndicator({
   migrationId,
@@ -45,67 +62,70 @@ function ProgressIndicator({
 
   if (!progress) {
     return (
-      <div className="progress-container">
-        <div className="progress-loading">Waiting for progress...</div>
+      <div className="p-6 text-center">
+        <Text type="secondary">Waiting for progress...</Text>
       </div>
     );
   }
 
-  const statusColor = {
-    pending: '#ff9800',
-    running: '#2196f3',
-    completed: '#4caf50',
-    failed: '#f44336',
-  }[progress.status] || '#666';
+  const statusConfig = STATUS_CONFIG[progress.status] || { color: 'default', label: 'UNKNOWN' };
+  const isIndeterminate = progress.progress < 0;
+  const percent = isIndeterminate ? 0 : progress.progress;
+  const progressStatus =
+    progress.status === 'failed' ? 'exception' :
+      progress.status === 'completed' ? 'success' :
+        'active';
 
   return (
-    <div className="progress-container">
-      <div className="progress-header">
-        <h3>Migration Progress</h3>
-        <span className="progress-status" style={{ color: statusColor }}>
-          {progress.status.toUpperCase()}
-        </span>
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <Title level={4} className="mb-0">Migration Progress</Title>
+        <Tag color={statusConfig.color}>{statusConfig.label}</Tag>
       </div>
 
-      {error && <div className="progress-error">{error}</div>}
+      {error && (
+        <Alert
+          type="error"
+          title={error}
+          showIcon
+          className="mb-4"
+        />
+      )}
 
-      <div className="progress-bar-container">
-        <div className="progress-bar">
-          <div
-            className={`progress-fill${progress.progress < 0 ? ' indeterminate' : ''}`}
-            style={{
-              width: progress.progress < 0 ? '100%' : `${progress.progress}%`,
-              backgroundColor: statusColor,
-              opacity: progress.progress < 0 ? 0.4 : 1,
-            }}
-          />
-        </div>
-        <span className="progress-percentage">
-          {progress.progress < 0 ? '...' : `${progress.progress}%`}
-        </span>
+      <div className="mb-4">
+        <Progress
+          percent={percent}
+          status={progressStatus}
+          format={() => (isIndeterminate ? '...' : `${progress.progress}%`)}
+        />
       </div>
 
       {progress.current_task && (
-        <div className="progress-task">
-          <span className="task-label">Current Task:</span>
-          <span className="task-name">{progress.current_task}</span>
+        <div className="mb-4">
+          <Text type="secondary">Current Task: </Text>
+          <Text>{progress.current_task}</Text>
         </div>
       )}
 
       {progress.messages && progress.messages.length > 0 && (
-        <div className="progress-messages">
-          <div className="messages-label">Messages:</div>
-          <ul className="messages-list">
-            {progress.messages.map((msg, idx) => (
-              <li key={idx}>{msg}</li>
-            ))}
-          </ul>
+        <div className="mb-4">
+          <Text strong className="block mb-2">Messages:</Text>
+          <div
+            className="max-h-48 overflow-y-auto border border-gray-200 rounded p-2 bg-gray-50"
+          >
+            <List
+              size="small"
+              dataSource={progress.messages}
+              renderItem={(msg) => <List.Item className="py-1">{msg}</List.Item>}
+            />
+          </div>
         </div>
       )}
 
       {!isFinished && (
-        <button
-          className="btn-cancel-migration"
+        <Button
+          danger
+          icon={<StopOutlined />}
           onClick={async () => {
             if (window.electronAPI) {
               await window.electronAPI.cancelMigration(migrationId);
@@ -114,15 +134,20 @@ function ProgressIndicator({
           }}
         >
           Cancel Migration
-        </button>
+        </Button>
       )}
 
       {isFinished && (
-        <div className={`progress-finish ${progress.status}`}>
-          {progress.status === 'completed'
-            ? '✓ Migration completed successfully'
-            : '✗ Migration failed'}
-        </div>
+        <Alert
+          type={progress.status === 'completed' ? 'success' : 'error'}
+          title={
+            progress.status === 'completed'
+              ? 'Migration completed successfully'
+              : 'Migration failed'
+          }
+          showIcon
+          className="mt-4"
+        />
       )}
     </div>
   );

@@ -18,6 +18,18 @@ if (typeof globalThis.MessageChannel === 'undefined') {
   };
 }
 
+// Polyfill ResizeObserver for Ant Design Select/dropdown components in jsdom
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class ResizeObserver {
+    constructor(callback) {
+      this._callback = callback;
+    }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 // Suppress Ant Design warnings about missing matchMedia
 if (typeof window !== 'undefined' && !window.matchMedia) {
   window.matchMedia = (query) => ({

@@ -1,10 +1,34 @@
 import React, { useState } from 'react';
+import {
+  Steps,
+  Button,
+  Typography,
+  Descriptions,
+  Alert,
+  Result,
+  Space,
+  Tag,
+} from 'antd';
+import {
+  UserOutlined,
+  EyeOutlined,
+  LoadingOutlined,
+  CheckCircleOutlined,
+} from '@ant-design/icons';
 import AuthorMapper from './AuthorMapper';
 import ProgressIndicator from './ProgressIndicator';
 
+const { Title, Text } = Typography;
+
+const STEP_ITEMS = [
+  { title: 'Author Mappings', icon: <UserOutlined /> },
+  { title: 'Review & Confirm', icon: <EyeOutlined /> },
+  { title: 'Progress', icon: <LoadingOutlined /> },
+  { title: 'Complete', icon: <CheckCircleOutlined /> },
+];
 
 function MigrationWizard({ repo, onComplete, onCancel }) {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [mappings, setMappings] = useState(null);
   const [migrationId, setMigrationId] = useState(null);
   const [error, setError] = useState(null);
@@ -12,7 +36,7 @@ function MigrationWizard({ repo, onComplete, onCancel }) {
 
   const handleMappingsSave = async (savedMappings) => {
     setMappings(savedMappings);
-    setStep(2);
+    setStep(1);
   };
 
   const handleStartMigration = async () => {
@@ -35,7 +59,7 @@ function MigrationWizard({ repo, onComplete, onCancel }) {
       }
 
       setMigrationId(result.migrationId);
-      setStep(3);
+      setStep(2);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -44,150 +68,136 @@ function MigrationWizard({ repo, onComplete, onCancel }) {
   };
 
   const handleMigrationComplete = () => {
-    setStep(4);
+    setStep(3);
   };
 
   const handleMigrationError = (errMsg) => {
     setError(errMsg);
     setMigrationId(null);
-    setStep(2);
+    setStep(1);
+  };
+
+  const renderMappingsTable = (title, mappingsObj) => {
+    const entries = Object.entries(mappingsObj);
+    if (entries.length === 0) return null;
+
+    return (
+      <div className="mb-4">
+        <Text strong className="block mb-2">{title}</Text>
+        <Descriptions bordered size="small" column={1}>
+          {entries.map(([key, mapping]) => (
+            <Descriptions.Item
+              key={key}
+              label={
+                <span>
+                  {mapping.original_name} &lt;{mapping.original_email}&gt;
+                </span>
+              }
+            >
+              {mapping.new_name} &lt;{mapping.new_email}&gt;
+            </Descriptions.Item>
+          ))}
+        </Descriptions>
+      </div>
+    );
   };
 
   return (
-    <div className="migration-wizard-container">
-      <div className="wizard-header">
-        <h2>Migration Wizard</h2>
-        <p className="repo-name">Repository: {repo?.name}</p>
+    <div className="p-6">
+      <div className="mb-6">
+        <Title level={3}>Migration Wizard</Title>
+        <Text type="secondary">Repository: {repo?.name}</Text>
       </div>
 
-      <div className="wizard-steps">
-        <div className={`step-indicator ${step >= 1 ? 'active' : ''}`}>
-          <span className="step-number">1</span>
-          <span className="step-label">Configure Authors</span>
-        </div>
-        <div className="step-connector" />
-        <div className={`step-indicator ${step >= 2 ? 'active' : ''}`}>
-          <span className="step-number">2</span>
-          <span className="step-label">Review & Confirm</span>
-        </div>
-        <div className="step-connector" />
-        <div className={`step-indicator ${step >= 3 ? 'active' : ''}`}>
-          <span className="step-number">3</span>
-          <span className="step-label">Migration In Progress</span>
-        </div>
-        <div className="step-connector" />
-        <div className={`step-indicator ${step >= 4 ? 'active' : ''}`}>
-          <span className="step-number">4</span>
-          <span className="step-label">Complete</span>
-        </div>
-      </div>
+      <Steps
+        current={step}
+        items={STEP_ITEMS}
+        className="mb-8"
+      />
 
-      {error && <div className="wizard-error">{error}</div>}
+      {error && (
+        <Alert
+          type="error"
+          title={error}
+          showIcon
+          closable
+          onClose={() => setError(null)}
+          className="mb-4"
+        />
+      )}
 
-      <div className="wizard-content">
-        {step === 1 && (
-          <AuthorMapper
-            onSave={handleMappingsSave}
-            onCancel={onCancel}
+      {/* Step 0: Author Mappings */}
+      {step === 0 && (
+        <AuthorMapper
+          onSave={handleMappingsSave}
+          onCancel={onCancel}
+        />
+      )}
+
+      {/* Step 1: Review & Confirm */}
+      {step === 1 && mappings && (
+        <div className="p-4">
+          <Title level={4}>Review Mappings</Title>
+          <Text type="secondary" className="block mb-4">
+            Please review the author and committer mappings before proceeding:
+          </Text>
+
+          {renderMappingsTable('Author Mappings', mappings.authorMappings)}
+          {renderMappingsTable('Committer Mappings', mappings.committerMappings)}
+
+          {Object.keys(mappings.authorMappings).length === 0 &&
+            Object.keys(mappings.committerMappings).length === 0 && (
+            <Tag color="orange" className="mb-4">No mappings configured</Tag>
+          )}
+
+          <Alert
+            type="warning"
+            title="This operation will modify git history. Make sure you have a backup!"
+            showIcon
+            className="mb-6"
           />
-        )}
 
-        {step === 2 && mappings && (
-          <div className="step-review">
-            <h3>Review Mappings</h3>
-            <p>Please review the author and committer mappings before proceeding:</p>
-
-            {Object.keys(mappings.authorMappings).length > 0 && (
-              <div className="review-section">
-                <h4>Author Mappings</h4>
-                <div className="mappings-review">
-                  {Object.entries(mappings.authorMappings).map(([key, mapping]) => (
-                    <div key={key} className="mapping-review-item">
-                      <div className="original">
-                        <strong>{mapping.original_name}</strong>
-                        <span>&lt;{mapping.original_email}&gt;</span>
-                      </div>
-                      <div className="arrow">→</div>
-                      <div className="new">
-                        <strong>{mapping.new_name}</strong>
-                        <span>&lt;{mapping.new_email}&gt;</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {Object.keys(mappings.committerMappings).length > 0 && (
-              <div className="review-section">
-                <h4>Committer Mappings</h4>
-                <div className="mappings-review">
-                  {Object.entries(mappings.committerMappings).map(([key, mapping]) => (
-                    <div key={key} className="mapping-review-item">
-                      <div className="original">
-                        <strong>{mapping.original_name}</strong>
-                        <span>&lt;{mapping.original_email}&gt;</span>
-                      </div>
-                      <div className="arrow">→</div>
-                      <div className="new">
-                        <strong>{mapping.new_name}</strong>
-                        <span>&lt;{mapping.new_email}&gt;</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="review-warning">
-              ⚠️ This operation will modify git history. Make sure you have a backup!
-            </div>
-
-            <div className="review-actions">
-              <button
-                className="btn-back"
-                onClick={() => setStep(1)}
-                disabled={loading}
-              >
-                Back
-              </button>
-              <button
-                className="btn-confirm"
-                onClick={handleStartMigration}
-                disabled={loading}
-              >
-                {loading ? 'Starting...' : 'Start Migration'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {step === 3 && (
-          <ProgressIndicator
-            migrationId={migrationId}
-            onComplete={handleMigrationComplete}
-            onError={handleMigrationError}
-            onCancel={() => {
-              setMigrationId(null);
-              setStep(2);
-            }}
-          />
-        )}
-
-        {step === 4 && (
-          <div className="step-complete">
-            <div className="success-icon">✓</div>
-            <h3>Migration Complete</h3>
-            <p>The migration has been completed successfully!</p>
-            <button
-              className="btn-finish"
-              onClick={onComplete}
+          <Space>
+            <Button onClick={() => setStep(0)} disabled={loading}>
+              Previous
+            </Button>
+            <Button
+              type="primary"
+              onClick={handleStartMigration}
+              loading={loading}
             >
+              Start Migration
+            </Button>
+          </Space>
+        </div>
+      )}
+
+      {/* Step 2: Progress */}
+      {step === 2 && (
+        <ProgressIndicator
+          migrationId={migrationId}
+          onComplete={handleMigrationComplete}
+          onError={handleMigrationError}
+          onCancel={() => {
+            setMigrationId(null);
+            setStep(1);
+          }}
+        />
+      )}
+
+      {/* Step 3: Complete */}
+      {step === 3 && (
+        <Result
+          status="success"
+          title="Migration Complete"
+          subTitle="The migration has been completed successfully!"
+          extra={[
+            <Button key="close" type="primary" onClick={onComplete}>
               Close
-            </button>
-          </div>
-        )}
-      </div>
+            </Button>,
+          ]}
+        />
+      )}
     </div>
   );
 }
