@@ -427,6 +427,10 @@ export async function fillInteractive(config) {
     updates.token = token.trim();
   } else if (authMethod === 'oauth') {
     if (!config.oauthClientId) {
+      const gitlabUrl = (updates.url || config.url || 'https://gitlab.com').replace(/\/$/, '');
+      showInfo(
+        `Чтобы получить OAuth Client ID, создайте приложение в GitLab:\n  ${gitlabUrl}/-/profile/applications\n  Redirect URI: urn:ietf:wg:oauth:2.0:oob  |  Scope: read_api`
+      );
       const { oauthClientId } = await inquirer.prompt([
         {
           type: 'input',

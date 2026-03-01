@@ -59,18 +59,14 @@ gitlab-dump/
 │   ├── electron-builder.config.js # Electron build config
 │   ├── __tests__/                 # Jest tests
 │   └── README.md                  # Electron-specific documentation
-├── gitlab_downloader/             # Legacy Python package (preserved for reference)
-├── tests/                         # Legacy Python test suite
 ├── docs/                          # Documentation and plans
 ├── package.json                   # Root workspace package
 ├── Makefile                       # Development commands
-├── pyproject.toml                 # Legacy Python project configuration
 ├── .env.example                   # Environment template
 ├── .gitignore                     # Git ignore rules
 ├── Dockerfile                     # Docker configuration
 ├── README.MD                      # Russian documentation (primary)
 ├── README.en.md                   # English documentation (secondary)
-├── AGENTS.md                      # Agent-specific documentation
 └── CLAUDE.md                      # This file
 ```
 
@@ -132,19 +128,12 @@ Node.js targets:
 - `make cli-dry-run` - Run CLI with --dry-run flag
 - `make electron-build` - Build Electron GUI application binary
 
-Legacy Python targets (still available):
-- `make install` - Create venv and install Python dependencies
-- `make run` - Run Python CLI application
-- `make test` - Run Python test suite with pytest
-- `make lint` - Check Python code with ruff
-- `make format` - Format Python code with ruff
-- `make typecheck` - Run mypy type checking
-- `make ci` - Run Python linting, typecheck, and tests
-- `make binary` - Build standalone Python binary (onedir)
-- `make binary_onefile` - Build single-file Python binary
+Docker:
+- `make docker-build` - Build Docker image
+- `make docker-run` - Run application in Docker container
 
 General:
-- `make clean` - Remove venv, node_modules, and build artifacts
+- `make clean` - Remove node_modules and build artifacts
 - `make help` - Show all available targets
 
 ### electron-builder.config.js
@@ -217,8 +206,8 @@ npm run dist      # Build for distribution
 
 ### Docker
 ```bash
-make build                     # Build Docker image
-make docker_run               # Run in Docker container
+make docker-build              # Build Docker image
+make docker-run                # Run in Docker container
 ```
 
 ## Testing
@@ -348,7 +337,7 @@ All checks must pass before merging to main branch.
 ## Language and Documentation
 
 The project maintains dual-language documentation:
-- **Russian (primary)**: README.MD, AGENTS.md comments, commit messages
+- **Russian (primary)**: README.MD, commit messages
 - **English (secondary)**: README.en.md, code comments, docstrings
 
 Keep both versions in sync for consistency.

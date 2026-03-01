@@ -545,9 +545,11 @@ describe('setupIpcHandlers', () => {
     expect(result).toEqual({ success: false, error: 'Path is required' });
   });
 
-  test('open-path handler calls shell.openPath', async () => {
+  test('open-path handler calls shell.openPath for valid path', async () => {
     const { shell } = require('electron');
     const { setupIpcHandlers } = require('../main');
+    const originalClonePath = process.env.CLONE_PATH;
+    process.env.CLONE_PATH = '/tmp';
     setupIpcHandlers();
 
     const openPathCall = ipcMain.handle.mock.calls.find(
@@ -557,11 +559,14 @@ describe('setupIpcHandlers', () => {
     const result = await handler(null, '/tmp/some-dir');
     expect(result).toEqual({ success: true });
     expect(shell.openPath).toHaveBeenCalledWith('/tmp/some-dir');
+    process.env.CLONE_PATH = originalClonePath;
   });
 
   test('open-path handler returns error when shell.openPath fails', async () => {
     const { shell } = require('electron');
     shell.openPath.mockResolvedValueOnce('Failed to open path');
+    const originalClonePath = process.env.CLONE_PATH;
+    process.env.CLONE_PATH = '/tmp';
 
     const { setupIpcHandlers } = require('../main');
     setupIpcHandlers();
@@ -572,6 +577,22 @@ describe('setupIpcHandlers', () => {
     const handler = openPathCall[1];
     const result = await handler(null, '/tmp/bad-path');
     expect(result).toEqual({ success: false, error: 'Failed to open path' });
+    process.env.CLONE_PATH = originalClonePath;
+  });
+
+  test('open-path handler rejects path outside clone directory', async () => {
+    const { setupIpcHandlers } = require('../main');
+    const originalClonePath = process.env.CLONE_PATH;
+    process.env.CLONE_PATH = '/tmp/clone-root';
+    setupIpcHandlers();
+
+    const openPathCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'open-path',
+    );
+    const handler = openPathCall[1];
+    const result = await handler(null, '/etc/passwd');
+    expect(result).toEqual({ success: false, error: 'Path is outside clone directory' });
+    process.env.CLONE_PATH = originalClonePath;
   });
 
   test('dry-run-projects handler is callable with projects', async () => {

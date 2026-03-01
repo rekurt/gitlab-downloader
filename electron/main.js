@@ -438,7 +438,7 @@ function setupIpcHandlers() {
         requestTimeout: 10,
       });
       const apiUrl = `${config.url}/api/v4/user`;
-      const data = await lib.fetchJson(apiUrl, { private_token: token }, "test connection", config);
+      const data = await lib.fetchJson(apiUrl, {}, "test connection", config);
       if (data && data.username) {
         return { success: true, username: data.username };
       }
@@ -535,6 +535,11 @@ function setupIpcHandlers() {
       return { success: false, error: "Path is required" };
     }
     try {
+      const resolvedBase = path.resolve(resolveClonePath());
+      const resolvedTarget = path.resolve(targetPath);
+      if (!resolvedTarget.startsWith(resolvedBase + path.sep) && resolvedTarget !== resolvedBase) {
+        return { success: false, error: "Path is outside clone directory" };
+      }
       const result = await shell.openPath(targetPath);
       if (result) {
         return { success: false, error: result };

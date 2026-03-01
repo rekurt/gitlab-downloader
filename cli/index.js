@@ -135,6 +135,7 @@ export function findGitRepos(basePath, maxDepth = 10) {
       const entries = readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
         if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+        if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
         const full = join(dir, entry.name);
         if (existsSync(join(full, '.git'))) {
           repos.push(full);

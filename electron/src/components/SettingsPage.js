@@ -46,7 +46,11 @@ function SettingsPage({ settings, onSave }) {
     setSaving(true);
     try {
       if (window.electronAPI?.saveSettings) {
-        await window.electronAPI.saveSettings(values);
+        const result = await window.electronAPI.saveSettings(values);
+        if (result && !result.success) {
+          message.error(`Failed to save: ${result.error}`);
+          return;
+        }
       }
       onSave(values);
       message.success("Settings saved");
@@ -81,10 +85,13 @@ function SettingsPage({ settings, onSave }) {
   };
 
   const handleOAuthSuccess = useCallback(
-    (token) => {
+    async (token) => {
       message.success("OAuth authorization successful");
       const values = form.getFieldsValue();
       values.oauthToken = token;
+      if (window.electronAPI?.saveSettings) {
+        await window.electronAPI.saveSettings(values);
+      }
       onSave(values);
     },
     [form, message, onSave],
