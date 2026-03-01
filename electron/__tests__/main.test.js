@@ -37,6 +37,13 @@ jest.mock('electron', () => ({
 
 jest.mock('electron-is-dev', () => false);
 
+jest.mock('electron-store', () => {
+  return jest.fn().mockImplementation(() => ({
+    get: jest.fn().mockReturnValue({}),
+    set: jest.fn(),
+  }));
+});
+
 const { findGitRepos, resolveClonePath } = require('../main');
 
 describe('findGitRepos', () => {
@@ -325,10 +332,9 @@ describe('setupIpcHandlers', () => {
 
   test('load-settings handler returns stored settings', async () => {
     const mockStore = { get: jest.fn().mockReturnValue({ gitlabUrl: 'https://gitlab.com' }) };
-    jest.doMock('electron-store', () => ({
-      __esModule: true,
-      default: jest.fn().mockImplementation(() => mockStore),
-    }));
+    jest.doMock('electron-store', () => {
+      return jest.fn().mockImplementation(() => mockStore);
+    });
 
     // Reset the cached store to force re-import
     const mainModule = require('../main');

@@ -19,13 +19,12 @@ async function getCoreLib() {
 }
 
 /**
- * Lazily loaded electron-store (ESM package).
+ * Lazily loaded electron-store.
  */
+const Store = require("electron-store");
 let _store = null;
-async function getStore() {
+function getStore() {
   if (!_store) {
-    const mod = await import("electron-store");
-    const Store = mod.default;
     _store = new Store({ name: "settings" });
   }
   return _store;
@@ -402,7 +401,7 @@ function setupIpcHandlers() {
 
   // Load settings from electron-store
   ipcMain.handle("load-settings", async () => {
-    const store = await getStore();
+    const store = getStore();
     return store.get("settings", {});
   });
 
@@ -414,7 +413,7 @@ function setupIpcHandlers() {
       if (settings.gitlabUrl && !lib.validateGitlabUrl(settings.gitlabUrl)) {
         return { success: false, error: "Invalid GitLab URL" };
       }
-      const store = await getStore();
+      const store = getStore();
       store.set("settings", settings);
       return { success: true };
     } catch (err) {
@@ -452,7 +451,7 @@ function setupIpcHandlers() {
   ipcMain.handle("start-oauth-device-flow", async (event) => {
     try {
       const lib = await getCoreLib();
-      const store = await getStore();
+      const store = getStore();
       const settings = store.get("settings", {});
       const url = (settings.gitlabUrl || "").replace(/\/+$/, "");
       const oauthClientId = settings.oauthClientId || "";
@@ -554,7 +553,7 @@ function setupIpcHandlers() {
   ipcMain.handle("fetch-projects", async (_event, { group } = {}) => {
     try {
       const lib = await getCoreLib();
-      const store = await getStore();
+      const store = getStore();
       const settings = store.get("settings", {});
       const url = (settings.gitlabUrl || "").replace(/\/+$/, "");
       const token = settings.oauthToken || settings.token || null;
@@ -621,7 +620,7 @@ function setupIpcHandlers() {
 
     try {
       const lib = await getCoreLib();
-      const store = await getStore();
+      const store = getStore();
       const settings = store.get("settings", {});
       const url = (settings.gitlabUrl || "").replace(/\/+$/, "");
       const token = settings.oauthToken || settings.token || null;
@@ -642,6 +641,15 @@ function setupIpcHandlers() {
         maxConcurrency: settings.maxConcurrency || 5,
         gitAuthMode: settings.gitAuthMode || "url",
       });
+
+      // Normalize group_path from path_with_namespace to ensure consistent
+      // clone paths regardless of how projects were fetched (group vs user mode)
+      for (const project of projects) {
+        const pwn = String(project.path_with_namespace || "");
+        project.group_path = pwn.includes("/")
+          ? pwn.slice(0, pwn.lastIndexOf("/"))
+          : "";
+      }
 
       const ac = new AbortController();
       activeCloneAc = ac;
@@ -694,11 +702,20 @@ function setupIpcHandlers() {
 
     try {
       const lib = await getCoreLib();
-      const store = await getStore();
+      const store = getStore();
       const settings = store.get("settings", {});
       const clonePath = settings.clonePath || resolveClonePath();
 
       const config = { clonePath };
+
+      // Normalize group_path (same logic as clone-repositories)
+      for (const project of projects) {
+        const pwn = String(project.path_with_namespace || "");
+        project.group_path = pwn.includes("/")
+          ? pwn.slice(0, pwn.lastIndexOf("/"))
+          : "";
+      }
+
       const targets = projects.map((project) => {
         const { repoName, targetPath } = lib.buildCloneTarget(project, config);
         const exists = fs.existsSync(targetPath);
