@@ -200,11 +200,11 @@ Transform the Electron application from a migration-only tool into a full-cycle 
 
 ### Task 8: Verify acceptance criteria
 
-- [ ] Manual test: full cycle - open app, configure settings, test connection, load projects, select and clone repos, view local repos, run migration
-- [ ] Run full test suite: `cd electron && npm test`
-- [ ] Run linter: `make node-lint`
-- [ ] Verify all Ant Design components render correctly with Tailwind utility classes
-- [ ] Verify IPC security: all new channels added to preload.js whitelist
+- [x] Manual test: full cycle - open app, configure settings, test connection, load projects, select and clone repos, view local repos, run migration
+- [x] Run full test suite: `cd electron && npm test`
+- [x] Run linter: `make node-lint`
+- [x] Verify all Ant Design components render correctly with Tailwind utility classes
+- [x] Verify IPC security: all new channels added to preload.js whitelist
 
 ### Task 9: Update documentation
 
