@@ -108,6 +108,39 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cancelFetchProjects: () => ipcRenderer.invoke('cancel-fetch-projects'),
 
   /**
+   * Clone repositories with progress reporting
+   * @param {object} params - { projects: Array, updateExisting: boolean }
+   * @returns {Promise<{success: boolean, results?: Array, error?: string}>}
+   */
+  cloneRepositories: (params) => ipcRenderer.invoke('clone-repositories', params),
+
+  /**
+   * Cancel active clone operation
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  cancelClone: () => ipcRenderer.invoke('cancel-clone'),
+
+  /**
+   * Dry-run: compute clone targets without executing
+   * @param {object} params - { projects: Array }
+   * @returns {Promise<{success: boolean, targets?: Array, error?: string}>}
+   */
+  dryRunProjects: (params) => ipcRenderer.invoke('dry-run-projects', params),
+
+  /**
+   * Listen for clone progress updates
+   * @param {function} callback - Called with progress data {project, result, message, completed, total}
+   * @returns {function} - Cleanup function to remove listener
+   */
+  onCloneProgress: (callback) => {
+    const wrapper = (event, data) => callback(data);
+    ipcRenderer.on('clone-progress', wrapper);
+    return () => {
+      ipcRenderer.removeListener('clone-progress', wrapper);
+    };
+  },
+
+  /**
    * Start OAuth Device Flow authorization
    * @returns {Promise<{success: boolean, verificationUri?: string, userCode?: string, verificationUriComplete?: string, error?: string}>}
    */
@@ -133,6 +166,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const validChannels = [
       'migration-progress',
       'oauth-progress',
+      'clone-progress',
     ];
     if (validChannels.includes(channel)) {
       const wrapper = (event, ...args) => func(...args);
@@ -148,6 +182,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const validChannels = [
       'migration-progress',
       'oauth-progress',
+      'clone-progress',
     ];
     if (validChannels.includes(channel)) {
       const wrapper = listenerMap.get(func);
@@ -165,6 +200,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const validChannels = [
       'migration-progress',
       'oauth-progress',
+      'clone-progress',
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.once(channel, (event, ...args) => func(...args));

@@ -197,6 +197,11 @@ const activeMigrations = new Map();
 let activeFetchAc = null;
 
 /**
+ * Active clone operation abort controller (only one at a time).
+ */
+let activeCloneAc = null;
+
+/**
  * IPC handlers for frontend communication
  */
 function setupIpcHandlers() {
@@ -585,6 +590,108 @@ function setupIpcHandlers() {
       return { success: true };
     }
     return { success: false, error: "No active fetch" };
+  });
+
+  // Clone repositories with progress reporting
+  ipcMain.handle("clone-repositories", async (_event, { projects, updateExisting }) => {
+    if (!projects || projects.length === 0) {
+      return { success: false, error: "No projects to clone" };
+    }
+
+    try {
+      const lib = await getCoreLib();
+      const store = await getStore();
+      const settings = store.get("settings", {});
+      const url = (settings.gitlabUrl || "").replace(/\/+$/, "");
+      const token = settings.oauthToken || settings.token || null;
+      const clonePath = settings.clonePath || resolveClonePath();
+
+      if (!url) {
+        return { success: false, error: "GitLab URL is required" };
+      }
+      if (!token) {
+        return { success: false, error: "Authentication token is required" };
+      }
+
+      const config = lib.GitlabConfigSchema.parse({
+        url,
+        token,
+        clonePath,
+        updateExisting: !!updateExisting,
+        maxConcurrency: settings.maxConcurrency || 5,
+        gitAuthMode: settings.gitAuthMode || "url",
+      });
+
+      const ac = new AbortController();
+      activeCloneAc = ac;
+
+      let completed = 0;
+      const total = projects.length;
+
+      const results = await lib.cloneAllRepositories(projects, config, {
+        signal: ac.signal,
+        onResult: (result) => {
+          completed++;
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send("clone-progress", {
+              project: result.name,
+              result: result.status,
+              message: result.message,
+              completed,
+              total,
+            });
+          }
+        },
+      });
+
+      activeCloneAc = null;
+      return { success: true, results };
+    } catch (err) {
+      activeCloneAc = null;
+      if (err?.name === "AbortError") {
+        return { success: false, error: "Clone cancelled" };
+      }
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Cancel active clone operation
+  ipcMain.handle("cancel-clone", () => {
+    if (activeCloneAc) {
+      activeCloneAc.abort();
+      activeCloneAc = null;
+      return { success: true };
+    }
+    return { success: false, error: "No active clone" };
+  });
+
+  // Dry-run: compute clone targets without executing
+  ipcMain.handle("dry-run-projects", async (_event, { projects }) => {
+    if (!projects || projects.length === 0) {
+      return { success: true, targets: [] };
+    }
+
+    try {
+      const lib = await getCoreLib();
+      const store = await getStore();
+      const settings = store.get("settings", {});
+      const clonePath = settings.clonePath || resolveClonePath();
+
+      const config = { clonePath };
+      const targets = projects.map((project) => {
+        const { repoName, targetPath } = lib.buildCloneTarget(project, config);
+        const exists = fs.existsSync(targetPath);
+        return {
+          name: repoName,
+          targetPath,
+          status: exists ? "exists" : "new",
+        };
+      });
+
+      return { success: true, targets };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
   });
 }
 

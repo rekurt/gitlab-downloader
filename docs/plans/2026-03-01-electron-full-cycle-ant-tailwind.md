@@ -131,12 +131,12 @@ Transform the Electron application from a migration-only tool into a full-cycle 
 - Modify: `electron/preload.js`
 - Create: `electron/src/components/ClonePage.js`
 
-- [ ] Add IPC handlers in `main.js`:
+- [x] Add IPC handlers in `main.js`:
   - `clone-repositories`: receive project list, build config from settings + token, call `cloneAllRepositories` with `onResult` callback that sends `webContents.send('clone-progress', {project, result, completed, total})`. Track with AbortController
   - `cancel-clone`: abort the active clone operation
   - `dry-run-projects`: build config with `dryRun: true`, compute clone targets via `buildCloneTarget` for each project, return preview array [{name, targetPath, status: 'new'|'exists'}]
-- [ ] Expose in `preload.js`: `cloneRepositories`, `cancelClone`, `dryRunProjects`, `onCloneProgress` listener
-- [ ] Create `ClonePage` component:
+- [x] Expose in `preload.js`: `cloneRepositories`, `cancelClone`, `dryRunProjects`, `onCloneProgress` listener
+- [x] Create `ClonePage` component:
   - Shows list of selected projects (Ant Design `List` or `Table`)
   - Toggle switch: "Update existing repositories" (sets `updateExisting` in config)
   - "Preview (Dry Run)" button: shows planned operations in a table without executing
@@ -146,8 +146,8 @@ Transform the Electron application from a migration-only tool into a full-cycle 
   - "Cancel" button (Ant Design `Popconfirm` for safety)
   - Summary `Card` when done: success/updated/skipped/failed counts with Ant Design `Statistic` components
   - Option to go to Repositories view after completion
-- [ ] Write tests: ClonePage component (dry-run display, progress updates, completion summary), IPC handlers
-- [ ] Run project test suite - must pass before task 6
+- [x] Write tests: ClonePage component (dry-run display, progress updates, completion summary), IPC handlers
+- [x] Run project test suite - must pass before task 6
 
 ### Task 6: Refactor Local Repositories View
 

@@ -3,6 +3,7 @@ import { Spin } from "antd";
 import AppLayout from "./components/AppLayout";
 import SettingsPage from "./components/SettingsPage";
 import ProjectsPage from "./components/ProjectsPage";
+import ClonePage from "./components/ClonePage";
 import RepoList from "./components/RepoList";
 import MigrationWizard from "./components/MigrationWizard";
 
@@ -85,7 +86,11 @@ function App() {
       )}
 
       {currentView === "clone" && (
-        <div className="text-gray-500">Clone view (coming soon)</div>
+        <ClonePage
+          projects={selectedProjects}
+          settings={settings}
+          onNavigateToRepos={() => setCurrentView("repos")}
+        />
       )}
 
       {currentView === "repos" && (

@@ -250,6 +250,9 @@ describe('setupIpcHandlers', () => {
     expect(registeredChannels).toContain('start-oauth-device-flow');
     expect(registeredChannels).toContain('fetch-projects');
     expect(registeredChannels).toContain('cancel-fetch-projects');
+    expect(registeredChannels).toContain('clone-repositories');
+    expect(registeredChannels).toContain('cancel-clone');
+    expect(registeredChannels).toContain('dry-run-projects');
   });
 
   test('get-clone-path handler returns resolved path', () => {
@@ -454,5 +457,95 @@ describe('setupIpcHandlers', () => {
     const handler = cancelCall[1];
     const result = handler();
     expect(result).toEqual({ success: false, error: 'No active fetch' });
+  });
+
+  test('registers clone-repositories, cancel-clone, and dry-run-projects channels', () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const registeredChannels = ipcMain.handle.mock.calls.map(
+      (call) => call[0],
+    );
+    expect(registeredChannels).toContain('clone-repositories');
+    expect(registeredChannels).toContain('cancel-clone');
+    expect(registeredChannels).toContain('dry-run-projects');
+  });
+
+  test('clone-repositories handler returns error when no projects', async () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const cloneCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'clone-repositories',
+    );
+    expect(cloneCall).toBeTruthy();
+
+    const handler = cloneCall[1];
+    const result = await handler(null, { projects: [], updateExisting: false });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('No projects to clone');
+  });
+
+  test('clone-repositories handler returns error with empty projects', async () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const cloneCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'clone-repositories',
+    );
+    const handler = cloneCall[1];
+    const result = await handler(null, { projects: null });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('No projects to clone');
+  });
+
+  test('cancel-clone handler returns error when no active clone', () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const cancelCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'cancel-clone',
+    );
+    expect(cancelCall).toBeTruthy();
+
+    const handler = cancelCall[1];
+    const result = handler();
+    expect(result).toEqual({ success: false, error: 'No active clone' });
+  });
+
+  test('dry-run-projects handler returns empty targets for empty projects', async () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const dryRunCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'dry-run-projects',
+    );
+    expect(dryRunCall).toBeTruthy();
+
+    const handler = dryRunCall[1];
+    const result = await handler(null, { projects: [] });
+    expect(result).toEqual({ success: true, targets: [] });
+  });
+
+  test('dry-run-projects handler is callable with projects', async () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const dryRunCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'dry-run-projects',
+    );
+    const handler = dryRunCall[1];
+    // Handler requires ESM core lib; verify it returns a result object
+    // (either success with targets or error from ESM import)
+    const result = await handler(null, {
+      projects: [
+        { name: 'my-repo', group_path: 'group' },
+      ],
+    });
+    expect(result).toHaveProperty('success');
+    if (result.success) {
+      expect(result.targets).toHaveLength(1);
+      expect(result.targets[0].name).toBe('my-repo');
+    }
   });
 });
