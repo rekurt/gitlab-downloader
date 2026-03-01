@@ -53,10 +53,10 @@ Transform the Electron application from a migration-only tool into a full-cycle 
 - Create: `electron/src/components/AppLayout.js`
 - Create: `electron/src/components/SettingsPage.js`
 
-- [ ] Install `electron-store`
-- [ ] Create `AppLayout` component: Ant Design `Layout` + `Sider` with `Menu` (icons: SettingOutlined, CloudDownloadOutlined, FolderOutlined, SwapOutlined). 5 menu items: Settings, Projects, Clone, Repositories, Migration
-- [ ] Rewrite `App.js` to use `AppLayout` with state-based view switching (`currentView` state + `<AppLayout>` wrapper)
-- [ ] Create `SettingsPage` component with Ant Design `Form`:
+- [x] Install `electron-store`
+- [x] Create `AppLayout` component: Ant Design `Layout` + `Sider` with `Menu` (icons: SettingOutlined, CloudDownloadOutlined, FolderOutlined, SwapOutlined). 5 menu items: Settings, Projects, Clone, Repositories, Migration
+- [x] Rewrite `App.js` to use `AppLayout` with state-based view switching (`currentView` state + `<AppLayout>` wrapper)
+- [x] Create `SettingsPage` component with Ant Design `Form`:
   - GitLab URL (Input with URL validation)
   - Auth method (Radio: token / oauth)
   - Token input (Input.Password, shown when auth=token)
@@ -66,15 +66,15 @@ Transform the Electron application from a migration-only tool into a full-cycle 
   - Git auth mode (Radio: url / credential_helper)
   - "Test Connection" button (calls test-connection IPC, shows success/error result)
   - "Save" button
-- [ ] Add IPC handlers in `main.js`:
+- [x] Add IPC handlers in `main.js`:
   - `load-settings`: read from electron-store, return settings object
   - `save-settings`: validate with Zod schema, write to electron-store
   - `test-connection`: build config from settings, call `fetchJson` on `/api/v4/user` endpoint, return success/error
   - `select-directory`: use Electron `dialog.showOpenDialog` for clone path picker
-- [ ] Expose new IPC channels in `preload.js`: `loadSettings`, `saveSettings`, `testConnection`, `selectDirectory`
-- [ ] Load settings on app startup and pass to child views as context or props
-- [ ] Write tests: IPC handlers (load-settings, save-settings, test-connection), SettingsPage component render + form validation
-- [ ] Run project test suite - must pass before task 3
+- [x] Expose new IPC channels in `preload.js`: `loadSettings`, `saveSettings`, `testConnection`, `selectDirectory`
+- [x] Load settings on app startup and pass to child views as context or props
+- [x] Write tests: IPC handlers (load-settings, save-settings, test-connection), SettingsPage component render + form validation
+- [x] Run project test suite - must pass before task 3
 
 ### Task 3: Authentication - OAuth Device Flow UI
 

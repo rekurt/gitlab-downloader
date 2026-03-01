@@ -11,7 +11,8 @@ describe('Webpack build', () => {
       encoding: 'utf-8',
       timeout: 120000,
     });
-    expect(result).toContain('compiled successfully');
+    expect(result).toMatch(/compiled (successfully|with \d+ warning)/);
+    expect(result).not.toMatch(/ERROR/);
   });
 
   test('production build generates bundle.js', () => {

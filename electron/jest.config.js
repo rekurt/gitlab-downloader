@@ -9,6 +9,7 @@ module.exports = {
       displayName: 'components',
       testMatch: ['<rootDir>/__tests__/components/**/*.test.js'],
       testEnvironment: 'jsdom',
+      setupFiles: ['<rootDir>/__tests__/setup-jsdom.js'],
       transform: {
         '^.+\\.jsx?$': 'babel-jest',
       },

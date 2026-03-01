@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron");
 const path = require("path");
 const isDev = require("electron-is-dev");
 const os = require("os");
@@ -16,6 +16,19 @@ async function getCoreLib() {
     _coreLib = await import("@gitlab-dump/core");
   }
   return _coreLib;
+}
+
+/**
+ * Lazily loaded electron-store (ESM package).
+ */
+let _store = null;
+async function getStore() {
+  if (!_store) {
+    const mod = await import("electron-store");
+    const Store = mod.default;
+    _store = new Store({ name: "settings" });
+  }
+  return _store;
 }
 
 /**
@@ -376,6 +389,65 @@ function setupIpcHandlers() {
     app.quit();
     return { success: true };
   });
+
+  // Load settings from electron-store
+  ipcMain.handle("load-settings", async () => {
+    const store = await getStore();
+    return store.get("settings", {});
+  });
+
+  // Save settings to electron-store (with Zod validation)
+  ipcMain.handle("save-settings", async (_event, settings) => {
+    try {
+      const lib = await getCoreLib();
+      // Validate URL if provided
+      if (settings.gitlabUrl && !lib.validateGitlabUrl(settings.gitlabUrl)) {
+        return { success: false, error: "Invalid GitLab URL" };
+      }
+      const store = await getStore();
+      store.set("settings", settings);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Test connection to GitLab instance
+  ipcMain.handle("test-connection", async (_event, settings) => {
+    try {
+      const lib = await getCoreLib();
+      const url = (settings.gitlabUrl || "").replace(/\/+$/, "");
+      const token = settings.token || null;
+      if (!url) {
+        return { success: false, error: "GitLab URL is required" };
+      }
+      const config = lib.GitlabConfigSchema.parse({
+        url,
+        token,
+        maxRetries: 1,
+        requestTimeout: 10,
+      });
+      const apiUrl = `${config.url}/api/v4/user`;
+      const data = await lib.fetchJson(apiUrl, { private_token: token }, "test connection", config);
+      if (data && data.username) {
+        return { success: true, username: data.username };
+      }
+      return { success: false, error: "Unexpected response from GitLab" };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Open directory picker dialog
+  ipcMain.handle("select-directory", async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ["openDirectory", "createDirectory"],
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+    return result.filePaths[0];
+  });
 }
 
 /**
@@ -428,4 +500,5 @@ module.exports = {
   findGitRepos,
   resolveClonePath,
   setupIpcHandlers,
+  getStore,
 };

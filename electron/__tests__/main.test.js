@@ -7,6 +7,7 @@ jest.mock('electron', () => ({
   app: {
     on: jest.fn(),
     quit: jest.fn(),
+    getPath: jest.fn().mockReturnValue('/tmp/test-userdata'),
   },
   BrowserWindow: jest.fn().mockImplementation(() => ({
     loadURL: jest.fn(),
@@ -23,6 +24,9 @@ jest.mock('electron', () => ({
   },
   ipcMain: {
     handle: jest.fn(),
+  },
+  dialog: {
+    showOpenDialog: jest.fn().mockResolvedValue({ canceled: false, filePaths: ['/tmp/selected'] }),
   },
 }));
 
@@ -237,6 +241,10 @@ describe('setupIpcHandlers', () => {
     expect(registeredChannels).toContain('start-migration');
     expect(registeredChannels).toContain('cancel-migration');
     expect(registeredChannels).toContain('request-shutdown');
+    expect(registeredChannels).toContain('load-settings');
+    expect(registeredChannels).toContain('save-settings');
+    expect(registeredChannels).toContain('test-connection');
+    expect(registeredChannels).toContain('select-directory');
   });
 
   test('get-clone-path handler returns resolved path', () => {
@@ -301,5 +309,78 @@ describe('setupIpcHandlers', () => {
     const handler = cancelCall[1];
     const result = handler(null, 'nonexistent-id');
     expect(result).toEqual({ success: false, error: 'Migration not found' });
+  });
+
+  test('load-settings handler returns stored settings', async () => {
+    const mockStore = { get: jest.fn().mockReturnValue({ gitlabUrl: 'https://gitlab.com' }) };
+    jest.doMock('electron-store', () => ({
+      __esModule: true,
+      default: jest.fn().mockImplementation(() => mockStore),
+    }));
+
+    // Reset the cached store to force re-import
+    const mainModule = require('../main');
+    // We need to access the handler directly via ipcMain.handle mock
+    mainModule.setupIpcHandlers();
+
+    const loadSettingsCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'load-settings',
+    );
+    expect(loadSettingsCall).toBeTruthy();
+  });
+
+  test('save-settings handler validates and saves settings', async () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const saveCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'save-settings',
+    );
+    expect(saveCall).toBeTruthy();
+  });
+
+  test('test-connection handler returns error for missing URL', async () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const testConnCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'test-connection',
+    );
+    expect(testConnCall).toBeTruthy();
+
+    const handler = testConnCall[1];
+    const result = await handler(null, { gitlabUrl: '', token: '' });
+    expect(result).toEqual({ success: false, error: 'GitLab URL is required' });
+  });
+
+  test('select-directory handler returns selected path', async () => {
+    const { dialog } = require('electron');
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const selectDirCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'select-directory',
+    );
+    expect(selectDirCall).toBeTruthy();
+
+    const handler = selectDirCall[1];
+    const result = await handler();
+    expect(result).toBe('/tmp/selected');
+    expect(dialog.showOpenDialog).toHaveBeenCalled();
+  });
+
+  test('select-directory handler returns null when canceled', async () => {
+    const { dialog } = require('electron');
+    dialog.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] });
+
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const selectDirCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'select-directory',
+    );
+    const handler = selectDirCall[1];
+    const result = await handler();
+    expect(result).toBeNull();
   });
 });

@@ -69,6 +69,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
   requestShutdown: () => ipcRenderer.invoke('request-shutdown'),
 
   /**
+   * Load application settings from persistent store
+   * @returns {Promise<object>}
+   */
+  loadSettings: () => ipcRenderer.invoke('load-settings'),
+
+  /**
+   * Save application settings to persistent store
+   * @param {object} settings
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
+
+  /**
+   * Test connection to GitLab instance
+   * @param {object} settings - { gitlabUrl, token }
+   * @returns {Promise<{success: boolean, username?: string, error?: string}>}
+   */
+  testConnection: (settings) => ipcRenderer.invoke('test-connection', settings),
+
+  /**
+   * Open directory picker dialog
+   * @returns {Promise<string|null>}
+   */
+  selectDirectory: () => ipcRenderer.invoke('select-directory'),
+
+  /**
    * Listen for messages from the main process
    */
   on: (channel, func) => {
