@@ -192,6 +192,11 @@ function createMenu() {
 const activeMigrations = new Map();
 
 /**
+ * Active fetch operations abort controller (only one at a time).
+ */
+let activeFetchAc = null;
+
+/**
  * IPC handlers for frontend communication
  */
 function setupIpcHandlers() {
@@ -517,6 +522,69 @@ function setupIpcHandlers() {
       return null;
     }
     return result.filePaths[0];
+  });
+
+  // Fetch projects from GitLab (group or user membership)
+  ipcMain.handle("fetch-projects", async (_event, { group } = {}) => {
+    try {
+      const lib = await getCoreLib();
+      const store = await getStore();
+      const settings = store.get("settings", {});
+      const url = (settings.gitlabUrl || "").replace(/\/+$/, "");
+      const token = settings.oauthToken || settings.token || null;
+
+      if (!url) {
+        return { success: false, error: "GitLab URL is required" };
+      }
+      if (!token) {
+        return { success: false, error: "Authentication token is required" };
+      }
+
+      const groupValue = group || settings.group || null;
+      const config = lib.GitlabConfigSchema.parse({
+        url,
+        token,
+        group: groupValue || undefined,
+        maxRetries: 3,
+        requestTimeout: 30,
+      });
+
+      const ac = new AbortController();
+      activeFetchAc = ac;
+
+      let projects;
+      if (groupValue) {
+        const metadata = await lib.fetchGroupMetadata(config, {
+          signal: ac.signal,
+        });
+        projects = await lib.getAllProjects(
+          config,
+          metadata.full_path || groupValue,
+          { signal: ac.signal },
+        );
+      } else {
+        projects = await lib.getUserProjects(config, { signal: ac.signal });
+      }
+
+      activeFetchAc = null;
+      return { success: true, projects };
+    } catch (err) {
+      activeFetchAc = null;
+      if (err?.name === "AbortError") {
+        return { success: false, error: "Fetch cancelled" };
+      }
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Cancel active project fetch
+  ipcMain.handle("cancel-fetch-projects", () => {
+    if (activeFetchAc) {
+      activeFetchAc.abort();
+      activeFetchAc = null;
+      return { success: true };
+    }
+    return { success: false, error: "No active fetch" };
   });
 }
 

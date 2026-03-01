@@ -248,6 +248,8 @@ describe('setupIpcHandlers', () => {
     expect(registeredChannels).toContain('test-connection');
     expect(registeredChannels).toContain('select-directory');
     expect(registeredChannels).toContain('start-oauth-device-flow');
+    expect(registeredChannels).toContain('fetch-projects');
+    expect(registeredChannels).toContain('cancel-fetch-projects');
   });
 
   test('get-clone-path handler returns resolved path', () => {
@@ -412,5 +414,45 @@ describe('setupIpcHandlers', () => {
     const handler = selectDirCall[1];
     const result = await handler();
     expect(result).toBeNull();
+  });
+
+  test('fetch-projects handler is registered', () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const registeredChannels = ipcMain.handle.mock.calls.map(
+      (call) => call[0],
+    );
+    expect(registeredChannels).toContain('fetch-projects');
+    expect(registeredChannels).toContain('cancel-fetch-projects');
+  });
+
+  test('fetch-projects handler returns error when URL missing', async () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const fetchCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'fetch-projects',
+    );
+    expect(fetchCall).toBeTruthy();
+
+    const handler = fetchCall[1];
+    const result = await handler(null, {});
+    expect(result.success).toBe(false);
+    expect(result.error).toBeTruthy();
+  });
+
+  test('cancel-fetch-projects handler returns error when no active fetch', () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const cancelCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'cancel-fetch-projects',
+    );
+    expect(cancelCall).toBeTruthy();
+
+    const handler = cancelCall[1];
+    const result = handler();
+    expect(result).toEqual({ success: false, error: 'No active fetch' });
   });
 });

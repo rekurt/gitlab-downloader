@@ -95,6 +95,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
 
   /**
+   * Fetch projects from GitLab (group or user membership)
+   * @param {object} [params] - { group?: string }
+   * @returns {Promise<{success: boolean, projects?: Array, error?: string}>}
+   */
+  fetchProjects: (params) => ipcRenderer.invoke('fetch-projects', params),
+
+  /**
+   * Cancel active project fetch
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  cancelFetchProjects: () => ipcRenderer.invoke('cancel-fetch-projects'),
+
+  /**
    * Start OAuth Device Flow authorization
    * @returns {Promise<{success: boolean, verificationUri?: string, userCode?: string, verificationUriComplete?: string, error?: string}>}
    */

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Spin } from "antd";
 import AppLayout from "./components/AppLayout";
 import SettingsPage from "./components/SettingsPage";
+import ProjectsPage from "./components/ProjectsPage";
 import RepoList from "./components/RepoList";
 import MigrationWizard from "./components/MigrationWizard";
 
@@ -9,6 +10,7 @@ function App() {
   const [currentView, setCurrentView] = useState("settings");
   const [settings, setSettings] = useState(null);
   const [selectedRepo, setSelectedRepo] = useState(null);
+  const [selectedProjects, setSelectedProjects] = useState([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -49,6 +51,11 @@ function App() {
     setCurrentView("migration");
   }, []);
 
+  const handleCloneSelected = useCallback((projects) => {
+    setSelectedProjects(projects);
+    setCurrentView("clone");
+  }, []);
+
   const handleMigrationComplete = useCallback(() => {
     setCurrentView("repos");
     setSelectedRepo(null);
@@ -71,7 +78,10 @@ function App() {
       )}
 
       {currentView === "projects" && (
-        <div className="text-gray-500">Projects view (coming soon)</div>
+        <ProjectsPage
+          settings={settings}
+          onCloneSelected={handleCloneSelected}
+        />
       )}
 
       {currentView === "clone" && (

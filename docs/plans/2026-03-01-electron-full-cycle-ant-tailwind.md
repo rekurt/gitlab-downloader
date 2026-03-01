@@ -109,11 +109,11 @@ Transform the Electron application from a migration-only tool into a full-cycle 
 - Modify: `electron/preload.js`
 - Create: `electron/src/components/ProjectsPage.js`
 
-- [ ] Add IPC handlers in `main.js`:
+- [x] Add IPC handlers in `main.js`:
   - `fetch-projects`: build config from stored settings + resolved token, optionally call `fetchGroupMetadata` + `getAllProjects` (if group set) or `getUserProjects` (if no group). Return array of project objects
   - Cancel support: track active fetch with AbortController, add `cancel-fetch-projects` handler
-- [ ] Expose in `preload.js`: `fetchProjects`, `cancelFetchProjects`
-- [ ] Create `ProjectsPage` component:
+- [x] Expose in `preload.js`: `fetchProjects`, `cancelFetchProjects`
+- [x] Create `ProjectsPage` component:
   - "Load Projects" button (with loading spinner via Ant Design `Button` loading state)
   - Optional group input field (if not set in settings, allow override here)
   - Ant Design `Table` with columns: name, path_with_namespace, http_url_to_repo (truncated), last_activity_at (formatted date)
@@ -121,8 +121,8 @@ Transform the Electron application from a migration-only tool into a full-cycle 
   - Search input to filter table rows by name
   - Footer: "{N} projects selected" + "Clone Selected" button
   - "Clone Selected" passes selected projects to clone view via App-level state
-- [ ] Write tests: ProjectsPage component (loading state, table render, selection, search filter), IPC handlers
-- [ ] Run project test suite - must pass before task 5
+- [x] Write tests: ProjectsPage component (loading state, table render, selection, search filter), IPC handlers
+- [x] Run project test suite - must pass before task 5
 
 ### Task 5: Clone & Update Operations
 
