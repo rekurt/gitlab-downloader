@@ -39,12 +39,23 @@ gitlab-dump/
 │   ├── preload.js                 # IPC bridge (secure channel whitelist)
 │   ├── env.js                     # Environment configuration
 │   ├── src/
-│   │   ├── App.js                 # Main React component
-│   │   ├── App.css                # App styling
-│   │   ├── components/            # React components (IPC-based, no HTTP)
-│   │   └── styles/                # CSS modules
+│   │   ├── App.js                 # Main React component (view switching)
+│   │   ├── components/            # React components (Ant Design + Tailwind CSS)
+│   │   │   ├── AppLayout.js       # Layout with sidebar navigation
+│   │   │   ├── SettingsPage.js    # Settings form with persistent storage
+│   │   │   ├── OAuthDeviceFlow.js # OAuth Device Flow authorization
+│   │   │   ├── ProjectsPage.js    # GitLab projects browser
+│   │   │   ├── ClonePage.js       # Clone/update operations with progress
+│   │   │   ├── RepoList.js        # Local repositories list
+│   │   │   ├── MigrationWizard.js # Step-by-step migration wizard
+│   │   │   ├── AuthorMapper.js    # Author/committer mapping editor
+│   │   │   └── ProgressIndicator.js # Migration progress indicator
+│   │   └── styles/
+│   │       └── globals.css        # Tailwind directives + Ant Design reset
+│   ├── tailwind.config.js         # Tailwind CSS configuration
+│   ├── postcss.config.js          # PostCSS configuration
 │   ├── package.json               # Node dependencies
-│   ├── webpack.config.js          # Webpack configuration
+│   ├── webpack.config.js          # Webpack configuration (+ postcss-loader)
 │   ├── electron-builder.config.js # Electron build config
 │   ├── __tests__/                 # Jest tests
 │   └── README.md                  # Electron-specific documentation
@@ -74,6 +85,9 @@ gitlab-dump/
 - **dotenv**: Environment variable loading
 - **Electron**: Cross-platform desktop GUI framework
 - **React**: Frontend UI library for Electron app
+- **Ant Design (antd)**: UI component library for Electron app
+- **Tailwind CSS**: Utility-first CSS framework for Electron app
+- **electron-store**: Persistent settings storage for Electron app
 - **Webpack**: Module bundler for Electron renderer
 - **electron-builder**: Electron application packaging
 - **Jest**: Testing framework
@@ -168,8 +182,11 @@ Container configuration for running the application in Docker.
 ### Frontend (Electron/React)
 - Functional components with hooks
 - IPC communication via `window.electronAPI` (preload bridge)
-- CSS modules for styling
+- Ant Design components for UI elements (Table, Form, Steps, Progress, etc.)
+- Tailwind CSS utility classes for layout and spacing
+- No CSS modules — use `globals.css` with Tailwind directives
 - No HTTP calls — all data flows through IPC
+- Settings persisted via `electron-store` (loaded on startup)
 
 ## Running the Application
 
@@ -256,8 +273,10 @@ Output: `electron/dist_electron/` with platform-specific installers
 ### Electron IPC Design
 - Preload script exposes whitelisted IPC channels via `contextBridge`
 - Main process registers `ipcMain.handle()` for each channel
-- Migration progress delivered via `webContents.send()` events
-- Active migrations tracked with AbortControllers for cancellation
+- Progress events delivered via `webContents.send()`: `migration-progress`, `oauth-progress`, `clone-progress`
+- Active operations (migrations, fetches, clones) tracked with AbortControllers for cancellation
+- `electron-store` used for persistent settings (lazy ESM import via `getStore()`)
+- Core library (`@gitlab-dump/core`) loaded via lazy ESM import (`getCoreLib()`)
 
 ## Troubleshooting
 
@@ -322,7 +341,7 @@ All checks must pass before merging to main branch.
 
 ### Frontend Changes (Electron)
 1. Modify React components in `electron/src/components/`
-2. Update styles in `electron/src/styles/`
+2. Use Ant Design components for UI elements, Tailwind CSS for utilities
 3. Test in development mode: `npm run dev`
 4. Build and test final package: `npm run dist`
 

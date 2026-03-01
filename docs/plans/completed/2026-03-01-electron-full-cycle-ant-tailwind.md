@@ -208,6 +208,6 @@ Transform the Electron application from a migration-only tool into a full-cycle 
 
 ### Task 9: Update documentation
 
-- [ ] Update `electron/README.md` with new features and dependencies
-- [ ] Update `CLAUDE.md` if internal patterns changed (new IPC channels, new components)
-- [ ] Move this plan to `docs/plans/completed/`
+- [x] Update `electron/README.md` with new features and dependencies
+- [x] Update `CLAUDE.md` if internal patterns changed (new IPC channels, new components)
+- [x] Move this plan to `docs/plans/completed/`

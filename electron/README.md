@@ -2,7 +2,7 @@
 
 ## Обзор
 
-Десктопное приложение на базе Electron для управления репозиториями GitLab и миграции данных. Предоставляет удобный графический интерфейс для настройки и выполнения операций GitLab Dump. Использует общую Node.js-библиотеку (`lib/`) напрямую через IPC, без внешнего серверного процесса.
+Десктопное приложение на базе Electron для полного цикла работы с репозиториями GitLab: аутентификация, просмотр проектов, клонирование, обновление и миграция данных. Предоставляет графический интерфейс на базе Ant Design + Tailwind CSS. Использует общую Node.js-библиотеку (`lib/`) напрямую через IPC, без внешнего серверного процесса. Настройки сохраняются между сессиями через `electron-store`.
 
 Поддерживаемые платформы: Windows (портативный .exe), macOS (app bundle), Linux (AppImage).
 
@@ -36,22 +36,29 @@ Renderer-процесс общается с main-процессом через I
 ```
 electron/
 ├── main.js                 # Основной процесс Electron (IPC-обработчики → lib/)
-├── preload.js             # Безопасный IPC-мост к renderer
+├── preload.js             # Безопасный IPC-мост к renderer (белый список каналов)
 ├── env.js                 # Конфигурация окружения
-├── webpack.config.js      # Конфигурация Webpack
+├── webpack.config.js      # Конфигурация Webpack (Babel + PostCSS + Tailwind)
+├── tailwind.config.js     # Конфигурация Tailwind CSS
+├── postcss.config.js      # Конфигурация PostCSS
 ├── package.json           # Зависимости и npm-скрипты
 ├── electron-builder.config.js  # Конфигурация сборки дистрибутивов
 ├── src/                   # Исходники React-приложения
 │   ├── index.js          # Точка входа
-│   ├── App.js            # Главный компонент
-│   ├── App.css           # Основные стили
+│   ├── App.js            # Главный компонент (навигация между видами)
 │   ├── index.html        # HTML-шаблон
-│   ├── components/       # React-компоненты
-│   │   ├── AuthorMapper.js
-│   │   ├── MigrationWizard.js
-│   │   ├── ProgressIndicator.js
-│   │   └── RepoList.js
-│   └── styles/           # Стили компонентов
+│   ├── components/       # React-компоненты (Ant Design)
+│   │   ├── AppLayout.js         # Общий layout с боковым меню
+│   │   ├── SettingsPage.js      # Настройки: URL, токен, OAuth, пути
+│   │   ├── OAuthDeviceFlow.js   # OAuth Device Flow авторизация
+│   │   ├── ProjectsPage.js      # Браузер проектов GitLab
+│   │   ├── ClonePage.js         # Клонирование и обновление репозиториев
+│   │   ├── RepoList.js          # Список локальных репозиториев
+│   │   ├── MigrationWizard.js   # Пошаговый визард миграции
+│   │   ├── AuthorMapper.js      # Маппинг авторов/коммитеров
+│   │   └── ProgressIndicator.js # Индикатор прогресса миграции
+│   └── styles/
+│       └── globals.css   # Tailwind CSS директивы + Ant Design reset
 ├── __tests__/            # Jest-тесты
 ├── dist/                 # Результат сборки Webpack
 ├── dist_electron/        # Результат сборки electron-builder
@@ -180,27 +187,76 @@ npm run dist-mac
 
 ## UI-компоненты
 
-### AuthorMapper
-Маппинг пользователей GitLab на Git-авторов для корректной атрибуции коммитов при миграции.
+Все компоненты используют Ant Design для UI-элементов и Tailwind CSS для утилитарных стилей.
 
-### MigrationWizard
-Пошаговый визард для миграции:
-- Выбор репозиториев
-- Настройка учётных данных
-- Параметры миграции
-- Отслеживание прогресса
+### AppLayout
+Общий layout приложения: Ant Design `Layout` + `Sider` с `Menu`. Боковое меню с 5 пунктами навигации: Settings, Projects, Clone, Repositories, Migration.
 
-### ProgressIndicator
-Отслеживание прогресса в реальном времени с обновлениями статуса, обработкой ошибок и уведомлениями о завершении. Получает обновления через IPC-события от main-процесса.
+### SettingsPage
+Страница настроек приложения (Ant Design `Form`):
+- GitLab URL, метод авторизации (token / OAuth), токен или OAuth Client ID
+- Путь клонирования (с диалогом выбора папки), лимит конкурентности, режим git-авторизации
+- Кнопки "Test Connection" и "Save"
+- Настройки сохраняются в `electron-store` между сессиями
+
+### OAuthDeviceFlow
+OAuth Device Flow авторизация:
+- Отображает verification URL (ссылка) и user code (крупный текст для копирования)
+- Ant Design `Spin` при ожидании подтверждения
+- Автоматическое сохранение токена при успехе
+
+### ProjectsPage
+Браузер проектов GitLab:
+- Загрузка проектов по группе или по членству пользователя
+- Ant Design `Table` с колонками: имя, путь, URL, дата активности
+- Выбор проектов чекбоксами, поиск по имени
+- Кнопка "Clone Selected" для перехода к клонированию
+
+### ClonePage
+Клонирование и обновление репозиториев:
+- Dry-run (предпросмотр) перед выполнением
+- Переключатель "Update existing repositories"
+- Ant Design `Table` с динамическим статусом (pending/cloning/success/updated/skipped/failed)
+- Общий `Progress` bar, кнопка отмены с подтверждением
+- Итоговая статистика (Ant Design `Statistic`)
 
 ### RepoList
-Список доступных репозиториев, просканированных из локальной директории клонов, с фильтрацией и выбором.
+Список локальных репозиториев (Ant Design `Table`):
+- Колонки: имя, remote URL, локальный путь, дата обновления, действия
+- Действия: Update (обновить), Migrate (перейти к миграции), Open folder (открыть в файловом менеджере)
+- Поиск по имени, пустое состояние (Ant Design `Empty`)
+
+### MigrationWizard
+Пошаговый визард миграции (Ant Design `Steps`, 4 шага):
+- Step 1: Author Mappings — настройка маппинга авторов/коммитеров
+- Step 2: Review & Confirm — просмотр маппингов перед миграцией
+- Step 3: Progress — отслеживание прогресса миграции в реальном времени
+- Step 4: Complete — результат миграции
+
+### AuthorMapper
+Маппинг авторов/коммитеров (Ant Design `Form` + `Form.List`):
+- Динамический список маппингов: тип (author/committer), оригинальное и новое имя/email
+- Добавление/удаление маппингов, валидация полей
+
+### ProgressIndicator
+Индикатор прогресса миграции:
+- Ant Design `Progress` (процентный или индетерминантный режим)
+- Текущая задача, лог сообщений (`List`), кнопка отмены
 
 ## IPC-каналы
 
 ### Renderer → Main (через preload)
 
 **Invoke-обработчики (запрос-ответ):**
+
+Настройки и аутентификация:
+- `load-settings`: загрузить настройки из electron-store
+- `save-settings`: валидировать и сохранить настройки в electron-store
+- `test-connection`: проверить подключение к GitLab (вызов `/api/v4/user`)
+- `select-directory`: открыть диалог выбора папки (для пути клонирования)
+- `start-oauth-device-flow`: запустить OAuth Device Flow авторизацию
+
+Репозитории и миграция (legacy):
 - `get-clone-path`: получить директорию хранения репозиториев
 - `get-repos`: просканировать директорию и получить список git-репозиториев
 - `get-author-mappings`: загрузить маппинг авторов/коммитеров из конфигурации
@@ -209,11 +265,23 @@ npm run dist-mac
 - `save-config`: сохранить конфигурацию миграции в репозиторий
 - `start-migration`: запустить асинхронную миграцию, возвращает migrationId
 - `cancel-migration`: отменить запущенную миграцию по ID
+
+Проекты и клонирование:
+- `fetch-projects`: загрузить проекты из GitLab (по группе или пользователю)
+- `cancel-fetch-projects`: отменить активную загрузку проектов
+- `clone-repositories`: клонировать/обновить репозитории с прогрессом
+- `cancel-clone`: отменить активное клонирование
+- `dry-run-projects`: вычислить цели клонирования без выполнения
+
+Системные:
+- `open-path`: открыть путь в файловом менеджере (shell.openPath)
 - `request-shutdown`: запросить корректное завершение приложения
 
 ### Main → Renderer (события)
 
 - `migration-progress`: обновления прогресса миграции в реальном времени
+- `oauth-progress`: обновления OAuth Device Flow (status, token, message)
+- `clone-progress`: обновления прогресса клонирования (project, result, completed, total)
 
 ### Каналы управления окном
 
@@ -247,7 +315,7 @@ npm run dist-mac
 
 `webpack.config.js` обрабатывает:
 - Бандлинг React-компонентов через Babel
-- Обработка CSS-модулей
+- CSS pipeline: style-loader → css-loader → postcss-loader (Tailwind CSS + autoprefixer)
 - Генерация HTML-шаблонов через HtmlWebpackPlugin
 - Конфигурация dev-сервера
 
@@ -321,12 +389,21 @@ make electron-test
 
 ## Зависимости
 
+Runtime:
 - **React 18.2**: UI-фреймворк
+- **Ant Design 6**: библиотека UI-компонентов
+- **@ant-design/icons 6**: иконки для Ant Design
+- **electron-store 11**: persistent хранилище настроек (ESM)
 - **Electron 27**: десктопный фреймворк
+- **@gitlab-dump/core**: общая core-библиотека (lib/)
+- **Zod 3**: валидация настроек
+
+Dev:
+- **Tailwind CSS 4**: утилитарные CSS-классы
+- **PostCSS 8** + **autoprefixer**: CSS post-processing
 - **Webpack 5**: бандлер модулей
 - **Babel 7**: JavaScript-транспилятор
 - **electron-builder 24**: сборка дистрибутивов
-- **@gitlab-dump/core**: общая core-библиотека (lib/)
 
 Полный список зависимостей и версий см. в `package.json`.
 
