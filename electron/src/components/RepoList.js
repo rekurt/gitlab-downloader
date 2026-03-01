@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import '../styles/RepoList.css';
+
 
 function RepoList({ clonePath, onSelectRepo, onMigrationStart }) {
   const [repos, setRepos] = useState([]);

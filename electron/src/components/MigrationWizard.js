@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import AuthorMapper from './AuthorMapper';
 import ProgressIndicator from './ProgressIndicator';
-import '../styles/MigrationWizard.css';
+
 
 function MigrationWizard({ repo, onComplete, onCancel }) {
   const [step, setStep] = useState(1);

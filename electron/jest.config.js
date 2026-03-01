@@ -16,5 +16,10 @@ module.exports = {
         '\\.css$': '<rootDir>/__tests__/__mocks__/styleMock.js',
       },
     },
+    {
+      displayName: 'build',
+      testMatch: ['<rootDir>/__tests__/build.test.js'],
+      testEnvironment: 'node',
+    },
   ],
 };

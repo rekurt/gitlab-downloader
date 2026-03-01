@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import '../styles/AuthorMapper.css';
+
 
 function AuthorMapper({ onSave, onCancel }) {
   const [mappings, setMappings] = useState([

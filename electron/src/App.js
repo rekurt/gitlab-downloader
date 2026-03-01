@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import RepoList from "./components/RepoList";
 import MigrationWizard from "./components/MigrationWizard";
-import "./App.css";
+
 
 function App() {
   const [clonePath, setClonePath] = useState("");
