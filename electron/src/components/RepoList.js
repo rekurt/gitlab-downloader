@@ -1,11 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Table,
+  Input,
+  Button,
+  Space,
+  Tooltip,
+  Empty,
+  Typography,
+  App,
+  Tag,
+} from 'antd';
+import {
+  SyncOutlined,
+  SwapOutlined,
+  FolderOpenOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons';
 
+const { Title, Text } = Typography;
 
 function RepoList({ clonePath, onSelectRepo, onMigrationStart }) {
   const [repos, setRepos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedRepo, setSelectedRepo] = useState(null);
+  const [searchText, setSearchText] = useState('');
+  const [updatingRepos, setUpdatingRepos] = useState(new Set());
+  const { message } = App.useApp();
 
   const fetchRepos = async () => {
     try {
@@ -33,83 +53,197 @@ function RepoList({ clonePath, onSelectRepo, onMigrationStart }) {
     return () => clearInterval(interval);
   }, [clonePath]);
 
-  const handleSelectRepo = (repo) => {
-    setSelectedRepo(repo);
-    if (onSelectRepo) {
-      onSelectRepo(repo);
+  const handleUpdate = async (repo) => {
+    setUpdatingRepos((prev) => new Set([...prev, repo.path]));
+    try {
+      const project = {
+        name: repo.name,
+        path_with_namespace: repo.name,
+        http_url_to_repo: repo.url,
+      };
+      await window.electronAPI.cloneRepositories({
+        projects: [project],
+        updateExisting: true,
+      });
+      message.success(`${repo.name} updated`);
+      fetchRepos();
+    } catch (err) {
+      message.error(`Failed to update ${repo.name}: ${err.message}`);
+    } finally {
+      setUpdatingRepos((prev) => {
+        const next = new Set(prev);
+        next.delete(repo.path);
+        return next;
+      });
     }
   };
 
-  const handleMigrate = () => {
-    if (selectedRepo && onMigrationStart) {
-      onMigrationStart(selectedRepo);
+  const handleMigrate = (repo) => {
+    if (onSelectRepo) onSelectRepo(repo);
+    if (onMigrationStart) onMigrationStart(repo);
+  };
+
+  const handleOpenFolder = async (repo) => {
+    try {
+      await window.electronAPI.openPath(repo.path);
+    } catch (err) {
+      message.error(`Failed to open folder: ${err.message}`);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="repo-list-container">
-        <div className="repo-list-loading">Loading repositories...</div>
-      </div>
+  const filteredRepos = useMemo(() => {
+    if (!searchText) return repos;
+    const lower = searchText.toLowerCase();
+    return repos.filter(
+      (r) =>
+        r.name.toLowerCase().includes(lower) ||
+        (r.url && r.url.toLowerCase().includes(lower)),
     );
-  }
+  }, [repos, searchText]);
+
+  const columns = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      sorter: (a, b) => a.name.localeCompare(b.name),
+    },
+    {
+      title: 'Remote URL',
+      dataIndex: 'url',
+      key: 'url',
+      ellipsis: true,
+      render: (url) => (
+        <Text copyable={{ text: url }} className="text-xs">
+          {url}
+        </Text>
+      ),
+    },
+    {
+      title: 'Local Path',
+      dataIndex: 'path',
+      key: 'path',
+      ellipsis: true,
+      render: (p) => (
+        <Text copyable={{ text: p }} className="text-xs">
+          {p}
+        </Text>
+      ),
+    },
+    {
+      title: 'Last Updated',
+      dataIndex: 'last_updated',
+      key: 'last_updated',
+      width: 180,
+      sorter: (a, b) => {
+        const da = a.last_updated ? new Date(a.last_updated) : new Date(0);
+        const db = b.last_updated ? new Date(b.last_updated) : new Date(0);
+        return da - db;
+      },
+      render: (val) =>
+        val ? (
+          <Tag>{new Date(val).toLocaleString()}</Tag>
+        ) : (
+          <Tag color="default">Unknown</Tag>
+        ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 150,
+      render: (_, record) => (
+        <Space>
+          <Tooltip title="Update (pull)">
+            <Button
+              type="text"
+              size="small"
+              icon={<SyncOutlined spin={updatingRepos.has(record.path)} />}
+              loading={updatingRepos.has(record.path)}
+              onClick={() => handleUpdate(record)}
+              data-testid={`update-btn-${record.name}`}
+            />
+          </Tooltip>
+          <Tooltip title="Migrate">
+            <Button
+              type="text"
+              size="small"
+              icon={<SwapOutlined />}
+              onClick={() => handleMigrate(record)}
+              data-testid={`migrate-btn-${record.name}`}
+            />
+          </Tooltip>
+          <Tooltip title="Open folder">
+            <Button
+              type="text"
+              size="small"
+              icon={<FolderOpenOutlined />}
+              onClick={() => handleOpenFolder(record)}
+              data-testid={`open-btn-${record.name}`}
+            />
+          </Tooltip>
+        </Space>
+      ),
+    },
+  ];
 
   if (error) {
     return (
-      <div className="repo-list-container">
-        <div className="repo-list-error">
-          <p>Error loading repositories: {error}</p>
-          <button onClick={fetchRepos}>Retry</button>
+      <div className="p-6" data-testid="repo-list-error">
+        <Title level={4}>Local Repositories</Title>
+        <div className="text-red-500 mb-4">
+          Error loading repositories: {error}
         </div>
+        <Button icon={<ReloadOutlined />} onClick={fetchRepos}>
+          Retry
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="repo-list-container">
-      <div className="repo-list-header">
-        <h2>Cloned Repositories</h2>
-        <span className="repo-count">{repos.length} repositories</span>
+    <div className="p-6" data-testid="repo-list">
+      <div className="flex items-center justify-between mb-4">
+        <Title level={4} className="!mb-0">
+          Local Repositories
+        </Title>
+        <Space>
+          <Text type="secondary">{repos.length} repositories</Text>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={fetchRepos}
+            loading={loading}
+            data-testid="refresh-btn"
+          >
+            Refresh
+          </Button>
+        </Space>
       </div>
 
-      {repos.length === 0 ? (
-        <div className="repo-list-empty">
-          <p>No repositories cloned yet.</p>
-          <p>Use the CLI to clone repositories first.</p>
-        </div>
-      ) : (
-        <>
-          <div className="repo-list">
-            {repos.map((repo) => (
-              <div
-                key={repo.path}
-                className={`repo-item ${selectedRepo?.path === repo.path ? 'selected' : ''}`}
-                onClick={() => handleSelectRepo(repo)}
-              >
-                <div className="repo-name">{repo.name}</div>
-                <div className="repo-url">{repo.url}</div>
-                <div className="repo-path">{repo.path}</div>
-                {repo.last_updated && (
-                  <div className="repo-updated">
-                    Updated: {new Date(repo.last_updated).toLocaleString()}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+      <Input.Search
+        placeholder="Search by name or URL..."
+        value={searchText}
+        onChange={(e) => setSearchText(e.target.value)}
+        className="mb-4"
+        allowClear
+        data-testid="search-input"
+      />
 
-          {selectedRepo && (
-            <div className="repo-actions">
-              <button
-                className="btn-migrate"
-                onClick={handleMigrate}
-              >
-                Start Migration
-              </button>
-            </div>
-          )}
-        </>
-      )}
+      <Table
+        columns={columns}
+        dataSource={filteredRepos}
+        rowKey="path"
+        loading={loading}
+        size="small"
+        pagination={{ pageSize: 20, showSizeChanger: true }}
+        locale={{
+          emptyText: (
+            <Empty
+              description="No repositories found. Clone projects first."
+              data-testid="empty-state"
+            />
+          ),
+        }}
+      />
     </div>
   );
 }

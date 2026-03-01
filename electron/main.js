@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require("electron");
 const path = require("path");
 const isDev = require("electron-is-dev");
 const os = require("os");
@@ -527,6 +527,22 @@ function setupIpcHandlers() {
       return null;
     }
     return result.filePaths[0];
+  });
+
+  // Open a path in the system file manager
+  ipcMain.handle("open-path", async (_event, targetPath) => {
+    if (!targetPath) {
+      return { success: false, error: "Path is required" };
+    }
+    try {
+      const result = await shell.openPath(targetPath);
+      if (result) {
+        return { success: false, error: result };
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
   });
 
   // Fetch projects from GitLab (group or user membership)

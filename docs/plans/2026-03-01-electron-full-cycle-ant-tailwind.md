@@ -154,7 +154,7 @@ Transform the Electron application from a migration-only tool into a full-cycle 
 **Files:**
 - Modify: `electron/src/components/RepoList.js`
 
-- [ ] Rewrite RepoList using Ant Design `Table`:
+- [x] Rewrite RepoList using Ant Design `Table`:
   - Columns: name, remote URL (ellipsis), local path (ellipsis), last updated (formatted), actions
   - Actions column with Ant Design `Space` + `Button`/`Tooltip`: Update (SyncOutlined), Migrate (SwapOutlined), Open folder (FolderOpenOutlined)
   - "Update" action: call IPC to pull single repo (reuse clone-repositories handler with single project + updateExisting=true)
@@ -162,11 +162,11 @@ Transform the Electron application from a migration-only tool into a full-cycle 
   - "Open folder" action: call `shell.openPath` via new IPC handler `open-path`
   - Search input (Ant Design `Input.Search`) to filter by repo name
   - Empty state with Ant Design `Empty` component
-- [ ] Add `open-path` IPC handler in `main.js` (uses `shell.openPath`)
-- [ ] Expose `openPath` in `preload.js`
-- [ ] Remove old CSS import
-- [ ] Update existing RepoList tests for new component structure
-- [ ] Run project test suite - must pass before task 7
+- [x] Add `open-path` IPC handler in `main.js` (uses `shell.openPath`)
+- [x] Expose `openPath` in `preload.js`
+- [x] Remove old CSS import
+- [x] Update existing RepoList tests for new component structure
+- [x] Run project test suite - must pass before task 7
 
 ### Task 7: Refactor Migration Wizard
 

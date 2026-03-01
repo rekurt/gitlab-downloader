@@ -95,6 +95,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
 
   /**
+   * Open a path in the system file manager
+   * @param {string} targetPath - Path to open
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  openPath: (targetPath) => ipcRenderer.invoke('open-path', targetPath),
+
+  /**
    * Fetch projects from GitLab (group or user membership)
    * @param {object} [params] - { group?: string }
    * @returns {Promise<{success: boolean, projects?: Array, error?: string}>}

@@ -30,6 +30,9 @@ jest.mock('electron', () => ({
   dialog: {
     showOpenDialog: jest.fn().mockResolvedValue({ canceled: false, filePaths: ['/tmp/selected'] }),
   },
+  shell: {
+    openPath: jest.fn().mockResolvedValue(''),
+  },
 }));
 
 jest.mock('electron-is-dev', () => false);
@@ -253,6 +256,7 @@ describe('setupIpcHandlers', () => {
     expect(registeredChannels).toContain('clone-repositories');
     expect(registeredChannels).toContain('cancel-clone');
     expect(registeredChannels).toContain('dry-run-projects');
+    expect(registeredChannels).toContain('open-path');
   });
 
   test('get-clone-path handler returns resolved path', () => {
@@ -525,6 +529,49 @@ describe('setupIpcHandlers', () => {
     const handler = dryRunCall[1];
     const result = await handler(null, { projects: [] });
     expect(result).toEqual({ success: true, targets: [] });
+  });
+
+  test('open-path handler returns error when path is empty', async () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const openPathCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'open-path',
+    );
+    expect(openPathCall).toBeTruthy();
+
+    const handler = openPathCall[1];
+    const result = await handler(null, '');
+    expect(result).toEqual({ success: false, error: 'Path is required' });
+  });
+
+  test('open-path handler calls shell.openPath', async () => {
+    const { shell } = require('electron');
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const openPathCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'open-path',
+    );
+    const handler = openPathCall[1];
+    const result = await handler(null, '/tmp/some-dir');
+    expect(result).toEqual({ success: true });
+    expect(shell.openPath).toHaveBeenCalledWith('/tmp/some-dir');
+  });
+
+  test('open-path handler returns error when shell.openPath fails', async () => {
+    const { shell } = require('electron');
+    shell.openPath.mockResolvedValueOnce('Failed to open path');
+
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const openPathCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'open-path',
+    );
+    const handler = openPathCall[1];
+    const result = await handler(null, '/tmp/bad-path');
+    expect(result).toEqual({ success: false, error: 'Failed to open path' });
   });
 
   test('dry-run-projects handler is callable with projects', async () => {
