@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Form,
   Input,
@@ -15,6 +15,7 @@ import {
   ApiOutlined,
   FolderOpenOutlined,
 } from "@ant-design/icons";
+import OAuthDeviceFlow from "./OAuthDeviceFlow";
 
 const { Title } = Typography;
 
@@ -78,6 +79,16 @@ function SettingsPage({ settings, onSave }) {
       setTesting(false);
     }
   };
+
+  const handleOAuthSuccess = useCallback(
+    (token) => {
+      message.success("OAuth authorization successful");
+      const values = form.getFieldsValue();
+      values.oauthToken = token;
+      onSave(values);
+    },
+    [form, message, onSave],
+  );
 
   const handleSelectDirectory = async () => {
     try {
@@ -143,18 +154,23 @@ function SettingsPage({ settings, onSave }) {
           )}
 
           {authMethod === "oauth" && (
-            <Form.Item
-              name="oauthClientId"
-              label="OAuth Client ID"
-              rules={[
-                {
-                  required: authMethod === "oauth",
-                  message: "OAuth Client ID is required",
-                },
-              ]}
-            >
-              <Input placeholder="OAuth Application ID" />
-            </Form.Item>
+            <>
+              <Form.Item
+                name="oauthClientId"
+                label="OAuth Client ID"
+                rules={[
+                  {
+                    required: authMethod === "oauth",
+                    message: "OAuth Client ID is required",
+                  },
+                ]}
+              >
+                <Input placeholder="OAuth Application ID" />
+              </Form.Item>
+              <Form.Item label="OAuth Authorization">
+                <OAuthDeviceFlow onSuccess={handleOAuthSuccess} />
+              </Form.Item>
+            </>
           )}
 
           <Form.Item name="clonePath" label="Clone Path">

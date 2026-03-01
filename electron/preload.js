@@ -95,11 +95,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
 
   /**
+   * Start OAuth Device Flow authorization
+   * @returns {Promise<{success: boolean, verificationUri?: string, userCode?: string, verificationUriComplete?: string, error?: string}>}
+   */
+  startOAuthDeviceFlow: () => ipcRenderer.invoke('start-oauth-device-flow'),
+
+  /**
+   * Listen for OAuth progress updates
+   * @param {function} callback - Called with progress data {status, token?, message?}
+   * @returns {function} - Cleanup function to remove listener
+   */
+  onOAuthProgress: (callback) => {
+    const wrapper = (event, data) => callback(data);
+    ipcRenderer.on('oauth-progress', wrapper);
+    return () => {
+      ipcRenderer.removeListener('oauth-progress', wrapper);
+    };
+  },
+
+  /**
    * Listen for messages from the main process
    */
   on: (channel, func) => {
     const validChannels = [
       'migration-progress',
+      'oauth-progress',
     ];
     if (validChannels.includes(channel)) {
       const wrapper = (event, ...args) => func(...args);
@@ -114,6 +134,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   off: (channel, func) => {
     const validChannels = [
       'migration-progress',
+      'oauth-progress',
     ];
     if (validChannels.includes(channel)) {
       const wrapper = listenerMap.get(func);
@@ -130,6 +151,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   once: (channel, func) => {
     const validChannels = [
       'migration-progress',
+      'oauth-progress',
     ];
     if (validChannels.includes(channel)) {
       ipcRenderer.once(channel, (event, ...args) => func(...args));

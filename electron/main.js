@@ -438,6 +438,76 @@ function setupIpcHandlers() {
     }
   });
 
+  // Start OAuth Device Flow
+  ipcMain.handle("start-oauth-device-flow", async (event) => {
+    try {
+      const lib = await getCoreLib();
+      const store = await getStore();
+      const settings = store.get("settings", {});
+      const url = (settings.gitlabUrl || "").replace(/\/+$/, "");
+      const oauthClientId = settings.oauthClientId || "";
+
+      if (!url) {
+        return { success: false, error: "GitLab URL is required" };
+      }
+      if (!oauthClientId) {
+        return { success: false, error: "OAuth Client ID is required" };
+      }
+
+      const config = lib.GitlabConfigSchema.parse({
+        url,
+        authMethod: "oauth",
+        oauthClientId,
+        oauthScope: settings.oauthScope || "read_api read_repository",
+      });
+
+      const deviceData = await lib.deviceAuthorize(config);
+
+      // Start polling in background
+      const pollPromise = lib.pollDeviceToken(
+        config,
+        String(deviceData.device_code || ""),
+        parseInt(deviceData.interval, 10) || 5,
+        parseInt(deviceData.expires_in, 10) || 300,
+      );
+
+      pollPromise
+        .then(async (tokenPayload) => {
+          const normalized = lib.normalizeOAuthPayload(config, tokenPayload);
+          // Save token to settings
+          const currentSettings = store.get("settings", {});
+          currentSettings.oauthToken = normalized.access_token;
+          store.set("settings", currentSettings);
+
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send("oauth-progress", {
+              status: "success",
+              token: normalized.access_token,
+            });
+          }
+        })
+        .catch((err) => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send("oauth-progress", {
+              status: "error",
+              message: err.message,
+            });
+          }
+        });
+
+      return {
+        success: true,
+        verificationUri: String(deviceData.verification_uri || ""),
+        userCode: String(deviceData.user_code || ""),
+        verificationUriComplete: String(
+          deviceData.verification_uri_complete || "",
+        ),
+      };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
   // Open directory picker dialog
   ipcMain.handle("select-directory", async () => {
     const result = await dialog.showOpenDialog(mainWindow, {

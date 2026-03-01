@@ -8,6 +8,8 @@ jest.mock('electron', () => ({
     on: jest.fn(),
     quit: jest.fn(),
     getPath: jest.fn().mockReturnValue('/tmp/test-userdata'),
+    getVersion: jest.fn().mockReturnValue('0.1.0'),
+    getName: jest.fn().mockReturnValue('gitlab-dump-desktop'),
   },
   BrowserWindow: jest.fn().mockImplementation(() => ({
     loadURL: jest.fn(),
@@ -245,6 +247,7 @@ describe('setupIpcHandlers', () => {
     expect(registeredChannels).toContain('save-settings');
     expect(registeredChannels).toContain('test-connection');
     expect(registeredChannels).toContain('select-directory');
+    expect(registeredChannels).toContain('start-oauth-device-flow');
   });
 
   test('get-clone-path handler returns resolved path', () => {
@@ -367,6 +370,33 @@ describe('setupIpcHandlers', () => {
     const result = await handler();
     expect(result).toBe('/tmp/selected');
     expect(dialog.showOpenDialog).toHaveBeenCalled();
+  });
+
+  test('start-oauth-device-flow handler returns error when settings missing', async () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const oauthCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'start-oauth-device-flow',
+    );
+    expect(oauthCall).toBeTruthy();
+
+    const handler = oauthCall[1];
+    const result = await handler({ sender: { send: jest.fn() } });
+    expect(result.success).toBe(false);
+    // Should fail because gitlabUrl is empty in default store
+    expect(result.error).toBeTruthy();
+  });
+
+  test('start-oauth-device-flow handler is registered', () => {
+    const { setupIpcHandlers } = require('../main');
+    setupIpcHandlers();
+
+    const oauthCall = ipcMain.handle.mock.calls.find(
+      (c) => c[0] === 'start-oauth-device-flow',
+    );
+    expect(oauthCall).toBeTruthy();
+    expect(typeof oauthCall[1]).toBe('function');
   });
 
   test('select-directory handler returns null when canceled', async () => {

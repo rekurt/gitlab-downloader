@@ -84,23 +84,23 @@ Transform the Electron application from a migration-only tool into a full-cycle 
 - Modify: `electron/src/components/SettingsPage.js`
 - Create: `electron/src/components/OAuthDeviceFlow.js`
 
-- [ ] Add IPC handler `start-oauth-device-flow` in `main.js`:
+- [x] Add IPC handler `start-oauth-device-flow` in `main.js`:
   - Build config from stored settings
   - Call `deviceAuthorize()` from `lib/auth.js`
   - Return device code info to renderer (verification_uri, user_code, verification_uri_complete)
   - Start `pollDeviceToken()` in background, send progress via `webContents.send('oauth-progress')`
   - On success: save token to electron-store, send `{status: 'success', token}` event
   - On failure/timeout: send `{status: 'error', message}` event
-- [ ] Expose in `preload.js`: `startOAuthDeviceFlow`, `onOAuthProgress` listener
-- [ ] Create `OAuthDeviceFlow` component:
+- [x] Expose in `preload.js`: `startOAuthDeviceFlow`, `onOAuthProgress` listener
+- [x] Create `OAuthDeviceFlow` component:
   - "Authorize with OAuth" button triggers `startOAuthDeviceFlow` IPC
   - Shows verification URL (clickable link via `shell.openExternal`) and user code (large, copyable text)
   - Ant Design `Spin` while polling
   - Success: show checkmark, auto-close after delay
   - Error: show error message with retry button
-- [ ] Integrate into `SettingsPage`: when auth method is OAuth, show OAuthDeviceFlow component instead of token input
-- [ ] Write tests: OAuthDeviceFlow component states (idle, pending, success, error), IPC handler
-- [ ] Run project test suite - must pass before task 4
+- [x] Integrate into `SettingsPage`: when auth method is OAuth, show OAuthDeviceFlow component instead of token input
+- [x] Write tests: OAuthDeviceFlow component states (idle, pending, success, error), IPC handler
+- [x] Run project test suite - must pass before task 4
 
 ### Task 4: GitLab Projects Browser
 
