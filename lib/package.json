@@ -1,0 +1,34 @@
+{
+  "name": "@gitlab-dump/core",
+  "version": "0.1.0",
+  "description": "Core library for GitLab repository downloading and migration",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./constants": "./constants.js",
+    "./config": "./config.js",
+    "./utils": "./utils.js",
+    "./client": "./client.js",
+    "./auth": "./auth.js",
+    "./cloner": "./cloner.js",
+    "./author-mapper": "./author-mapper.js",
+    "./migration": "./migration.js",
+    "./reporting": "./reporting.js"
+  },
+  "scripts": {
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "dotenv": "^16.3.0",
+    "js-yaml": "^4.1.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "eslint": "^9.39.3",
+    "jest": "^29.7.0"
+  },
+  "license": "MIT"
+}

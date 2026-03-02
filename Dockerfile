@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM node:20-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
@@ -8,14 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN useradd -m -u 10001 appuser
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY lib ./lib
+COPY cli ./cli
+RUN npm install --prefix lib && npm install --prefix cli
 
-COPY fetch_repositories.py .
-COPY gitlab_downloader ./gitlab_downloader
-
-ENV PYTHONUNBUFFERED=1
 USER appuser
 
-ENTRYPOINT ["python3", "fetch_repositories.py"]
+ENTRYPOINT ["node", "cli/bin/gitlab-dump.js"]
 CMD []

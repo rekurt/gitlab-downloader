@@ -1,60 +1,69 @@
-.PHONY: run dry_run install build docker_run venv lint format test typecheck ci binary binary_onefile binary_clean
+.PHONY: help clean \
+       node-install lib-test cli-test electron-test node-test node-lint node-ci \
+       cli-run cli-dry-run electron-build \
+       docker-build docker-run
 
-IMAGE_NAME=fetch-repositories
-CLONE_PATH?=$(shell pwd)/repositories
-VENV_PATH=venv
+# ─── Configuration ───
+
+IMAGE_NAME  := fetch-repositories
+CLONE_PATH  ?= $(shell pwd)/repositories
+JEST        := node --experimental-vm-modules
 
 ifneq (,$(wildcard .env))
     include .env
     export $(shell sed 's/=.*//' .env)
 endif
 
-run:
-	@$(VENV_PATH)/bin/python fetch_repositories.py
+# ─── Node.js: Setup ───
 
-dry_run:
-	@$(VENV_PATH)/bin/python fetch_repositories.py --dry-run
+node-install:
+	@npm install --prefix lib
+	@npm install --prefix cli
+	@npm install --prefix electron
 
-interactive:
-	@$(VENV_PATH)/bin/python fetch_repositories.py --interactive
+# ─── Node.js: Testing ───
 
-venv:
-	@[ -d $(VENV_PATH) ] || python3 -m venv $(VENV_PATH)
-	@$(VENV_PATH)/bin/pip install --upgrade pip
-	@$(VENV_PATH)/bin/pip install --no-cache-dir -r requirements.txt
-	@$(VENV_PATH)/bin/pip install --no-cache-dir -e .[dev]
+lib-test:
+	@$(JEST) lib/node_modules/.bin/jest --config lib/jest.config.js
 
-install: venv
+cli-test:
+	@$(JEST) cli/node_modules/.bin/jest --config cli/jest.config.js
 
-lint:
-	@$(VENV_PATH)/bin/ruff check .
+electron-test:
+	@$(JEST) electron/node_modules/.bin/jest --config electron/jest.config.js
 
-format:
-	@$(VENV_PATH)/bin/ruff format .
+node-test: lib-test cli-test electron-test
 
-test:
-	@$(VENV_PATH)/bin/pytest
+# ─── Node.js: Linting ───
 
-typecheck:
-	@$(VENV_PATH)/bin/mypy gitlab_downloader
+node-lint:
+	@lib/node_modules/.bin/eslint --config lib/eslint.config.js \
+		lib/*.js cli/index.js cli/ui.js cli/bin/gitlab-dump.js
 
-ci: lint typecheck test
+# ─── Node.js: CI ───
 
-binary:
-	@$(VENV_PATH)/bin/pip install --no-cache-dir pyinstaller
-	@$(VENV_PATH)/bin/pyinstaller --onedir --name gitlab-dump fetch_repositories.py
+node-ci: node-lint node-test
 
-binary_onefile:
-	@$(VENV_PATH)/bin/pip install --no-cache-dir pyinstaller
-	@$(VENV_PATH)/bin/pyinstaller --onefile --name gitlab-dump fetch_repositories.py
+# ─── Node.js: Run ───
 
-binary_clean:
-	@rm -rf build dist *.spec
+cli-run:
+	@node cli/bin/gitlab-dump.js
 
-build:
+cli-dry-run:
+	@node cli/bin/gitlab-dump.js --dry-run
+
+# ─── Electron ───
+
+electron-build:
+	@cd electron && npm run dist
+	@echo "Electron binary built successfully in electron/dist_electron"
+
+# ─── Docker ───
+
+docker-build:
 	docker build -t $(IMAGE_NAME) .
 
-docker_run: build
+docker-run: docker-build
 	docker run --rm \
 		--env GITLAB_URL=$(GITLAB_URL) \
 		--env GITLAB_TOKEN=$(GITLAB_TOKEN) \
@@ -62,3 +71,39 @@ docker_run: build
 		--env CLONE_PATH=/app/repositories \
 		-v $(CLONE_PATH):/app/repositories \
 		$(IMAGE_NAME)
+
+# ─── General ───
+
+clean:
+	@rm -rf lib/node_modules cli/node_modules electron/node_modules
+	@rm -rf electron/dist_electron
+	@echo "Cleaned: node_modules and build artifacts"
+
+help:
+	@echo "Usage: make <target>"
+	@echo ""
+	@echo "  Setup:"
+	@echo "    node-install       Install dependencies for lib, cli, and electron"
+	@echo ""
+	@echo "  Testing:"
+	@echo "    lib-test           Run lib/ tests"
+	@echo "    cli-test           Run cli/ tests"
+	@echo "    electron-test      Run electron/ tests"
+	@echo "    node-test          Run all tests (lib + cli + electron)"
+	@echo ""
+	@echo "  Quality:"
+	@echo "    node-lint          Run ESLint on Node.js source files"
+	@echo "    node-ci            CI pipeline (lint + tests)"
+	@echo ""
+	@echo "  Run:"
+	@echo "    cli-run            Run CLI application"
+	@echo "    cli-dry-run        Run CLI with --dry-run flag"
+	@echo "    electron-build     Build Electron application binary"
+	@echo ""
+	@echo "  Docker:"
+	@echo "    docker-build       Build Docker image"
+	@echo "    docker-run         Run application in Docker container"
+	@echo ""
+	@echo "  General:"
+	@echo "    clean              Remove node_modules and build artifacts"
+	@echo "    help               Show this help message"

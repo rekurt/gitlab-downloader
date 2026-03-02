@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  quality:
+  python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,3 +22,17 @@ jobs:
         run: mypy gitlab_downloader
       - name: Tests
         run: pytest -q
+
+  node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: make node-install
+      - name: Lint
+        run: make node-lint
+      - name: Tests
+        run: make node-test

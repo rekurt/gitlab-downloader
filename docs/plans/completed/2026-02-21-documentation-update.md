@@ -1,0 +1,131 @@
+# Актуализация документации, README, Makefile и CLAUDE.md
+
+## Overview
+Обновить документацию проекта с учетом текущего состояния, расширить примеры (средний
+уровень: улучшить структуру, добавить новые разделы, расширить примеры). Это включает
+синхронизацию README.MD (русский) и README.en.md (английский), документирование компонентов Electron/GUI,
+расширение примеров, улучшение целей Makefile, создание README для Electron приложения и актуализацию
+CLAUDE.md с информацией о проекте для агентов.
+
+## Context
+- Files involved: README.MD, README.en.md, Makefile, AGENTS.md, electron/README.md (новый), CLAUDE.md
+- Related patterns: Русский primary, English secondary; async patterns; CLI + REST API + Electron GUI
+- Dependencies: Недавние коммиты показывают добавление Electron frontend и PyInstaller bundling
+- Project structure: CLI, REST API, и Electron GUI компоненты
+
+## Development Approach
+- Regular approach (modify files directly, no tests needed for documentation)
+- Complete each task fully before moving to next
+- Ensure consistency between Russian and English versions
+- Follow existing documentation style and conventions
+
+## Implementation Steps
+
+### Task 1: Update README.MD (Russian) with Electron GUI section
+
+**Files:**
+- Modify: `README.MD`
+
+- [x] Add new "Графический интерфейс (GUI)" section after "Использование" describing Electron GUI capabilities
+- [x] Include instructions for running the GUI application
+- [x] Add information about GUI bundling with electron-builder
+- [x] Update "Требования" section to note Electron runtime requirements if needed
+- [x] Review for logical flow and alignment with recent features
+
+### Task 2: Update README.en.md (English) with Electron GUI section
+
+**Files:**
+- Modify: `README.en.md`
+
+- [x] Mirror changes from Task 1 in English
+- [x] Add "Graphical User Interface (GUI)" section with Electron description
+- [x] Include GUI bundling instructions paralleling Russian version
+- [x] Ensure consistency with Russian version structure and completeness
+
+### Task 3: Create electron/README.md for Electron application
+
+**Files:**
+- Create: `electron/README.md`
+
+- [x] Add comprehensive guide for Electron application structure and setup
+- [x] Document how to run Electron app in development mode
+- [x] Include build instructions for creating distributable binaries
+- [x] Document available UI components and their purpose
+- [x] Add architecture overview (communication with Python backend via REST API)
+- [x] Include development requirements (Node.js version, npm packages)
+- [x] Add troubleshooting section for common Electron setup issues
+- [x] Include configuration options for electron-builder
+
+### Task 4: Expand examples section in both READMEs
+
+**Files:**
+- Modify: `README.MD`, `README.en.md`
+
+- [x] Add "Примеры использования" (Examples) section in Russian README
+- [x] Include: OAuth with credential helper, dry-run mode, update mode examples
+- [x] Add real-world usage scenarios (syncing from private GitLab instance, specific project export)
+- [x] Mirror examples section in English README with parallel structure
+- [x] Include .env configuration examples
+
+### Task 5: Enhance Makefile with new targets
+
+**Files:**
+- Modify: `Makefile`
+
+- [x] Add `make help` target displaying all available targets with descriptions
+- [x] Add `make clean` target to remove venv and build artifacts
+- [x] Add `make electron-build` target for building GUI binary
+- [x] Add `make coverage` target for running tests with coverage report
+- [x] Verify all existing targets still work correctly
+
+### Task 6: Update AGENTS.md with Electron information
+
+**Files:**
+- Modify: `AGENTS.md`
+
+- [x] Add section describing Electron frontend structure and location
+- [x] Document REST API endpoints available to frontend
+- [x] Add GUI entry point information (`gitlab_downloader.gui.main`)
+- [x] Update project structure section to include `gitlab_downloader/gui/` directory
+- [x] Reference electron-builder configuration
+
+### Task 7: Add Local Development section to README
+
+**Files:**
+- Modify: `README.MD`, `README.en.md`
+
+- [x] Add "Локальная разработка" (Local Development) section in Russian README
+- [x] Include guide for running CLI, GUI, and API together during development
+- [x] Add instructions for running tests and code quality checks
+- [x] Mirror section in English README with "Local Development" title
+- [x] Include typical developer workflow steps
+
+### Task 8: Create or update CLAUDE.md with project information
+
+**Files:**
+- Create/Modify: `CLAUDE.md`
+
+- [x] Add project overview and purpose
+- [x] Document project structure and key directories
+- [x] Add information about CLI, REST API, and Electron GUI components
+- [x] Include key technologies and frameworks used
+- [x] Document configuration files and their purpose
+- [x] Add guidelines for code style and conventions
+- [x] Include information about running tests and building binaries
+- [x] Document the REST API endpoints for agent interaction
+- [x] Add important patterns and architectural decisions
+- [x] Include troubleshooting section for common development issues
+
+### Task 9: Verify all documentation updates
+
+- [x] Check markdown syntax validity (no broken links, proper formatting)
+- [x] Verify Russian and English versions are synchronized in structure
+- [x] Test conceptual validity of code examples
+- [x] Confirm Makefile targets work: `make help`, `make install`, `make test`
+- [x] Review for typos, clarity, and tone consistency
+- [x] Final review of all changes
+
+### Task 10: Move plan to completed folder
+
+- [x] Move this plan to `docs/plans/completed/2026-02-21-documentation-update.md`
+- [x] Commit documentation updates

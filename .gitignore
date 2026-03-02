@@ -6,9 +6,26 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.coverage
 .ruff_cache/
 .DS_Store
 AGENTS.md
 build/
 dist/
 *.spec
+
+# Migration config files (may contain tokens)
+migration_config.json
+migration_config.yaml
+migration_config.yml
+
+# Node.js
+node_modules/
+package-lock.json
+coverage/
+
+# Electron build output
+dist_electron/
+
+# ralphex progress logs
+.ralphex/progress/
