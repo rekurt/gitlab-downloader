@@ -19,7 +19,7 @@ module.exports = {
           options: {
             presets: [
               require.resolve("@babel/preset-env"),
-              require.resolve("@babel/preset-react"),
+              [require.resolve("@babel/preset-react"), { runtime: "automatic" }],
             ],
           },
         },

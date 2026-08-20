@@ -1,333 +1,527 @@
-import { Command } from 'commander';
-import { mkdir } from 'node:fs/promises';
-import { readdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
-import dotenv from 'dotenv';
+import { Command, CommanderError, InvalidArgumentError } from 'commander';
+import inquirer from 'inquirer';
+import { randomUUID } from 'node:crypto';
+import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { dirname, resolve } from 'node:path';
+
 import {
-  parseConfig,
-  resolveAccessToken,
-  fetchGroupMetadata,
-  getAllProjects,
-  getUserProjects,
-  buildCloneTarget,
-  cloneAllRepositories,
-  printSummary,
-  printDryRun,
-  writeJsonReport,
-  MigrationExecutor,
-  loadMigrationConfig as loadMigrationConfigCore,
-  saveMigrationConfig as saveMigrationConfigCore,
-  DEFAULT_CLONE_PATH,
-  DEFAULT_PER_PAGE,
-  DEFAULT_TIMEOUT,
   DEFAULT_API_RETRIES,
+  DEFAULT_CLONE_PATH,
   DEFAULT_CLONE_RETRIES,
   DEFAULT_CONCURRENCY,
+  DEFAULT_PER_PAGE,
+  DEFAULT_TIMEOUT,
+  HISTORY_REWRITE_CONFIRMATION,
+  TransferPlanSchema,
+  buildCloneTarget,
+  cancelBulkImport,
+  cloneAllRepositories,
+  executeTransfer,
+  fetchGroupMetadata,
+  getAllProjects,
+  getBulkImport,
+  getUserProjects,
+  parseConfig,
+  planTransfer,
+  previewHistoryRewrite,
+  redactSecrets,
+  rewriteHistory,
 } from '@gitlab-dump/core';
-import {
-  showMainMenu,
-  showCloneMenu,
-  showMigrationWizard,
-  showHistoryMenu,
-  saveMigrationConfig,
-  fillInteractive,
-  showSuccess,
-  showError,
-  showInfo,
-  showWarning,
-} from './ui.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
-/**
- * Parse an environment variable as integer, returning defaultValue if absent or NaN.
- * Unlike `parseInt(v) || default`, this correctly handles 0 as a valid value.
- */
-function envIntOrDefault(envName, defaultValue) {
-  const raw = process.env[envName];
-  if (raw === undefined || raw === '') return defaultValue;
-  const parsed = parseInt(raw, 10);
-  return Number.isNaN(parsed) ? defaultValue : parsed;
+function integer(value) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed)) throw new InvalidArgumentError('Expected an integer');
+  return parsed;
 }
 
-/**
- * Build commander program with all CLI options.
- * @returns {Command}
- */
-export function buildProgram() {
-  const program = new Command();
-
-  program
-    .name('gitlab-dump')
-    .description('Download and clone GitLab repositories preserving directory structure')
-    .version(VERSION)
-    .option('--url <url>', 'GitLab instance URL', process.env.GITLAB_URL)
-    .option('--token <token>', 'GitLab personal access token', process.env.GITLAB_TOKEN)
-    .option('--group <group>', 'GitLab group ID or path', process.env.GITLAB_GROUP)
-    .option('--clone-path <path>', 'Directory for cloned repositories', process.env.CLONE_PATH || DEFAULT_CLONE_PATH)
-    .option('--dry-run', 'Preview operations without executing', false)
-    .option('--update', 'Update existing repositories with git pull', false)
-    .option('--interactive', 'Prompt for missing configuration values', false)
-    .option('--interactive-menu', 'Launch rich interactive menu', false)
-    .option('--concurrency <n>', 'Maximum concurrent clone operations', (v) => parseInt(v, 10), envIntOrDefault('MAX_CONCURRENCY', DEFAULT_CONCURRENCY))
-    .option('--per-page <n>', 'Items per API page', (v) => parseInt(v, 10), envIntOrDefault('PER_PAGE', DEFAULT_PER_PAGE))
-    .option('--timeout <seconds>', 'API request timeout in seconds', (v) => parseInt(v, 10), envIntOrDefault('REQUEST_TIMEOUT', DEFAULT_TIMEOUT))
-    .option('--api-retries <n>', 'Number of API retry attempts', (v) => parseInt(v, 10), envIntOrDefault('MAX_RETRIES', DEFAULT_API_RETRIES))
-    .option('--clone-retries <n>', 'Number of clone retry attempts', (v) => parseInt(v, 10), envIntOrDefault('CLONE_RETRIES', DEFAULT_CLONE_RETRIES))
-    .option('--auth-method <method>', 'Authentication method (token|oauth)', process.env.AUTH_METHOD || 'oauth')
-    .option('--git-auth-mode <mode>', 'Git credential mode (url|credential_helper)', process.env.GIT_AUTH_MODE || 'url')
-    .option('--oauth-client-id <id>', 'OAuth application client ID', process.env.GITLAB_OAUTH_CLIENT_ID)
-    .option('--oauth-client-secret <secret>', 'OAuth application client secret', process.env.GITLAB_OAUTH_CLIENT_SECRET)
-    .option('--oauth-scope <scope>', 'OAuth scopes', process.env.GITLAB_OAUTH_SCOPE || 'read_api read_repository')
-    .option('--log-level <level>', 'Logging level', process.env.LOG_LEVEL || 'INFO')
-    .option('--report-json <path>', 'Write JSON report to file', process.env.REPORT_JSON);
-
-  return program;
+function sourceType(value) {
+  if (!['group', 'project'].includes(value)) throw new InvalidArgumentError('Expected group or project');
+  return value;
 }
 
-/**
- * Convert commander options to config object matching GitlabConfigSchema.
- * @param {object} opts - Commander parsed options
- * @returns {object}
- */
-export function optsToConfig(opts) {
-  return {
-    url: opts.url || '',
-    token: opts.token || null,
-    group: opts.group || null,
-    clonePath: opts.clonePath || DEFAULT_CLONE_PATH,
-    perPage: opts.perPage ?? DEFAULT_PER_PAGE,
-    requestTimeout: opts.timeout ?? DEFAULT_TIMEOUT,
-    maxRetries: opts.apiRetries ?? DEFAULT_API_RETRIES,
-    cloneRetries: opts.cloneRetries ?? DEFAULT_CLONE_RETRIES,
-    maxConcurrency: opts.concurrency ?? DEFAULT_CONCURRENCY,
-    dryRun: opts.dryRun || false,
-    updateExisting: opts.update || false,
-    logLevel: opts.logLevel || 'INFO',
-    logFile: null,
-    interactive: opts.interactive || false,
-    interactiveMenu: opts.interactiveMenu || false,
-    reportJson: opts.reportJson || null,
-    authMethod: opts.authMethod || 'oauth',
-    gitAuthMode: opts.gitAuthMode || 'url',
-    oauthClientId: opts.oauthClientId || null,
-    oauthClientSecret: opts.oauthClientSecret || null,
-    oauthScope: opts.oauthScope || 'read_api read_repository',
-  };
+function defaultPrompt(question) {
+  return inquirer.prompt([question]).then((answers) => answers[question.name]);
 }
 
-/**
- * Find git repositories recursively under a base directory.
- * @param {string} basePath
- * @param {number} [maxDepth=10]
- * @returns {string[]}
- */
-export function findGitRepos(basePath, maxDepth = 10) {
-  const repos = [];
-
-  function walk(dir, depth) {
-    if (depth > maxDepth) return;
-    try {
-      if (existsSync(join(dir, '.git'))) {
-        repos.push(dir);
-        return;
-      }
-      const entries = readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
-        if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
-        const full = join(dir, entry.name);
-        if (existsSync(join(full, '.git'))) {
-          repos.push(full);
-        } else {
-          walk(full, depth + 1);
-        }
-      }
-    } catch {
-      // Permission errors or broken symlinks - skip
-    }
-  }
-
-  walk(basePath, 0);
-  return repos;
+export async function resolveToken(role, options = {}) {
+  const env = options.env ?? process.env;
+  const sideName = role === 'destination' ? 'GITLAB_DESTINATION_TOKEN' : 'GITLAB_SOURCE_TOKEN';
+  const token = env[sideName] || env.GITLAB_TOKEN;
+  if (token) return token;
+  const isTTY = options.isTTY ?? Boolean(process.stdin.isTTY && process.stderr.isTTY);
+  if (!isTTY) throw new Error(`${sideName} or GITLAB_TOKEN is required in non-interactive mode`);
+  const prompt = options.prompt ?? defaultPrompt;
+  const prompted = await prompt({
+    type: 'password',
+    name: 'token',
+    message: `${role === 'destination' ? 'Destination' : 'Source'} GitLab PAT:`,
+    mask: '*',
+  });
+  if (!prompted) throw new Error('A non-empty GitLab PAT is required');
+  return prompted;
 }
 
-/**
- * Run the clone workflow.
- * @param {object} config - Validated config
- * @returns {Promise<number>} - Exit code
- */
-export async function runClone(config) {
+export async function secureJsonWrite(path, value) {
+  const target = resolve(path);
+  await mkdir(dirname(target), { recursive: true });
+  const temporary = `${target}.${process.pid}.${randomUUID()}.tmp`;
+  await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+  if (process.platform !== 'win32') await chmod(temporary, 0o600);
+  await rename(temporary, target);
+  if (process.platform !== 'win32') await chmod(target, 0o600);
+}
+
+async function readJson(path) {
+  return JSON.parse(await readFile(resolve(path), 'utf8'));
+}
+
+function runStateDirectory(env = process.env) {
+  const base = env.XDG_STATE_HOME || resolve(homedir(), '.local', 'state');
+  return resolve(base, 'gitlab-dump', 'runs');
+}
+
+function validateRunId(runId) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9-]{0,127}$/.test(runId)) throw new Error('Invalid run ID');
+  return runId;
+}
+
+function runStatePath(runId, env) {
+  return resolve(runStateDirectory(env), `${validateRunId(runId)}.json`);
+}
+
+async function readRunState(runId, env) {
   try {
-    const accessToken = await resolveAccessToken(config);
-    const updatedConfig = { ...config, token: accessToken };
-
-    await mkdir(updatedConfig.clonePath, { recursive: true });
-
-    showInfo('Fetching repository list...');
-
-    let projects;
-    if (updatedConfig.group) {
-      const groupMeta = await fetchGroupMetadata(updatedConfig);
-      const rootFullPath =
-        groupMeta.full_path || groupMeta.path || String(updatedConfig.group);
-      projects = await getAllProjects(updatedConfig, rootFullPath);
-    } else {
-      projects = await getUserProjects(updatedConfig);
-    }
-
-    showInfo(`Found ${projects.length} repositories`);
-
-    if (updatedConfig.dryRun) {
-      printDryRun(projects, updatedConfig, buildCloneTarget);
-      return 0;
-    }
-
-    showInfo('Starting clone...');
-    const ac = new AbortController();
-
-    process.once('SIGINT', () => {
-      showWarning('Shutdown signal received. Stopping new clones...');
-      ac.abort();
-    });
-    process.once('SIGTERM', () => ac.abort());
-
-    const results = await cloneAllRepositories(projects, updatedConfig, { signal: ac.signal });
-    const hasFailed = printSummary(results);
-
-    if (updatedConfig.reportJson) {
-      await writeJsonReport(updatedConfig.reportJson, updatedConfig, projects.length, results);
-      showSuccess(`JSON report written to ${updatedConfig.reportJson}`);
-    }
-
-    return hasFailed ? 1 : 0;
-  } catch (err) {
-    showError(`Clone failed: ${err.message}`);
-    return 1;
+    return await readJson(runStatePath(runId, env));
+  } catch (error) {
+    if (error.code === 'ENOENT') throw new Error(`Transfer ${runId} was not found`);
+    throw error;
   }
 }
 
-/**
- * Run interactive menu loop.
- * @param {object} config - Base config
- * @returns {Promise<number>}
- */
-export async function runInteractiveMenu(config) {
-  while (true) {
-    const choice = await showMainMenu();
-
-    if (choice === 'exit') break;
-
-    if (choice === 'clone') {
-      const cloneConfig = await showCloneMenu();
-      if (cloneConfig) {
-        const updated = parseConfig({
-          ...config,
-          url: cloneConfig.url.replace(/\/+$/, ''),
-          token: cloneConfig.token,
-          authMethod: 'token',
-          group: cloneConfig.group,
-          clonePath: cloneConfig.clonePath,
-        });
-        await runClone(updated);
-      }
-    } else if (choice === 'migrate') {
-      const migrationConfig = await showMigrationWizard();
-      if (migrationConfig) {
-        const executor = new MigrationExecutor(migrationConfig);
-        executor.on('error', (msg) => showError(msg));
-        executor.on('progress', (msg) => showInfo(msg));
-
-        const repos = findGitRepos(migrationConfig.source_repos_path);
-        let succeeded = 0;
-        let failed = 0;
-
-        for (const repoDir of repos) {
-          const repoName = repoDir.split('/').filter(Boolean).pop() || repoDir;
-          showInfo(`Migrating ${repoName}...`);
-          const ok = await executor.migrateRepository(repoDir);
-          if (ok) {
-            succeeded++;
-          } else {
-            failed++;
-          }
-        }
-
-        showInfo(`Migration complete: ${succeeded} succeeded, ${failed} failed out of ${repos.length} repositories`);
-
-        await saveMigrationConfig(
-          migrationConfig,
-          saveMigrationConfigCore,
-          migrationConfig.source_repos_path
-        );
-      }
-    } else if (choice === 'history') {
-      await showHistoryMenu(loadMigrationConfigCore);
-    }
-  }
-
+function exitCodeForStatus(status) {
+  if (status === 'partial') return 2;
+  if (status === 'canceled') return 130;
+  if (status === 'failed') return 1;
   return 0;
 }
 
-/**
- * Validate config for clone mode - checks required fields.
- * @param {object} config
- * @returns {string|null} - Error message or null if valid
- */
-export function validateCloneConfig(config) {
-  if (!config.url) {
-    return 'GitLab URL is required. Use --url or set GITLAB_URL env variable.';
+async function withOperationSignals(operation) {
+  const controller = new AbortController();
+  const abort = (signal) => controller.abort(new DOMException(`Received ${signal}`, 'AbortError'));
+  const onSigint = () => abort('SIGINT');
+  const onSigterm = () => abort('SIGTERM');
+  process.once('SIGINT', onSigint);
+  process.once('SIGTERM', onSigterm);
+  try {
+    return await operation(controller.signal);
+  } finally {
+    process.removeListener('SIGINT', onSigint);
+    process.removeListener('SIGTERM', onSigterm);
   }
-  if (config.authMethod === 'token' && !config.token) {
-    return 'GitLab token is required for token auth. Use --token or set GITLAB_TOKEN env variable.';
-  }
-  if (config.authMethod === 'oauth' && !config.oauthClientId) {
-    return 'OAuth client ID is required for OAuth auth. Use --oauth-client-id or set GITLAB_OAUTH_CLIENT_ID env variable.';
-  }
-  return null;
 }
 
-/**
- * Main CLI entry point.
- * @param {string[]} [argv] - Command line arguments
- * @returns {Promise<number>} - Exit code
- */
-export async function main(argv) {
-  dotenv.config();
+function cloneConfig(options, token, env) {
+  return parseConfig({
+    url: options.url || env.GITLAB_URL || '',
+    token,
+    group: options.group || env.GITLAB_GROUP || null,
+    clonePath: options.clonePath || env.CLONE_PATH || DEFAULT_CLONE_PATH,
+    perPage: options.perPage ?? DEFAULT_PER_PAGE,
+    requestTimeout: options.timeout ?? DEFAULT_TIMEOUT,
+    maxRetries: options.apiRetries ?? DEFAULT_API_RETRIES,
+    cloneRetries: options.cloneRetries ?? DEFAULT_CLONE_RETRIES,
+    maxConcurrency: options.concurrency ?? DEFAULT_CONCURRENCY,
+    dryRun: Boolean(options.dryRun),
+    updateExisting: Boolean(options.update),
+  });
+}
 
-  const program = buildProgram();
-  program.parse(argv || process.argv);
-  const opts = program.opts();
+async function runCloneCommand(options, context) {
+  const token = await resolveToken('source', context);
+  const config = cloneConfig(options, token, context.env);
+  const projects = config.group
+    ? await (async () => {
+        const group = await context.core.fetchGroupMetadata(config, { signal: context.signal });
+        return context.core.getAllProjects(
+          config,
+          group.full_path || group.path || config.group,
+          { signal: context.signal },
+        );
+      })()
+    : await context.core.getUserProjects(config, { signal: context.signal });
 
-  const rawConfig = optsToConfig(opts);
-
-  // Interactive menu mode
-  if (opts.interactiveMenu) {
-    const config = parseConfig({ ...rawConfig, url: rawConfig.url || 'https://gitlab.com' });
-    return runInteractiveMenu(config);
+  if (config.dryRun) {
+    const preview = projects.map((project) => ({
+      id: project.id,
+      fullPath: project.path_with_namespace,
+      ...buildCloneTarget(project, config),
+    }));
+    context.output(`${JSON.stringify({ status: 'preview', repositories: preview }, null, 2)}\n`);
+    return 0;
   }
+  const results = await context.core.cloneAllRepositories(projects, config, {
+    signal: context.signal,
+  });
+  const failedCount = results.filter((item) => item.status === 'failed').length;
+  const report = {
+    schemaVersion: 1,
+    status: context.signal.aborted
+      ? 'canceled'
+      : failedCount === results.length && results.length > 0
+        ? 'failed'
+        : failedCount > 0
+          ? 'partial'
+          : 'finished',
+    repositories: results,
+  };
+  if (options.report) await secureJsonWrite(options.report, report);
+  context.output(`${JSON.stringify(report, null, 2)}\n`);
+  return exitCodeForStatus(report.status);
+}
 
-  // Interactive mode - fill missing config via prompts
-  if (opts.interactive) {
-    const filled = await fillInteractive(rawConfig);
-    const config = parseConfig(filled);
-    return runClone(config);
+async function runPlanCommand(options, context) {
+  const [sourceToken, destinationToken] = await Promise.all([
+    resolveToken('source', context),
+    resolveToken('destination', context),
+  ]);
+  const plan = await context.core.planTransfer({
+    source: {
+      url: options.sourceUrl,
+      token: sourceToken,
+      fullPath: options.sourcePath,
+      type: options.sourceType,
+    },
+    destination: {
+      url: options.destinationUrl,
+      token: destinationToken,
+      namespace: options.destinationNamespace,
+    },
+  }, { signal: context.signal });
+  await secureJsonWrite(options.out, plan);
+  context.output(`${JSON.stringify(plan, null, 2)}\n`);
+  return plan.entities.some((entity) => entity.mode === 'blocked') ? 2 : 0;
+}
+
+async function runTransferCommand(options, context) {
+  const plan = TransferPlanSchema.parse(await readJson(options.plan));
+  const [sourceToken, destinationToken] = await Promise.all([
+    resolveToken('source', context),
+    resolveToken('destination', context),
+  ]);
+  const runId = validateRunId(options.runId || randomUUID());
+  const statePath = runStatePath(runId, context.env);
+  let previousState = null;
+  if (options.runId) {
+    try {
+      previousState = await readRunState(runId, context.env);
+      if (
+        previousState.sourceUrl !== plan.source.url ||
+        previousState.destinationUrl !== plan.destination.url
+      ) {
+        throw new Error(`Transfer ${runId} belongs to a different plan`);
+      }
+    } catch (error) {
+      if (!error.message.includes('was not found')) throw error;
+    }
   }
-
-  // Auto-fallback: if auth method is oauth but no client ID and a token is provided, use token auth
-  if (rawConfig.authMethod === 'oauth' && !rawConfig.oauthClientId && rawConfig.token) {
-    showWarning('OAuth client ID not set but token provided. Falling back to token authentication.');
-    rawConfig.authMethod = 'token';
+  const stateController = new AbortController();
+  const persist = async (state) => {
+    try {
+      const current = await readRunState(runId, context.env);
+      if (['cancel_requested', 'canceled'].includes(current.status)) {
+        stateController.abort(new DOMException('Canceled', 'AbortError'));
+        return;
+      }
+    } catch (error) {
+      if (!error.message.includes('was not found')) throw error;
+    }
+    await secureJsonWrite(statePath, {
+      schemaVersion: 1,
+      ...state,
+      sourceUrl: plan.source.url,
+      destinationUrl: plan.destination.url,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+  context.error(`${JSON.stringify({ runId, status: 'starting' })}\n`);
+  const operationSignal = AbortSignal.any([context.signal, stateController.signal]);
+  let monitorReading = false;
+  const monitor = setInterval(async () => {
+    if (monitorReading || stateController.signal.aborted) return;
+    monitorReading = true;
+    try {
+      const current = await readRunState(runId, context.env);
+      if (['cancel_requested', 'canceled'].includes(current.status)) {
+        stateController.abort(new DOMException('Canceled', 'AbortError'));
+      }
+    } catch (error) {
+      if (!error.message.includes('was not found')) stateController.abort(error);
+    } finally {
+      monitorReading = false;
+    }
+  }, 250);
+  monitor.unref?.();
+  let result;
+  try {
+    result = await context.core.executeTransfer(plan, {
+      sourceToken,
+      destinationToken,
+      runId,
+      signal: operationSignal,
+      resumeBulkImportId: previousState?.bulkImportId ?? null,
+      onStateChange: persist,
+      onEvent: (event) => context.error(`${JSON.stringify(event)}\n`),
+    });
+  } finally {
+    clearInterval(monitor);
   }
+  if (options.report) await secureJsonWrite(options.report, result);
+  context.output(`${JSON.stringify(result, null, 2)}\n`);
+  return exitCodeForStatus(result.status);
+}
 
-  // Standard clone mode - validate required fields
-  const validationError = validateCloneConfig(rawConfig);
-  if (validationError) {
-    showError(validationError);
+async function runStatusCommand(options, context) {
+  const state = await readRunState(options.runId, context.env);
+  if (state.bulkImportId && !['finished', 'failed', 'canceled', 'partial'].includes(state.status)) {
+    const token = await resolveToken('destination', context);
+    const remote = await context.core.getBulkImport(
+      { url: state.destinationUrl, token },
+      state.bulkImportId,
+      { signal: context.signal },
+    );
+    state.status = remote.status;
+    state.updatedAt = new Date().toISOString();
+    await secureJsonWrite(runStatePath(options.runId, context.env), state);
+  }
+  context.output(`${JSON.stringify(state, null, 2)}\n`);
+  return exitCodeForStatus(state.status);
+}
+
+async function runCancelCommand(options, context) {
+  const state = await readRunState(options.runId, context.env);
+  if (['finished', 'failed', 'canceled', 'partial'].includes(state.status)) {
+    context.output(`${JSON.stringify(state, null, 2)}\n`);
+    return exitCodeForStatus(state.status);
+  }
+  state.status = 'cancel_requested';
+  state.updatedAt = new Date().toISOString();
+  await secureJsonWrite(runStatePath(options.runId, context.env), state);
+  if (state.bulkImportId && !['finished', 'failed', 'canceled'].includes(state.status)) {
+    const token = await resolveToken('destination', context);
+    await context.core.cancelBulkImport(
+      { url: state.destinationUrl, token },
+      state.bulkImportId,
+      { signal: context.signal },
+    );
+  }
+  state.status = 'canceled';
+  state.updatedAt = new Date().toISOString();
+  await secureJsonWrite(runStatePath(options.runId, context.env), state);
+  context.output(`${JSON.stringify(state, null, 2)}\n`);
+  return 0;
+}
+
+async function confirmation(context) {
+  const isTTY = context.isTTY ?? Boolean(process.stdin.isTTY && process.stderr.isTTY);
+  if (!isTTY) throw new Error('History rewrite push requires an interactive confirmation');
+  return (context.prompt ?? defaultPrompt)({
+    type: 'input',
+    name: 'confirmation',
+    message: `Type exactly: ${HISTORY_REWRITE_CONFIRMATION}`,
+  });
+}
+
+async function runRewriteCommand(options, context) {
+  const mapping = await readJson(options.mapping);
+  const needsToken = /^https:/i.test(options.repository);
+  const token = needsToken ? await resolveToken('source', context) : undefined;
+  if (options.dryRun) {
+    const preview = await context.core.previewHistoryRewrite({
+      repository: options.repository,
+      mapping,
+      token,
+    }, { signal: context.signal });
+    if (options.report) await secureJsonWrite(options.report, preview);
+    context.output(`${JSON.stringify(preview, null, 2)}\n`);
+    return 0;
+  }
+  let phrase;
+  let preview;
+  if (options.push) {
+    preview = await context.core.previewHistoryRewrite({
+      repository: options.repository,
+      mapping,
+      token,
+    }, { signal: context.signal });
+    context.error(`${JSON.stringify({
+      ...preview,
+      warning: 'Pushing rewrites commit SHAs and can break GitLab MR and pipeline links',
+    }, null, 2)}\n`);
+    phrase = await confirmation(context);
+  }
+  const destinationToken = options.push
+    ? await resolveToken('destination', context)
+    : undefined;
+  const result = await context.core.rewriteHistory({
+    repository: options.repository,
+    mapping,
+    output: options.output,
+    backupPath: options.backup,
+    token,
+    destinationToken,
+    push: Boolean(options.push),
+    confirmation: phrase,
+    preview,
+  }, { signal: context.signal });
+  if (options.report) await secureJsonWrite(options.report, result);
+  context.output(`${JSON.stringify(result, null, 2)}\n`);
+  return exitCodeForStatus(result.status);
+}
+
+function addCloneCommand(program, handler) {
+  program.command('clone')
+    .description('Clone or safely fast-forward repositories visible to the current PAT')
+    .requiredOption('--url <url>', 'GitLab instance URL', process.env.GITLAB_URL)
+    .option('--group <path>', 'Limit cloning to a group', process.env.GITLAB_GROUP)
+    .option('--clone-path <path>', 'Destination directory', process.env.CLONE_PATH || DEFAULT_CLONE_PATH)
+    .option('--update', 'Fast-forward existing repositories')
+    .option('--dry-run', 'Print clone targets without changing the filesystem')
+    .option('--concurrency <number>', 'Concurrent Git operations', integer, DEFAULT_CONCURRENCY)
+    .option('--per-page <number>', 'GitLab API page size', integer, DEFAULT_PER_PAGE)
+    .option('--timeout <seconds>', 'GitLab API timeout', integer, DEFAULT_TIMEOUT)
+    .option('--api-retries <number>', 'Retry count for safe API reads', integer, DEFAULT_API_RETRIES)
+    .option('--clone-retries <number>', 'Retry count for clone', integer, DEFAULT_CLONE_RETRIES)
+    .option('--report <path>', 'Write a private JSON report')
+    .action(handler);
+}
+
+function addTransferCommands(program, handlers) {
+  const transfer = program.command('transfer').description('Plan and execute a GitLab transfer');
+  transfer.command('plan')
+    .requiredOption('--source-url <url>')
+    .requiredOption('--destination-url <url>')
+    .requiredOption('--source-path <path>')
+    .requiredOption('--destination-namespace <path>')
+    .requiredOption('--out <path>')
+    .option('--source-type <type>', 'group or project', sourceType, 'group')
+    .action(handlers.plan);
+  transfer.command('run')
+    .requiredOption('--plan <path>')
+    .option('--run-id <id>')
+    .option('--report <path>')
+    .action(handlers.run);
+  transfer.command('status')
+    .requiredOption('--run-id <id>')
+    .action(handlers.status);
+  transfer.command('cancel')
+    .requiredOption('--run-id <id>')
+    .action(handlers.cancel);
+}
+
+function addRewriteCommand(program, handler) {
+  program.command('rewrite-history')
+    .requiredOption('--repository <url-or-path>')
+    .requiredOption('--mapping <path>')
+    .requiredOption('--output <path>')
+    .option('--backup <path>')
+    .option('--dry-run')
+    .option('--push')
+    .option('--report <path>')
+    .action(handler);
+}
+
+export function buildProgram(handlers = {}) {
+  const noop = () => 0;
+  const program = new Command()
+    .name('gitlab-dump')
+    .description('Secure GitLab repository cloning and transfer')
+    .version(VERSION)
+    .showHelpAfterError();
+  addCloneCommand(program, handlers.clone ?? noop);
+  addTransferCommands(program, {
+    plan: handlers.plan ?? noop,
+    run: handlers.run ?? noop,
+    status: handlers.status ?? noop,
+    cancel: handlers.cancel ?? noop,
+  });
+  addRewriteCommand(program, handlers.rewrite ?? noop);
+  program.action(() => {
+    throw new Error('A subcommand is required');
+  });
+  return program;
+}
+
+function configureCommand(command, output) {
+  command.exitOverride();
+  command.configureOutput(output);
+  command.commands.forEach((child) => configureCommand(child, output));
+}
+
+function defaultCore() {
+  return {
+    fetchGroupMetadata,
+    getAllProjects,
+    getUserProjects,
+    cloneAllRepositories,
+    planTransfer,
+    executeTransfer,
+    getBulkImport,
+    cancelBulkImport,
+    previewHistoryRewrite,
+    rewriteHistory,
+  };
+}
+
+export async function main(argv = process.argv, options = {}) {
+  const context = {
+    env: options.env ?? process.env,
+    isTTY: options.isTTY,
+    prompt: options.prompt,
+    core: { ...defaultCore(), ...options.core },
+    output: options.output ?? ((text) => process.stdout.write(text)),
+    error: options.error ?? ((text) => process.stderr.write(text)),
+  };
+  let code = 0;
+  const wrap = (operation) => async (commandOptions) => {
+    try {
+      code = await withOperationSignals((signal) => operation(commandOptions, {
+        ...context,
+        signal,
+      }));
+    } catch (error) {
+      const secrets = [
+        context.env.GITLAB_TOKEN,
+        context.env.GITLAB_SOURCE_TOKEN,
+        context.env.GITLAB_DESTINATION_TOKEN,
+      ];
+      context.error(`${redactSecrets(error.message || String(error), secrets)}\n`);
+      code = error.name === 'AbortError' ? 130 : 1;
+    }
+  };
+  const program = buildProgram({
+    clone: wrap(runCloneCommand),
+    plan: wrap(runPlanCommand),
+    run: wrap(runTransferCommand),
+    status: wrap(runStatusCommand),
+    cancel: wrap(runCancelCommand),
+    rewrite: wrap(runRewriteCommand),
+  });
+  configureCommand(program, {
+    writeOut: context.output,
+    writeErr: context.error,
+  });
+  try {
+    await program.parseAsync(argv);
+    return code;
+  } catch (error) {
+    if (error instanceof CommanderError) {
+      if (error.code === 'commander.helpDisplayed' || error.code === 'commander.version') return 0;
+      return error.exitCode || 1;
+    }
+    context.error(`${redactSecrets(error.message || String(error))}\n`);
     return 1;
   }
-
-  const config = parseConfig(rawConfig);
-  return runClone(config);
 }
-

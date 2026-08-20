@@ -1,0 +1,11 @@
+.git
+.github
+.gitignore
+.nvmrc
+**/node_modules
+**/coverage
+electron/dist
+electron/release
+docs
+*.log
+.DS_Store

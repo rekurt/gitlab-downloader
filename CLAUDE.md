@@ -1,351 +1,131 @@
-# Gitlab Downloader - Project Reference
+# GitLab Dump 0.2 — Engineering Reference
 
-This document serves as a comprehensive reference for developers and AI agents working with the Gitlab Downloader project.
+This file is the canonical contributor reference. User-facing behavior and limitations are documented in [README.md](README.md) and [README.ru.md](README.ru.md).
 
-## Project Overview
+## Architecture
 
-Gitlab Downloader is a utility for downloading and cloning all repositories from a GitLab group and its subgroups while preserving the directory structure. The project is built entirely in Node.js and includes three main components:
+The repository is one npm workspace with a single lockfile and three packages:
 
-1. **Core Library** (`lib/`) - Shared Node.js modules for GitLab API, cloning, migration, and auth
-2. **CLI Application** (`cli/`) - Standalone command-line interface using the core library
-3. **Electron GUI** (`electron/`) - Desktop application using the core library via IPC
-
-## Project Structure
-
-```
-gitlab-dump/
-├── lib/                           # Shared Node.js core library (no Electron deps)
-│   ├── package.json               # @gitlab-dump/core package
-│   ├── index.js                   # Re-exports all modules
-│   ├── client.js                  # GitLab API client (pagination, retry, rate limit)
-│   ├── cloner.js                  # Git clone/pull with concurrency control
-│   ├── auth.js                    # OAuth device flow + token auth
-│   ├── migration.js               # Git author/committer rewriting (filter-branch)
-│   ├── author-mapper.js           # Author mapping load/save (JSON/YAML)
-│   ├── config.js                  # Configuration model + validation (Zod)
-│   ├── constants.js               # Default values and limits
-│   ├── utils.js                   # Path sanitization, URL building, credential stripping
-│   ├── reporting.js               # Summary/dry-run/JSON report generation
-│   └── __tests__/                 # Jest tests for all modules
-├── cli/                           # Standalone CLI (no Electron dependency)
-│   ├── package.json               # gitlab-dump-cli package
-│   ├── bin/
-│   │   └── gitlab-dump.js         # CLI entry point
-│   ├── index.js                   # CLI logic (arg parsing, interactive mode)
-│   ├── ui.js                      # Terminal UI (prompts, tables, colored output)
-│   └── __tests__/                 # Jest tests
-├── electron/                      # Electron GUI (uses lib/ directly via IPC)
-│   ├── main.js                    # Main process (IPC handlers calling lib/)
-│   ├── preload.js                 # IPC bridge (secure channel whitelist)
-│   ├── env.js                     # Environment configuration
-│   ├── src/
-│   │   ├── App.js                 # Main React component (view switching)
-│   │   ├── components/            # React components (Ant Design + Tailwind CSS)
-│   │   │   ├── AppLayout.js       # Layout with sidebar navigation
-│   │   │   ├── SettingsPage.js    # Settings form with persistent storage
-│   │   │   ├── OAuthDeviceFlow.js # OAuth Device Flow authorization
-│   │   │   ├── ProjectsPage.js    # GitLab projects browser
-│   │   │   ├── ClonePage.js       # Clone/update operations with progress
-│   │   │   ├── RepoList.js        # Local repositories list
-│   │   │   ├── MigrationWizard.js # Step-by-step migration wizard
-│   │   │   ├── AuthorMapper.js    # Author/committer mapping editor
-│   │   │   └── ProgressIndicator.js # Migration progress indicator
-│   │   └── styles/
-│   │       └── globals.css        # Tailwind directives + Ant Design reset
-│   ├── tailwind.config.js         # Tailwind CSS configuration
-│   ├── postcss.config.js          # PostCSS configuration
-│   ├── package.json               # Node dependencies
-│   ├── webpack.config.js          # Webpack configuration (+ postcss-loader)
-│   ├── electron-builder.config.js # Electron build config
-│   ├── __tests__/                 # Jest tests
-│   └── README.md                  # Electron-specific documentation
-├── docs/                          # Documentation and plans
-├── package.json                   # Root workspace package
-├── Makefile                       # Development commands
-├── .env.example                   # Environment template
-├── .gitignore                     # Git ignore rules
-├── Dockerfile                     # Docker configuration
-├── README.MD                      # Russian documentation (primary)
-├── README.en.md                   # English documentation (secondary)
-└── CLAUDE.md                      # This file
+```text
+lib/       @gitlab-dump/core: schemas and plain async functions
+cli/       gitlab-dump command-line shell
+electron/  sandboxed Electron/React shell
 ```
 
-## Key Technologies
+Both shells call the same core API. There is no service/controller/repository layer and no renderer-side GitLab or filesystem access.
 
-- **Node.js**: JavaScript runtime (ES modules)
-- **Zod**: Schema validation for configuration
-- **js-yaml**: YAML parsing for author mappings
-- **commander**: CLI argument parsing
-- **inquirer**: Interactive terminal prompts
-- **chalk**: Terminal colored output
-- **dotenv**: Environment variable loading
-- **Electron**: Cross-platform desktop GUI framework
-- **React**: Frontend UI library for Electron app
-- **Ant Design (antd)**: UI component library for Electron app
-- **Tailwind CSS**: Utility-first CSS framework for Electron app
-- **electron-store**: Persistent settings storage for Electron app
-- **Webpack**: Module bundler for Electron renderer
-- **electron-builder**: Electron application packaging
-- **Jest**: Testing framework
-- **ESLint**: Code linting
+Important core entry points:
 
-## Configuration Files
+- `planTransfer(input)` returns a schema-versioned, credential-free `TransferPlan`;
+- `executeTransfer(plan, options)`, `getTransferStatus(runId)`, and `cancelTransfer(runId)` implement the transfer lifecycle;
+- `syncRepository(input)` performs conservative Git ref/wiki/LFS synchronization;
+- `previewHistoryRewrite(input)` and `rewriteHistory(input)` operate on separate mirrors;
+- `findGitRepositories(path)` is shared local repository discovery.
 
-### package.json (root)
-Root workspace package with scripts for running tests across all packages.
+Transfer entities use exactly one mode: `direct_transfer`, `git_sync`, `git_only_fallback`, or `blocked`. Events use the shared `TransferEvent` schema.
 
-### lib/package.json
-Core library: `@gitlab-dump/core`, type: module (ESM).
+## Toolchain and commands
 
-### cli/package.json
-CLI application: `gitlab-dump-cli`, depends on `@gitlab-dump/core` via file reference.
+Node.js 24 and npm 11 are required. Dependency versions are exact in `package-lock.json`.
 
-### electron/package.json
-Desktop application: `gitlab-dump-desktop`, depends on `@gitlab-dump/core` via file reference.
-
-### .env and .env.example
-Environment variables (required or optional):
-- `GITLAB_URL`: GitLab instance URL (default: https://gitlab.com)
-- `GITLAB_TOKEN`: Personal access token for authentication
-- `AUTH_METHOD`: Authentication method (oauth, token)
-- `GIT_AUTH_MODE`: Git credential handling (url, credential_helper)
-- `GITLAB_OAUTH_CLIENT_ID`: OAuth client ID (if using OAuth)
-- `CLONE_PATH`: Directory for cloned repositories (default: ./repositories)
-- `GITLAB_GROUP`: Group ID/path (optional; uses user membership if omitted)
-
-### Makefile
-Development commands:
-
-Node.js targets:
-- `make node-install` - Install dependencies for lib, cli, and electron
-- `make lib-test` - Run lib/ tests
-- `make cli-test` - Run cli/ tests
-- `make electron-test` - Run electron/ tests
-- `make node-test` - Run all Node.js tests (lib + cli + electron)
-- `make node-lint` - Run ESLint on Node.js source files
-- `make node-ci` - Node.js CI pipeline (lint + tests)
-- `make cli-run` - Run CLI application
-- `make cli-dry-run` - Run CLI with --dry-run flag
-- `make electron-build` - Build Electron GUI application binary
-
-Docker:
-- `make docker-build` - Build Docker image
-- `make docker-run` - Run application in Docker container
-
-General:
-- `make clean` - Remove node_modules and build artifacts
-- `make help` - Show all available targets
-
-### electron-builder.config.js
-Electron packaging configuration:
-- Application metadata and icons
-- Platform-specific build options (Windows, macOS, Linux)
-- Auto-update configuration
-- File inclusion/exclusion rules
-
-### Dockerfile
-Container configuration for running the application in Docker.
-
-## Code Conventions and Style
-
-### JavaScript Code Style
-- ES modules (import/export) throughout
-- Use JSDoc for function documentation
-- camelCase for functions and variables
-- PascalCase for classes
-- UPPER_SNAKE_CASE for constants
-- Maximum line length: 100 characters
-
-### Error Handling
-- Use specific exception types (avoid bare catch)
-- Provide context in error messages for debugging
-- Clean up resources in finally blocks
-- Use AbortController for cancellable operations
-
-### Naming Conventions
-- Classes: PascalCase (e.g., `AuthorMapper`)
-- Functions/methods: camelCase (e.g., `fetchGroupMetadata`)
-- Constants: UPPER_SNAKE_CASE (e.g., `MAX_RETRIES`)
-- Private attributes: prefix with underscore (e.g., `_internalState`)
-
-### Frontend (Electron/React)
-- Functional components with hooks
-- IPC communication via `window.electronAPI` (preload bridge)
-- Ant Design components for UI elements (Table, Form, Steps, Progress, etc.)
-- Tailwind CSS utility classes for layout and spacing
-- No CSS modules — use `globals.css` with Tailwind directives
-- No HTTP calls — all data flows through IPC
-- Settings persisted via `electron-store` (loaded on startup)
-
-## Running the Application
-
-### CLI Mode
 ```bash
-node cli/bin/gitlab-dump.js --help
-node cli/bin/gitlab-dump.js --version
-node cli/bin/gitlab-dump.js --url <url> --token <token> --group <group>
-node cli/bin/gitlab-dump.js --dry-run --url <url> --token <token>
-node cli/bin/gitlab-dump.js --update --url <url> --token <token>
-node cli/bin/gitlab-dump.js --interactive
-node cli/bin/gitlab-dump.js --interactive-menu
+npm ci
+npm run lint
+npm test
+npm run test:coverage
+npm run build
+npm run pack
+npm audit --omit=dev --audit-level=high
 ```
 
-Or via Makefile:
-```bash
-make cli-run
-make cli-dry-run
+The equivalent Make targets are `install`, `lint`, `test`, `coverage`, `build`, `pack`, `audit`, and `ci`.
+
+Workspace-specific checks can be run with `npm test --workspace <package-name>` and `npm run lint --workspace <package-name>`.
+
+## CLI contract
+
+The 0.1 invocation without a subcommand is intentionally unsupported:
+
+```text
+gitlab-dump clone
+gitlab-dump transfer plan
+gitlab-dump transfer run
+gitlab-dump transfer status
+gitlab-dump transfer cancel
+gitlab-dump rewrite-history
 ```
 
-### Electron GUI
-```bash
-cd electron
-npm install
-npm run dev       # Development mode with hot reload
-npm run dist      # Build for distribution
-```
+PATs come only from `GITLAB_TOKEN`, `GITLAB_SOURCE_TOKEN`, `GITLAB_DESTINATION_TOKEN`, or a masked interactive prompt. Never add token flags or plaintext credential config fields.
 
-### Docker
-```bash
-make docker-build              # Build Docker image
-make docker-run                # Run in Docker container
-```
+CLI state/report files are written atomically with private permissions. Persist only safe IDs, URLs, statuses, and timestamps. Exit codes are `0` success/query, `1` failure, `2` partial/blocked, and `130` canceled.
 
-## Testing
+## Transfer invariants
 
-Run tests with Jest:
-```bash
-make node-test                 # Run all Node.js tests
-make lib-test                  # Run lib/ tests only
-make cli-test                  # Run cli/ tests only
-make electron-test             # Run electron/ tests only
-```
+- GitLab platform transfer requires HTTPS.
+- A failed or disconnected `POST /bulk_imports` is ambiguous and must not be retried automatically.
+- Resume polls a persisted bulk-import ID instead of issuing another POST.
+- Existing GitLab metadata, issues, merge requests, and wikis are never manually merged.
+- Git-sync creates missing refs, fast-forwards proven branches, leaves divergent branches/conflicting tags unchanged, and never deletes or force-pushes refs.
+- Git-only fallback creates empty group/project skeletons and transfers Git/wiki/LFS data only. Do not describe it as a full migration.
+- Reports enumerate supported, skipped, conflicting, and failed entities and preserve safe correlation IDs/relation failures.
+- The source is read-only.
 
-Test suite includes:
-- Unit tests for all core library modules
-- CLI argument parsing and workflow tests
-- Electron IPC handler tests
-- React component tests
-- Mock responses for external services
+`lib/gitlab-api.js` contains the HTTP contract. GET/HEAD requests may retry transient failures; state-changing requests do not. Every HTTP request and poll must honor an `AbortSignal` and a timeout.
 
-Test files are located in `__tests__/` directories within each package.
+## History rewrite invariants
 
-## Building Binaries
+- Mapping JSON is strict, schema-versioned, and credential-free.
+- `git filter-repo` is mandatory; `git filter-branch` must never be reintroduced.
+- Preview and rewrite always use a separate mirror.
+- A pre-rewrite Git bundle is mandatory and its recovery command is reported.
+- Push requires a fresh preview, the exact confirmation phrase, and one exact `--force-with-lease=<ref>:<old-sha>` per changed ref.
+- Never disable protected branches or retry a lease conflict with force.
 
-### Electron Binary
-```bash
-make electron-build           # Build platform-appropriate binary
-```
+## Secret handling
 
-Output: `electron/dist_electron/` with platform-specific installers
+- Never put credentials in clone URLs, process arguments, logs, plans, reports, renderer state, or ordinary configuration.
+- Git authentication uses a temporary `GIT_ASKPASS`; its helper is deleted in `finally`.
+- Credential-bearing legacy origins must be stripped before display or update.
+- Electron persists secrets only through `safeStorage`. If OS encryption is unavailable, keep them in the main process memory for the session.
+- The OAuth renderer receives only status, verification data, and a safe user profile—never an access token.
 
-## Important Architectural Patterns
+Do not print response bodies or command environments when they could contain secrets. Tests include explicit non-leak assertions.
 
-### Communication Flow
-- **CLI**: `cli/` imports and calls `lib/` modules directly
-- **Electron**: Renderer → IPC (preload.js) → Main process → `lib/` modules
+## Electron boundaries
 
-### Core Library (lib/)
-- `client.js` handles GitLab API communication (pagination, retry, rate limits)
-- `auth.js` manages authentication (OAuth Device Flow or token-based)
-- `cloner.js` orchestrates git clone/pull operations with concurrency control
-- `migration.js` handles git author/committer rewriting via filter-branch
-- `author-mapper.js` loads/saves author mapping configuration (JSON/YAML)
-- `config.js` provides Zod-based configuration validation
-- `reporting.js` generates summary, dry-run, and JSON reports
+`main.js` is only the composition root. Main-process responsibilities are split into:
 
-### Configuration Management
-- Centralized `config.js` with Zod schema validation
-- Environment variable support via dotenv
-- CLI argument overrides environment variables
-- Validation at startup
+- `window-security.js`: sandboxed window, navigation/window denial, application menu;
+- `ipc-handlers.js`: narrow validated IPC handlers;
+- `operation-registry.js`: independent `AbortController` and ownership per operation;
+- `preload.js`: named methods plus one removable operation-event subscription.
 
-### Electron IPC Design
-- Preload script exposes whitelisted IPC channels via `contextBridge`
-- Main process registers `ipcMain.handle()` for each channel
-- Progress events delivered via `webContents.send()`: `migration-progress`, `oauth-progress`, `clone-progress`
-- Active operations (migrations, fetches, clones) tracked with AbortControllers for cancellation
-- `electron-store` used for persistent settings (lazy ESM import via `getStore()`)
-- Core library (`@gitlab-dump/core`) loaded via lazy ESM import (`getCoreLib()`)
+Renderer requests carry operation/session/resource IDs issued by the main process. Main validates sender ownership and resolves user-approved paths. Do not add generic `invoke`, `on`, `off`, or `once` bridges.
 
-## Troubleshooting
+External OAuth URLs must be HTTPS and match the expected GitLab origin. Cancel and shutdown must stop polling and child Git processes.
 
-### GitLab API Connection Issues
-- Verify `GITLAB_URL` is correct (http/https protocol)
-- Check token validity and expiration
-- Ensure OAuth app is registered if using OAuth auth
-- Check network connectivity and firewall rules
+## Tests and coverage
 
-### Git Clone/Pull Failures
-- Verify SSH keys are configured if using SSH URLs
-- Check git credential helper configuration
-- Ensure sufficient disk space for cloning
-- Verify Unix file permissions for clone path
+Core tests include local fake GitLab HTTP contracts and real temporary Git repositories. CLI tests call both injected command handlers and the actual binary. Electron tests cover IPC ownership/security, OAuth values, secret boundaries, UI result states, subscription cleanup, and a production Webpack build.
 
-### Electron/GUI Problems
-- Ensure Node.js and npm are installed
-- Check Node version compatibility (16+)
-- Check browser console for React errors (F12 in dev mode)
-- Review main.js console output for IPC handler errors
+Coverage gates:
 
-### Performance Issues
-- Reduce concurrency limit in config
-- Check system resource usage (CPU, memory, disk I/O)
-- Enable logging to identify bottlenecks
-- Consider pagination for large group operations
+- core: at least 90% statements/lines, 80% functions/branches;
+- CLI and Electron main/renderer: at least 80% statements/lines/functions and 70% branches.
 
-## Code Quality Standards
+Do not silence React, Ant Design, or jsdom warnings. Fix their source. Generated `dist/`, `dist_electron/`, `coverage/`, and `node_modules/` are not source artifacts.
 
-### Before Committing
-1. Run `make node-lint` to check for style issues
-2. Run `make node-test` to ensure tests pass
-3. Update documentation if APIs change
+## Packaging and CI
 
-### CI Pipeline
-The `make node-ci` target runs:
-1. ESLint linter
-2. Jest test suite (lib + cli + electron)
+CI uses `npm ci`, Node 24, lint, coverage, production build, production dependency audit, and unsigned `electron-builder --dir` smoke packaging on Linux, macOS, and Windows. Signing and notarization require release-owner certificates.
 
-All checks must pass before merging to main branch.
+The opt-in GitLab smoke workflow receives credentials only from CI secrets and covers Direct Transfer, existing-project Git-sync, cancel/resume, and relation-failure reporting.
 
-## Common Development Tasks
+## Change checklist
 
-### Adding a New lib/ Module
-1. Create the module file in `lib/`
-2. Export it from `lib/index.js`
-3. Add export path to `lib/package.json` exports map
-4. Write tests in `lib/__tests__/`
-5. Document in this file
-
-### Adding CLI Arguments
-1. Add option to commander in `cli/index.js`
-2. Add corresponding config field in `lib/config.js` if needed
-3. Update `.env.example` if environment variable supported
-4. Add help text for --help output
-
-### Adding IPC Channels (Electron)
-1. Add handler in `electron/main.js` via `ipcMain.handle()`
-2. Expose in `electron/preload.js` via `contextBridge`
-3. Use in React components via `window.electronAPI`
-4. Write tests in `electron/__tests__/`
-
-### Frontend Changes (Electron)
-1. Modify React components in `electron/src/components/`
-2. Use Ant Design components for UI elements, Tailwind CSS for utilities
-3. Test in development mode: `npm run dev`
-4. Build and test final package: `npm run dist`
-
-## Language and Documentation
-
-The project maintains dual-language documentation:
-- **Russian (primary)**: README.MD, commit messages
-- **English (secondary)**: README.en.md, code comments, docstrings
-
-Keep both versions in sync for consistency.
-
-## References
-
-- GitLab API Documentation: https://docs.gitlab.com/ee/api/
-- Electron Documentation: https://www.electronjs.org/docs
-- React Documentation: https://react.dev/
-- Zod Documentation: https://zod.dev/
-- Commander.js: https://github.com/tj/commander.js/
+1. Keep `lib` free of Electron dependencies.
+2. Validate external input with existing schemas or an equally strict boundary.
+3. Add a failing test first for bug fixes and behavior changes.
+4. Preserve cancellation, deadlines, redaction, and cleanup in every new operation.
+5. Update English and Russian README content when public behavior changes.
+6. Run the full root verification commands before merging.

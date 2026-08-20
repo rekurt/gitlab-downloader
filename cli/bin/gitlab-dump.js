@@ -3,9 +3,11 @@
 import { main } from '../index.js';
 
 main(process.argv).then(
-  (code) => process.exit(code),
+  (code) => {
+    process.exitCode = code;
+  },
   (err) => {
     console.error(err.message || err);
-    process.exit(1);
+    process.exitCode = 1;
   }
 );

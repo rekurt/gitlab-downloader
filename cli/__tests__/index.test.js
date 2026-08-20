@@ -1,338 +1,600 @@
-import { jest } from '@jest/globals';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { afterEach, describe, expect, jest, test } from '@jest/globals';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { buildProgram, optsToConfig, findGitRepos, validateCloneConfig } from '../index.js';
+import { join } from 'node:path';
 
-// ─── buildProgram ─────────────────────────────────────────────
+import {
+  buildProgram,
+  main,
+  resolveToken,
+  secureJsonWrite,
+} from '../index.js';
 
-describe('buildProgram', () => {
-  test('returns a Commander program', () => {
+const roots = [];
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
+
+function command(program, ...names) {
+  let current = program;
+  for (const name of names) current = current.commands.find((item) => item.name() === name);
+  return current;
+}
+
+function transferPlan(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    createdAt: '2026-08-20T10:00:00.000Z',
+    source: {
+      url: 'https://source.example.com',
+      version: '18.6.0',
+      fullPath: 'team/app',
+      type: 'group',
+    },
+    destination: {
+      url: 'https://destination.example.com',
+      version: '18.7.0',
+      namespace: 'archive',
+    },
+    entities: [],
+    warnings: [],
+    ...overrides,
+  };
+}
+
+async function temporaryRoot(prefix) {
+  const root = await mkdtemp(join(tmpdir(), prefix));
+  roots.push(root);
+  return root;
+}
+
+function io() {
+  const stdout = [];
+  const stderr = [];
+  return {
+    stdout,
+    stderr,
+    output: (text) => stdout.push(text),
+    error: (text) => stderr.push(text),
+  };
+}
+
+describe('CLI 0.2 command surface', () => {
+  test('exposes only explicit clone, transfer, and rewrite-history entry points', () => {
     const program = buildProgram();
-    expect(program.name()).toBe('gitlab-dump');
-  });
-
-  test('parses --url option', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--url', 'https://gitlab.com']);
-    expect(program.opts().url).toBe('https://gitlab.com');
-  });
-
-  test('parses --token option', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--token', 'my-secret']);
-    expect(program.opts().token).toBe('my-secret');
-  });
-
-  test('parses --group option', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--group', 'my-group']);
-    expect(program.opts().group).toBe('my-group');
-  });
-
-  test('parses --clone-path option', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--clone-path', '/tmp/repos']);
-    expect(program.opts().clonePath).toBe('/tmp/repos');
-  });
-
-  test('parses --dry-run flag', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--dry-run']);
-    expect(program.opts().dryRun).toBe(true);
-  });
-
-  test('dry-run defaults to false', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test']);
-    expect(program.opts().dryRun).toBe(false);
-  });
-
-  test('parses --update flag', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--update']);
-    expect(program.opts().update).toBe(true);
-  });
-
-  test('parses --interactive flag', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--interactive']);
-    expect(program.opts().interactive).toBe(true);
-  });
-
-  test('parses --interactive-menu flag', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--interactive-menu']);
-    expect(program.opts().interactiveMenu).toBe(true);
-  });
-
-  test('parses --concurrency as integer', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--concurrency', '10']);
-    expect(program.opts().concurrency).toBe(10);
-  });
-
-  test('parses --per-page as integer', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--per-page', '50']);
-    expect(program.opts().perPage).toBe(50);
-  });
-
-  test('parses --timeout as integer', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--timeout', '60']);
-    expect(program.opts().timeout).toBe(60);
-  });
-
-  test('parses --api-retries as integer', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--api-retries', '5']);
-    expect(program.opts().apiRetries).toBe(5);
-  });
-
-  test('parses --clone-retries as integer', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--clone-retries', '3']);
-    expect(program.opts().cloneRetries).toBe(3);
-  });
-
-  test('parses --auth-method option', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--auth-method', 'token']);
-    expect(program.opts().authMethod).toBe('token');
-  });
-
-  test('parses --git-auth-mode option', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--git-auth-mode', 'credential_helper']);
-    expect(program.opts().gitAuthMode).toBe('credential_helper');
-  });
-
-  test('parses --oauth-client-id option', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--oauth-client-id', 'abc123']);
-    expect(program.opts().oauthClientId).toBe('abc123');
-  });
-
-  test('parses --oauth-client-secret option', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--oauth-client-secret', 'secret']);
-    expect(program.opts().oauthClientSecret).toBe('secret');
-  });
-
-  test('parses --oauth-scope option', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--oauth-scope', 'api']);
-    expect(program.opts().oauthScope).toBe('api');
-  });
-
-  test('parses --log-level option', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--log-level', 'DEBUG']);
-    expect(program.opts().logLevel).toBe('DEBUG');
-  });
-
-  test('parses --report-json option', () => {
-    const program = buildProgram();
-    program.parse(['node', 'test', '--report-json', '/tmp/report.json']);
-    expect(program.opts().reportJson).toBe('/tmp/report.json');
-  });
-
-  test('parses multiple options together', () => {
-    const program = buildProgram();
-    program.parse([
-      'node', 'test',
-      '--url', 'https://gitlab.example.com',
-      '--token', 'tok123',
-      '--group', 'my/group',
-      '--clone-path', '/data/repos',
-      '--dry-run',
-      '--concurrency', '8',
+    expect(program.version()).toBe('0.2.0');
+    expect(program.commands.map((item) => item.name())).toEqual([
+      'clone',
+      'transfer',
+      'rewrite-history',
     ]);
-    const opts = program.opts();
-    expect(opts.url).toBe('https://gitlab.example.com');
-    expect(opts.token).toBe('tok123');
-    expect(opts.group).toBe('my/group');
-    expect(opts.clonePath).toBe('/data/repos');
-    expect(opts.dryRun).toBe(true);
-    expect(opts.concurrency).toBe(8);
+    expect(command(program, 'transfer').commands.map((item) => item.name())).toEqual([
+      'plan', 'run', 'status', 'cancel',
+    ]);
   });
-});
 
-// ─── optsToConfig ─────────────────────────────────────────────
-
-describe('optsToConfig', () => {
-  test('maps commander opts to config object', () => {
-    const opts = {
-      url: 'https://gitlab.com',
-      token: 'tok',
-      group: 'grp',
-      clonePath: '/repos',
-      perPage: 50,
-      timeout: 60,
-      apiRetries: 5,
-      cloneRetries: 3,
-      concurrency: 10,
-      dryRun: true,
-      update: true,
-      logLevel: 'DEBUG',
-      reportJson: '/tmp/report.json',
-      authMethod: 'token',
-      gitAuthMode: 'credential_helper',
-      oauthClientId: 'cid',
-      oauthClientSecret: 'csecret',
-      oauthScope: 'api',
-      interactive: false,
-      interactiveMenu: false,
+  test('does not expose PAT or generic credential-helper flags anywhere', () => {
+    const flags = [];
+    const visit = (item) => {
+      flags.push(...item.options.map((option) => option.flags));
+      item.commands.forEach(visit);
     };
-
-    const config = optsToConfig(opts);
-
-    expect(config.url).toBe('https://gitlab.com');
-    expect(config.token).toBe('tok');
-    expect(config.group).toBe('grp');
-    expect(config.clonePath).toBe('/repos');
-    expect(config.perPage).toBe(50);
-    expect(config.requestTimeout).toBe(60);
-    expect(config.maxRetries).toBe(5);
-    expect(config.cloneRetries).toBe(3);
-    expect(config.maxConcurrency).toBe(10);
-    expect(config.dryRun).toBe(true);
-    expect(config.updateExisting).toBe(true);
-    expect(config.logLevel).toBe('DEBUG');
-    expect(config.reportJson).toBe('/tmp/report.json');
-    expect(config.authMethod).toBe('token');
-    expect(config.gitAuthMode).toBe('credential_helper');
-    expect(config.oauthClientId).toBe('cid');
-    expect(config.oauthClientSecret).toBe('csecret');
-    expect(config.oauthScope).toBe('api');
-  });
-
-  test('handles missing optional fields', () => {
-    const config = optsToConfig({});
-    expect(config.url).toBe('');
-    expect(config.token).toBeNull();
-    expect(config.group).toBeNull();
-    expect(config.dryRun).toBe(false);
-    expect(config.updateExisting).toBe(false);
-    expect(config.reportJson).toBeNull();
-    expect(config.oauthClientId).toBeNull();
-    expect(config.oauthClientSecret).toBeNull();
-  });
-
-  test('uses defaults for numeric fields when undefined', () => {
-    const config = optsToConfig({});
-    expect(config.perPage).toBe(100);
-    expect(config.requestTimeout).toBe(30);
-    expect(config.maxRetries).toBe(3);
-    expect(config.cloneRetries).toBe(2);
-    expect(config.maxConcurrency).toBe(5);
+    visit(buildProgram());
+    expect(flags.join(' ')).not.toMatch(/--token|--source-token|--destination-token|git-auth-mode/);
   });
 });
 
-// ─── validateCloneConfig ─────────────────────────────────────
-
-describe('validateCloneConfig', () => {
-  test('returns error when url is missing', () => {
-    const err = validateCloneConfig({ url: '', authMethod: 'token', token: 'tok' });
-    expect(err).toContain('URL is required');
+describe('secret handling', () => {
+  test('uses side-specific environment variables and falls back to GITLAB_TOKEN', async () => {
+    await expect(resolveToken('source', {
+      env: { GITLAB_SOURCE_TOKEN: 'source-secret', GITLAB_TOKEN: 'fallback' },
+    })).resolves.toBe('source-secret');
+    await expect(resolveToken('destination', {
+      env: { GITLAB_TOKEN: 'fallback' },
+    })).resolves.toBe('fallback');
   });
 
-  test('returns error when token is missing for token auth', () => {
-    const err = validateCloneConfig({ url: 'https://gitlab.com', authMethod: 'token', token: null });
-    expect(err).toContain('token is required');
+  test('uses a hidden prompt when no token is in the environment', async () => {
+    const prompts = [];
+    await expect(resolveToken('destination', {
+      env: {},
+      isTTY: true,
+      prompt: async (question) => {
+        prompts.push(question);
+        return 'prompted-secret';
+      },
+    })).resolves.toBe('prompted-secret');
+    expect(prompts[0]).toMatchObject({ type: 'password', mask: '*' });
   });
 
-  test('returns error when oauth client id is missing for oauth auth', () => {
-    const err = validateCloneConfig({ url: 'https://gitlab.com', authMethod: 'oauth', oauthClientId: null });
-    expect(err).toContain('OAuth client ID is required');
+  test('fails without an environment token in non-interactive mode', async () => {
+    await expect(resolveToken('source', { env: {}, isTTY: false })).rejects.toThrow(
+      'GITLAB_SOURCE_TOKEN or GITLAB_TOKEN',
+    );
   });
 
-  test('returns null for valid token config', () => {
-    const err = validateCloneConfig({
-      url: 'https://gitlab.com',
-      authMethod: 'token',
-      token: 'my-token',
-    });
-    expect(err).toBeNull();
-  });
-
-  test('returns null for valid oauth config', () => {
-    const err = validateCloneConfig({
-      url: 'https://gitlab.com',
-      authMethod: 'oauth',
-      oauthClientId: 'cid',
-    });
-    expect(err).toBeNull();
+  test('rejects an empty interactive token', async () => {
+    await expect(resolveToken('source', {
+      env: {},
+      isTTY: true,
+      prompt: async () => '',
+    })).rejects.toThrow('non-empty');
   });
 });
 
-// ─── findGitRepos ─────────────────────────────────────────────
+test('secureJsonWrite creates private JSON files', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gitlab-dump-cli-test-'));
+  roots.push(root);
+  const path = join(root, 'nested', 'report.json');
+  await secureJsonWrite(path, { status: 'finished' });
+  expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({ status: 'finished' });
+  if (process.platform !== 'win32') expect((await stat(path)).mode & 0o777).toBe(0o600);
+});
 
-describe('findGitRepos', () => {
-  const testDir = join(tmpdir(), `cli-test-repos-${Date.now()}`);
-
-  beforeAll(() => {
-    // Create structure:
-    // testDir/
-    //   repo1/.git/
-    //   group/repo2/.git/
-    //   group/subgroup/repo3/.git/
-    //   not-a-repo/
-    mkdirSync(join(testDir, 'repo1', '.git'), { recursive: true });
-    mkdirSync(join(testDir, 'group', 'repo2', '.git'), { recursive: true });
-    mkdirSync(join(testDir, 'group', 'subgroup', 'repo3', '.git'), { recursive: true });
-    mkdirSync(join(testDir, 'not-a-repo'), { recursive: true });
+test('transfer plan writes a token-free versioned plan and returns JSON', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gitlab-dump-cli-plan-test-'));
+  roots.push(root);
+  const outputPath = join(root, 'plan.json');
+  const stdout = [];
+  const plan = transferPlan();
+  const exitCode = await main([
+    'node', 'gitlab-dump', 'transfer', 'plan',
+    '--source-url', plan.source.url,
+    '--destination-url', plan.destination.url,
+    '--source-path', plan.source.fullPath,
+    '--destination-namespace', plan.destination.namespace,
+    '--out', outputPath,
+  ], {
+    env: {
+      GITLAB_SOURCE_TOKEN: 'source-must-not-leak',
+      GITLAB_DESTINATION_TOKEN: 'destination-must-not-leak',
+    },
+    output: (text) => stdout.push(text),
+    error: () => {},
+    core: {
+      planTransfer: async (input) => {
+        expect(input.source.token).toBe('source-must-not-leak');
+        expect(input.destination.token).toBe('destination-must-not-leak');
+        return plan;
+      },
+    },
   });
 
-  afterAll(() => {
-    rmSync(testDir, { recursive: true, force: true });
+  expect(exitCode).toBe(0);
+  const serialized = `${await readFile(outputPath, 'utf8')}${stdout.join('')}`;
+  expect(serialized).not.toContain('must-not-leak');
+  expect(JSON.parse(await readFile(outputPath, 'utf8'))).toEqual(plan);
+});
+
+describe('clone command', () => {
+  test('awaits user projects and emits a dry-run preview', async () => {
+    const stream = io();
+    const code = await main([
+      'node', 'gitlab-dump', 'clone',
+      '--url', 'https://gitlab.example.com',
+      '--clone-path', '/safe/output',
+      '--dry-run',
+    ], {
+      env: { GITLAB_SOURCE_TOKEN: 'secret' },
+      ...stream,
+      core: {
+        getUserProjects: async () => [{
+          id: 17,
+          name: 'app',
+          path: 'app',
+          path_with_namespace: 'team/app',
+          http_url_to_repo: 'https://gitlab.example.com/team/app.git',
+        }],
+      },
+    });
+
+    expect(code).toBe(0);
+    expect(JSON.parse(stream.stdout.join(''))).toMatchObject({
+      status: 'preview',
+      repositories: [{ id: 17, fullPath: 'team/app' }],
+    });
   });
 
-  test('finds all git repos recursively', () => {
-    const repos = findGitRepos(testDir);
-    expect(repos).toHaveLength(3);
+  test('uses group metadata and reports real clone failures', async () => {
+    const root = await temporaryRoot('gitlab-dump-cli-clone-');
+    const reportPath = join(root, 'clone-report.json');
+    const stream = io();
+    const fetchGroupMetadata = jest.fn().mockResolvedValue({ full_path: 'team/platform' });
+    const getAllProjects = jest.fn().mockResolvedValue([{ id: 1 }]);
+    const cloneAllRepositories = jest.fn().mockResolvedValue([{ id: 1, status: 'failed' }]);
+    const code = await main([
+      'node', 'gitlab-dump', 'clone',
+      '--url', 'https://gitlab.example.com',
+      '--group', 'team/platform',
+      '--update',
+      '--report', reportPath,
+    ], {
+      env: { GITLAB_TOKEN: 'secret' },
+      ...stream,
+      core: { fetchGroupMetadata, getAllProjects, cloneAllRepositories },
+    });
+
+    expect(code).toBe(1);
+    expect(getAllProjects).toHaveBeenCalledWith(
+      expect.objectContaining({ updateExisting: true }),
+      'team/platform',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(JSON.parse(await readFile(reportPath, 'utf8'))).toMatchObject({ status: 'failed' });
   });
 
-  test('includes root-level repos', () => {
-    const repos = findGitRepos(testDir);
-    expect(repos).toContain(join(testDir, 'repo1'));
+  test('returns partial when only some clone operations fail', async () => {
+    const stream = io();
+    const code = await main([
+      'node', 'gitlab-dump', 'clone', '--url', 'https://gitlab.example.com',
+    ], {
+      env: { GITLAB_SOURCE_TOKEN: 'secret' },
+      ...stream,
+      core: {
+        getUserProjects: async () => [{ id: 1 }, { id: 2 }],
+        cloneAllRepositories: async () => [
+          { id: 1, status: 'success' },
+          { id: 2, status: 'failed', message: 'not found' },
+        ],
+      },
+    });
+
+    expect(code).toBe(2);
+    expect(JSON.parse(stream.stdout.join(''))).toMatchObject({ status: 'partial' });
+  });
+});
+
+describe('transfer run lifecycle', () => {
+  test('persists token-free state, streams events, and returns partial as exit 2', async () => {
+    const root = await temporaryRoot('gitlab-dump-cli-transfer-');
+    const planPath = join(root, 'plan.json');
+    const reportPath = join(root, 'report.json');
+    await writeFile(planPath, JSON.stringify(transferPlan()));
+    const stream = io();
+    const executeTransfer = jest.fn(async (_plan, options) => {
+      await options.onStateChange({ status: 'running', bulkImportId: 44 });
+      options.onEvent({ runId: options.runId, status: 'running', phase: 'poll' });
+      return { schemaVersion: 1, runId: options.runId, status: 'partial', entities: [] };
+    });
+
+    const code = await main([
+      'node', 'gitlab-dump', 'transfer', 'run',
+      '--plan', planPath,
+      '--run-id', 'run-44',
+      '--report', reportPath,
+    ], {
+      env: {
+        XDG_STATE_HOME: root,
+        GITLAB_SOURCE_TOKEN: 'source-secret',
+        GITLAB_DESTINATION_TOKEN: 'destination-secret',
+      },
+      ...stream,
+      core: { executeTransfer },
+    });
+
+    expect(code).toBe(2);
+    expect(executeTransfer.mock.calls[0][1]).toMatchObject({
+      runId: 'run-44',
+      sourceToken: 'source-secret',
+      destinationToken: 'destination-secret',
+      resumeBulkImportId: null,
+    });
+    const state = await readFile(join(root, 'gitlab-dump', 'runs', 'run-44.json'), 'utf8');
+    expect(state).toContain('"bulkImportId": 44');
+    expect(state).not.toContain('"pid"');
+    expect(`${state}${stream.stdout}${stream.stderr}`).not.toContain('source-secret');
+    expect(JSON.parse(await readFile(reportPath, 'utf8'))).toMatchObject({ status: 'partial' });
   });
 
-  test('includes nested repos', () => {
-    const repos = findGitRepos(testDir);
-    expect(repos).toContain(join(testDir, 'group', 'repo2'));
-    expect(repos).toContain(join(testDir, 'group', 'subgroup', 'repo3'));
+  test('cancels a running local operation through private state without storing a PID', async () => {
+    const root = await temporaryRoot('gitlab-dump-cli-state-cancel-');
+    const planPath = join(root, 'plan.json');
+    const statePath = join(root, 'gitlab-dump', 'runs', 'cancel-local.json');
+    await writeFile(planPath, JSON.stringify(transferPlan()));
+    const env = {
+      XDG_STATE_HOME: root,
+      GITLAB_SOURCE_TOKEN: 'source',
+      GITLAB_DESTINATION_TOKEN: 'destination',
+    };
+    const executeTransfer = jest.fn(async (_plan, options) => {
+      await options.onStateChange({
+        runId: options.runId,
+        status: 'running',
+        bulkImportId: null,
+      });
+      await new Promise((resolve) => {
+        options.signal.addEventListener('abort', resolve, { once: true });
+      });
+      return { runId: options.runId, status: 'canceled', entities: [] };
+    });
+    const running = main([
+      'node', 'gitlab-dump', 'transfer', 'run', '--plan', planPath, '--run-id', 'cancel-local',
+    ], { env, output: () => {}, error: () => {}, core: { executeTransfer } });
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      try {
+        await stat(statePath);
+        break;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    }
+
+    await expect(main([
+      'node', 'gitlab-dump', 'transfer', 'cancel', '--run-id', 'cancel-local',
+    ], { env, output: () => {}, error: () => {} })).resolves.toBe(0);
+    await expect(running).resolves.toBe(130);
+    const state = JSON.parse(await readFile(statePath, 'utf8'));
+    expect(state).toMatchObject({ status: 'canceled' });
+    expect(state).not.toHaveProperty('pid');
   });
 
-  test('does not include non-repo directories', () => {
-    const repos = findGitRepos(testDir);
-    expect(repos).not.toContain(join(testDir, 'not-a-repo'));
+  test('resumes a matching bulk import and rejects state belonging to another plan', async () => {
+    const root = await temporaryRoot('gitlab-dump-cli-resume-');
+    const planPath = join(root, 'plan.json');
+    const stateDirectory = join(root, 'gitlab-dump', 'runs');
+    await mkdir(stateDirectory, { recursive: true });
+    await writeFile(planPath, JSON.stringify(transferPlan()));
+    await writeFile(join(stateDirectory, 'resume-1.json'), JSON.stringify({
+      sourceUrl: 'https://source.example.com',
+      destinationUrl: 'https://destination.example.com',
+      bulkImportId: 99,
+      status: 'running',
+    }));
+    const executeTransfer = jest.fn().mockResolvedValue({ status: 'finished' });
+    const shared = {
+      env: {
+        XDG_STATE_HOME: root,
+        GITLAB_SOURCE_TOKEN: 'source',
+        GITLAB_DESTINATION_TOKEN: 'destination',
+      },
+      output: () => {},
+      error: () => {},
+      core: { executeTransfer },
+    };
+    await expect(main([
+      'node', 'gitlab-dump', 'transfer', 'run', '--plan', planPath, '--run-id', 'resume-1',
+    ], shared)).resolves.toBe(0);
+    expect(executeTransfer.mock.calls[0][1].resumeBulkImportId).toBe(99);
+
+    await writeFile(join(stateDirectory, 'wrong-plan.json'), JSON.stringify({
+      sourceUrl: 'https://other.example.com',
+      destinationUrl: 'https://destination.example.com',
+      status: 'running',
+    }));
+    await expect(main([
+      'node', 'gitlab-dump', 'transfer', 'run', '--plan', planPath, '--run-id', 'wrong-plan',
+    ], shared)).resolves.toBe(1);
   });
 
-  test('respects maxDepth', () => {
-    const repos = findGitRepos(testDir, 0);
-    // At depth 0, we should find repo1 (it's at the first level of entries)
-    // but group/ is not a repo itself, so repos under group need depth > 0
-    expect(repos.some((r) => r.includes('repo3'))).toBe(false);
+  test('refreshes remote status and cancels a recorded bulk import', async () => {
+    const root = await temporaryRoot('gitlab-dump-cli-status-');
+    const stateDirectory = join(root, 'gitlab-dump', 'runs');
+    await mkdir(stateDirectory, { recursive: true });
+    const statePath = join(stateDirectory, 'run-status.json');
+    await writeFile(statePath, JSON.stringify({
+      sourceUrl: 'https://source.example.com',
+      destinationUrl: 'https://destination.example.com',
+      bulkImportId: 77,
+      status: 'running',
+      pid: process.pid,
+    }));
+    const stream = io();
+    const getBulkImport = jest.fn().mockResolvedValue({ status: 'failed' });
+    const cancelBulkImport = jest.fn().mockResolvedValue({ status: 'canceled' });
+    const shared = {
+      env: { XDG_STATE_HOME: root, GITLAB_DESTINATION_TOKEN: 'destination' },
+      ...stream,
+      core: { getBulkImport, cancelBulkImport },
+    };
+    await expect(main([
+      'node', 'gitlab-dump', 'transfer', 'status', '--run-id', 'run-status',
+    ], shared)).resolves.toBe(1);
+    expect(getBulkImport).toHaveBeenCalledWith(
+      { url: 'https://destination.example.com', token: 'destination' },
+      77,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+
+    await writeFile(statePath, JSON.stringify({
+      destinationUrl: 'https://destination.example.com',
+      bulkImportId: 77,
+      status: 'running',
+      pid: process.pid,
+    }));
+    await expect(main([
+      'node', 'gitlab-dump', 'transfer', 'cancel', '--run-id', 'run-status',
+    ], shared)).resolves.toBe(0);
+    expect(cancelBulkImport).toHaveBeenCalled();
+    expect(JSON.parse(await readFile(statePath, 'utf8')).status).toBe('canceled');
   });
 
-  test('returns empty for non-existent directory', () => {
-    const repos = findGitRepos('/non/existent/path');
-    expect(repos).toHaveLength(0);
+  test('returns terminal status without an API call and validates state/run IDs', async () => {
+    const root = await temporaryRoot('gitlab-dump-cli-terminal-status-');
+    const stateDirectory = join(root, 'gitlab-dump', 'runs');
+    await mkdir(stateDirectory, { recursive: true });
+    await writeFile(join(stateDirectory, 'canceled-1.json'), JSON.stringify({ status: 'canceled' }));
+    const getBulkImport = jest.fn();
+    const shared = {
+      env: { XDG_STATE_HOME: root },
+      output: () => {},
+      error: () => {},
+      core: { getBulkImport },
+    };
+    await expect(main([
+      'node', 'gitlab-dump', 'transfer', 'status', '--run-id', 'canceled-1',
+    ], shared)).resolves.toBe(130);
+    expect(getBulkImport).not.toHaveBeenCalled();
+    await expect(main([
+      'node', 'gitlab-dump', 'transfer', 'status', '--run-id', '../invalid',
+    ], shared)).resolves.toBe(1);
+    await expect(main([
+      'node', 'gitlab-dump', 'transfer', 'status', '--run-id', 'missing-1',
+    ], shared)).resolves.toBe(1);
+
+    await writeFile(join(stateDirectory, 'broken-1.json'), '{');
+    await expect(main([
+      'node', 'gitlab-dump', 'transfer', 'status', '--run-id', 'broken-1',
+    ], shared)).resolves.toBe(1);
+  });
+});
+
+describe('history rewrite command', () => {
+  test('previews a local repository and writes a report without requesting a token', async () => {
+    const root = await temporaryRoot('gitlab-dump-cli-rewrite-preview-');
+    const mappingPath = join(root, 'mapping.json');
+    const reportPath = join(root, 'report.json');
+    await writeFile(mappingPath, JSON.stringify({ schemaVersion: 1, mappings: [] }));
+    const previewHistoryRewrite = jest.fn().mockResolvedValue({
+      status: 'preview', changedCommits: 2, changedRefs: ['refs/heads/main'],
+    });
+    const code = await main([
+      'node', 'gitlab-dump', 'rewrite-history',
+      '--repository', join(root, 'source.git'),
+      '--mapping', mappingPath,
+      '--output', join(root, 'unused.git'),
+      '--dry-run',
+      '--report', reportPath,
+    ], {
+      env: {},
+      output: () => {},
+      error: () => {},
+      core: { previewHistoryRewrite },
+    });
+    expect(code).toBe(0);
+    expect(previewHistoryRewrite.mock.calls[0][0].token).toBeUndefined();
+    expect(JSON.parse(await readFile(reportPath, 'utf8'))).toMatchObject({ status: 'preview' });
   });
 
-  test('handles empty directory', () => {
-    const emptyDir = join(testDir, 'empty');
-    mkdirSync(emptyDir, { recursive: true });
-    const repos = findGitRepos(emptyDir);
-    expect(repos).toHaveLength(0);
+  test('requires interactive push confirmation and passes both side tokens', async () => {
+    const root = await temporaryRoot('gitlab-dump-cli-rewrite-push-');
+    const mappingPath = join(root, 'mapping.json');
+    await writeFile(mappingPath, JSON.stringify({ schemaVersion: 1, mappings: [] }));
+    const output = [];
+    const diagnostics = [];
+    const previewResult = {
+      status: 'preview', changedCommits: 7, changedRefs: ['refs/heads/main', 'refs/tags/v1'],
+    };
+    const previewHistoryRewrite = jest.fn().mockResolvedValue(previewResult);
+    const rewriteHistory = jest.fn().mockResolvedValue({ status: 'finished' });
+    const code = await main([
+      'node', 'gitlab-dump', 'rewrite-history',
+      '--repository', 'https://source.example.com/team/app.git',
+      '--mapping', mappingPath,
+      '--output', join(root, 'rewritten.git'),
+      '--push',
+    ], {
+      env: {
+        GITLAB_SOURCE_TOKEN: 'source',
+        GITLAB_DESTINATION_TOKEN: 'destination',
+      },
+      isTTY: true,
+      prompt: async () => {
+        expect(diagnostics.join('')).toContain('7');
+        expect(diagnostics.join('')).toContain('refs/heads/main');
+        return 'I UNDERSTAND THAT COMMIT SHAS WILL CHANGE';
+      },
+      output: (text) => output.push(text),
+      error: (text) => diagnostics.push(text),
+      core: { previewHistoryRewrite, rewriteHistory },
+    });
+    expect(code).toBe(0);
+    expect(previewHistoryRewrite).toHaveBeenCalledWith(expect.objectContaining({
+      repository: 'https://source.example.com/team/app.git',
+      token: 'source',
+    }), expect.any(Object));
+    expect(previewHistoryRewrite.mock.invocationCallOrder[0])
+      .toBeLessThan(rewriteHistory.mock.invocationCallOrder[0]);
+    expect(rewriteHistory.mock.calls[0][0]).toMatchObject({
+      token: 'source',
+      destinationToken: 'destination',
+      push: true,
+      confirmation: 'I UNDERSTAND THAT COMMIT SHAS WILL CHANGE',
+      preview: previewResult,
+    });
   });
 
-  test('directory that is itself a git repo', () => {
-    const repoDir = join(testDir, 'repo1');
-    const repos = findGitRepos(repoDir);
-    expect(repos).toHaveLength(1);
-    expect(repos[0]).toBe(repoDir);
+  test('returns exit 1 for a recoverable failed rewrite report', async () => {
+    const root = await temporaryRoot('gitlab-dump-cli-rewrite-failed-');
+    const mappingPath = join(root, 'mapping.json');
+    await writeFile(mappingPath, JSON.stringify({ schemaVersion: 1, mappings: [] }));
+    await expect(main([
+      'node', 'gitlab-dump', 'rewrite-history',
+      '--repository', join(root, 'source.git'),
+      '--mapping', mappingPath,
+      '--output', join(root, 'rewritten.git'),
+    ], {
+      env: {},
+      output: () => {},
+      error: () => {},
+      core: { rewriteHistory: jest.fn().mockResolvedValue({
+        status: 'failed', backupPath: join(root, 'before.bundle'), error: 'lease conflict',
+      }) },
+    })).resolves.toBe(1);
   });
+});
+
+test('reports invalid values and redacts secrets from operation failures', async () => {
+  const stream = io();
+  await expect(main([
+    'node', 'gitlab-dump', 'clone', '--url', 'https://gitlab.example.com', '--concurrency', 'NaN',
+  ], stream)).resolves.toBe(1);
+  await expect(main([
+    'node', 'gitlab-dump', 'clone', '--url', 'https://gitlab.example.com',
+  ], {
+    env: { GITLAB_SOURCE_TOKEN: 'must-not-leak' },
+    ...stream,
+    core: { getUserProjects: async () => { throw new Error('failure must-not-leak'); } },
+  })).resolves.toBe(1);
+  expect(stream.stderr.join('')).not.toContain('must-not-leak');
+});
+
+test('parses explicit numeric and project options and reports blocked plans', async () => {
+  const root = await temporaryRoot('gitlab-dump-cli-parsers-');
+  const plan = transferPlan({
+    source: { ...transferPlan().source, type: 'project' },
+    entities: [{
+      id: 'project:team/app',
+      type: 'project',
+      sourceFullPath: 'team/app',
+      destinationFullPath: 'archive/app',
+      mode: 'blocked',
+      reasons: ['blocked for test'],
+      warnings: [],
+    }],
+  });
+  const code = await main([
+    'node', 'gitlab-dump', 'transfer', 'plan',
+    '--source-url', plan.source.url,
+    '--destination-url', plan.destination.url,
+    '--source-path', plan.source.fullPath,
+    '--source-type', 'project',
+    '--destination-namespace', plan.destination.namespace,
+    '--out', join(root, 'plan.json'),
+  ], {
+    env: { GITLAB_SOURCE_TOKEN: 'source', GITLAB_DESTINATION_TOKEN: 'destination' },
+    output: () => {},
+    error: () => {},
+    core: { planTransfer: jest.fn().mockResolvedValue(plan) },
+  });
+  expect(code).toBe(2);
+
+  await expect(main([
+    'node', 'gitlab-dump', 'clone',
+    '--url', 'https://gitlab.example.com',
+    '--concurrency', '2', '--per-page', '50', '--timeout', '5',
+    '--api-retries', '1', '--clone-retries', '1', '--dry-run',
+  ], {
+    env: { GITLAB_TOKEN: 'token' },
+    output: () => {},
+    error: () => {},
+    core: { getUserProjects: jest.fn().mockResolvedValue([]) },
+  })).resolves.toBe(0);
+});
+
+test('handles help, version, and missing-subcommand parse outcomes in-process', async () => {
+  const stream = io();
+  await expect(main(['node', 'gitlab-dump', '--help'], stream)).resolves.toBe(0);
+  await expect(main(['node', 'gitlab-dump', '--version'], stream)).resolves.toBe(0);
+  await expect(main(['node', 'gitlab-dump'], stream)).resolves.toBe(1);
+  expect(stream.stderr.join('')).toContain('subcommand');
 });

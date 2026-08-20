@@ -1,47 +1,28 @@
-import React from "react";
-import { Layout, Menu } from "antd";
+import { Layout, Menu } from 'antd';
 import {
-  SettingOutlined,
   CloudDownloadOutlined,
-  FolderOutlined,
+  HistoryOutlined,
+  SettingOutlined,
   SwapOutlined,
-  ProjectOutlined,
-} from "@ant-design/icons";
+} from '@ant-design/icons';
 
-const { Sider, Content } = Layout;
-
-const menuItems = [
-  { key: "settings", icon: <SettingOutlined />, label: "Settings" },
-  { key: "projects", icon: <ProjectOutlined />, label: "Projects" },
-  { key: "clone", icon: <CloudDownloadOutlined />, label: "Clone" },
-  { key: "repos", icon: <FolderOutlined />, label: "Repositories" },
-  { key: "migration", icon: <SwapOutlined />, label: "Migration" },
+const items = [
+  { key: 'settings', icon: <SettingOutlined />, label: 'Settings' },
+  { key: 'clone', icon: <CloudDownloadOutlined />, label: 'Clone' },
+  { key: 'transfer', icon: <SwapOutlined />, label: 'Transfer' },
+  { key: 'rewrite', icon: <HistoryOutlined />, label: 'Rewrite history' },
 ];
 
-function AppLayout({ currentView, onNavigate, children }) {
+export default function AppLayout({ currentView, onNavigate, children }) {
   return (
     <Layout className="min-h-screen">
-      <Sider
-        breakpoint="lg"
-        collapsedWidth="64"
-        className="!bg-white border-r border-gray-200"
-      >
-        <div className="h-14 flex items-center justify-center border-b border-gray-200">
-          <span className="text-lg font-bold text-gray-800">GitLab Dump</span>
+      <Layout.Sider width={220} className="!bg-white border-r border-gray-200">
+        <div className="h-14 flex items-center px-5 border-b border-gray-200 font-semibold">
+          GitLab Dump 0.2
         </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[currentView]}
-          items={menuItems}
-          onClick={({ key }) => onNavigate(key)}
-          className="border-r-0"
-        />
-      </Sider>
-      <Layout>
-        <Content className="p-6 bg-gray-50">{children}</Content>
-      </Layout>
+        <Menu mode="inline" selectedKeys={[currentView]} items={items} onClick={({ key }) => onNavigate(key)} />
+      </Layout.Sider>
+      <Layout.Content className="p-6 bg-gray-50">{children}</Layout.Content>
     </Layout>
   );
 }
-
-export default AppLayout;

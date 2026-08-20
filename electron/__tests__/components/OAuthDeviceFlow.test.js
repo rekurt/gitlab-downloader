@@ -1,296 +1,76 @@
-import React from "react";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-} from "@testing-library/react";
-import "@testing-library/jest-dom";
-import { App as AntApp } from "antd";
-import OAuthDeviceFlow from "../../src/components/OAuthDeviceFlow";
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import OAuthDeviceFlow from '../../src/components/OAuthDeviceFlow';
 
-function renderWithAntd(ui) {
-  return render(<AntApp>{ui}</AntApp>);
-}
-
-describe("OAuthDeviceFlow", () => {
-  let mockStartOAuthDeviceFlow;
-  let oauthProgressCallback;
-  let cleanupFn;
-
-  beforeEach(() => {
-    mockStartOAuthDeviceFlow = jest.fn();
-    cleanupFn = jest.fn();
-    oauthProgressCallback = null;
-
+describe('OAuthDeviceFlow', () => {
+  test('uses current form values, never returns a token, and cleans up its subscription', async () => {
+    let listener;
+    const cleanup = jest.fn();
+    const onAuthorized = jest.fn();
+    const currentValues = {
+      gitlabUrl: 'https://current.example.com',
+      oauthClientId: 'current-client',
+      oauthScope: 'api',
+    };
     window.electronAPI = {
-      startOAuthDeviceFlow: mockStartOAuthDeviceFlow,
-      onOAuthProgress: jest.fn((cb) => {
-        oauthProgressCallback = cb;
-        return cleanupFn;
+      startOAuth: jest.fn().mockResolvedValue({
+        success: true,
+        operationId: 'oauth-1',
+        userCode: 'ABCD',
+        verificationUri: 'https://current.example.com/oauth/device',
+      }),
+      openOAuth: jest.fn(),
+      cancelOperation: jest.fn(),
+      onOperationEvent: jest.fn((callback) => {
+        listener = callback;
+        return cleanup;
       }),
     };
-
-    // Mock clipboard
-    Object.assign(navigator, {
-      clipboard: {
-        writeText: jest.fn().mockResolvedValue(undefined),
-      },
-    });
-  });
-
-  afterEach(() => {
-    delete window.electronAPI;
-    jest.restoreAllMocks();
-  });
-
-  test("renders idle state with authorize button", async () => {
+    const view = render(<OAuthDeviceFlow getValues={() => currentValues} onAuthorized={onAuthorized} />);
+    fireEvent.click(screen.getByTestId('oauth-start'));
+    await waitFor(() => expect(window.electronAPI.startOAuth).toHaveBeenCalledWith(currentValues));
     await act(async () => {
-      renderWithAntd(<OAuthDeviceFlow onSuccess={jest.fn()} />);
-    });
-
-    expect(screen.getByTestId("start-oauth-btn")).toBeInTheDocument();
-    expect(screen.getByText("Authorize with OAuth")).toBeInTheDocument();
-  });
-
-  test("transitions to pending state after clicking authorize", async () => {
-    mockStartOAuthDeviceFlow.mockResolvedValue({
-      success: true,
-      verificationUri: "https://gitlab.com/oauth/authorize",
-      userCode: "ABCD-1234",
-      verificationUriComplete:
-        "https://gitlab.com/oauth/authorize?code=ABCD-1234",
-    });
-
-    await act(async () => {
-      renderWithAntd(<OAuthDeviceFlow onSuccess={jest.fn()} />);
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("start-oauth-btn"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("oauth-pending")).toBeInTheDocument();
-    });
-
-    expect(screen.getByTestId("oauth-user-code")).toHaveTextContent(
-      "ABCD-1234",
-    );
-    expect(screen.getByTestId("oauth-link")).toBeInTheDocument();
-    expect(screen.getByText("Waiting for authorization...")).toBeInTheDocument();
-  });
-
-  test("shows error state when start fails", async () => {
-    mockStartOAuthDeviceFlow.mockResolvedValue({
-      success: false,
-      error: "OAuth Client ID is required",
-    });
-
-    await act(async () => {
-      renderWithAntd(<OAuthDeviceFlow onSuccess={jest.fn()} />);
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("start-oauth-btn"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("oauth-error")).toBeInTheDocument();
-    });
-
-    expect(
-      screen.getByText("OAuth Client ID is required"),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("oauth-retry-btn")).toBeInTheDocument();
-  });
-
-  test("shows success state when oauth-progress receives success", async () => {
-    mockStartOAuthDeviceFlow.mockResolvedValue({
-      success: true,
-      verificationUri: "https://gitlab.com/oauth/authorize",
-      userCode: "ABCD-1234",
-      verificationUriComplete: "",
-    });
-
-    const onSuccess = jest.fn();
-
-    await act(async () => {
-      renderWithAntd(<OAuthDeviceFlow onSuccess={onSuccess} />);
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("start-oauth-btn"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("oauth-pending")).toBeInTheDocument();
-    });
-
-    // Simulate success from main process
-    await act(async () => {
-      oauthProgressCallback({ status: "success", token: "test-token-abc" });
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("oauth-success")).toBeInTheDocument();
-    });
-
-    expect(onSuccess).toHaveBeenCalledWith("test-token-abc");
-  });
-
-  test("shows error state when oauth-progress receives error", async () => {
-    mockStartOAuthDeviceFlow.mockResolvedValue({
-      success: true,
-      verificationUri: "https://gitlab.com/oauth/authorize",
-      userCode: "ABCD-1234",
-      verificationUriComplete: "",
-    });
-
-    await act(async () => {
-      renderWithAntd(<OAuthDeviceFlow onSuccess={jest.fn()} />);
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("start-oauth-btn"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("oauth-pending")).toBeInTheDocument();
-    });
-
-    // Simulate error from main process
-    await act(async () => {
-      oauthProgressCallback({
-        status: "error",
-        message: "Device authorization expired",
+      listener({
+        operationId: 'oauth-1',
+        status: 'finished',
+        profile: { username: 'alice', name: 'Alice' },
       });
     });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("oauth-error")).toBeInTheDocument();
-    });
-
-    expect(
-      screen.getByText("Device authorization expired"),
-    ).toBeInTheDocument();
-  });
-
-  test("retry button restarts the flow after error", async () => {
-    mockStartOAuthDeviceFlow
-      .mockResolvedValueOnce({
-        success: false,
-        error: "Network error",
-      })
-      .mockResolvedValueOnce({
-        success: true,
-        verificationUri: "https://gitlab.com/oauth/authorize",
-        userCode: "RETRY-CODE",
-        verificationUriComplete: "",
-      });
-
-    await act(async () => {
-      renderWithAntd(<OAuthDeviceFlow onSuccess={jest.fn()} />);
-    });
-
-    // First attempt fails
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("start-oauth-btn"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("oauth-error")).toBeInTheDocument();
-    });
-
-    // Retry
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("oauth-retry-btn"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("oauth-pending")).toBeInTheDocument();
-    });
-
-    expect(screen.getByTestId("oauth-user-code")).toHaveTextContent(
-      "RETRY-CODE",
-    );
-    expect(mockStartOAuthDeviceFlow).toHaveBeenCalledTimes(2);
-  });
-
-  test("copy button copies user code to clipboard", async () => {
-    mockStartOAuthDeviceFlow.mockResolvedValue({
-      success: true,
-      verificationUri: "https://gitlab.com/oauth/authorize",
-      userCode: "COPY-ME",
-      verificationUriComplete: "",
-    });
-
-    await act(async () => {
-      renderWithAntd(<OAuthDeviceFlow onSuccess={jest.fn()} />);
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("start-oauth-btn"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("copy-code-btn")).toBeInTheDocument();
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("copy-code-btn"));
-    });
-
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("COPY-ME");
-  });
-
-  test("cleans up oauth-progress listener on unmount", async () => {
-    mockStartOAuthDeviceFlow.mockResolvedValue({
-      success: true,
-      verificationUri: "https://gitlab.com/oauth/authorize",
-      userCode: "TEST",
-      verificationUriComplete: "",
-    });
-
-    let unmount;
-    await act(async () => {
-      const result = renderWithAntd(
-        <OAuthDeviceFlow onSuccess={jest.fn()} />,
-      );
-      unmount = result.unmount;
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("start-oauth-btn"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("oauth-pending")).toBeInTheDocument();
-    });
-
-    act(() => {
-      unmount();
-    });
-
-    expect(cleanupFn).toHaveBeenCalled();
-  });
-
-  test("handles missing electronAPI gracefully", async () => {
+    expect(onAuthorized).toHaveBeenCalledWith({ username: 'alice', name: 'Alice' });
+    expect(JSON.stringify(onAuthorized.mock.calls)).not.toContain('token');
+    view.unmount();
+    expect(cleanup).toHaveBeenCalled();
     delete window.electronAPI;
+  });
 
-    await act(async () => {
-      renderWithAntd(<OAuthDeviceFlow onSuccess={jest.fn()} />);
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("start-oauth-btn"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("oauth-error")).toBeInTheDocument();
-    });
-
-    expect(screen.getByText("electronAPI not available")).toBeInTheDocument();
+  test('shows start failures and supports retry, open, cancel, and canceled events', async () => {
+    let listener;
+    window.electronAPI = {
+      startOAuth: jest.fn()
+        .mockResolvedValueOnce({ success: false, error: 'OAuth unavailable' })
+        .mockResolvedValueOnce({
+          success: true,
+          operationId: 'oauth-2',
+          userCode: 'EFGH',
+          verificationUri: 'https://gitlab.example.com/oauth/device',
+        }),
+      openOAuth: jest.fn().mockResolvedValue({ success: true }),
+      cancelOperation: jest.fn().mockResolvedValue({ success: true }),
+      onOperationEvent: jest.fn((callback) => { listener = callback; }),
+    };
+    render(<OAuthDeviceFlow getValues={() => ({ oauthClientId: 'client' })} />);
+    fireEvent.click(screen.getByTestId('oauth-start'));
+    await waitFor(() => expect(screen.getByText('OAuth unavailable')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Retry'));
+    await waitFor(() => expect(screen.getByText(/Code:/)).toHaveTextContent('EFGH'));
+    fireEvent.click(screen.getByText('Open authorization page'));
+    expect(window.electronAPI.openOAuth).toHaveBeenCalledWith({ operationId: 'oauth-2' });
+    fireEvent.click(screen.getByText('Cancel'));
+    expect(window.electronAPI.cancelOperation).toHaveBeenCalledWith({ operationId: 'oauth-2' });
+    await act(async () => listener({ operationId: 'other', status: 'failed', message: 'ignored' }));
+    expect(screen.queryByText('ignored')).not.toBeInTheDocument();
+    await act(async () => listener({ operationId: 'oauth-2', status: 'canceled' }));
+    expect(screen.getByText('OAuth canceled')).toBeInTheDocument();
+    delete window.electronAPI;
   });
 });

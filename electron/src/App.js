@@ -1,132 +1,31 @@
-import React, { useEffect, useState, useCallback } from "react";
-import { Spin } from "antd";
-import AppLayout from "./components/AppLayout";
-import SettingsPage from "./components/SettingsPage";
-import ProjectsPage from "./components/ProjectsPage";
-import ClonePage from "./components/ClonePage";
-import RepoList from "./components/RepoList";
-import MigrationWizard from "./components/MigrationWizard";
+import { useEffect, useState } from 'react';
+import { Alert, Spin } from 'antd';
+import AppLayout from './components/AppLayout';
+import ClonePage from './components/ClonePage';
+import HistoryRewritePage from './components/HistoryRewritePage';
+import SettingsPage from './components/SettingsPage';
+import TransferPage from './components/TransferPage';
 
-function App() {
-  const [currentView, setCurrentView] = useState("settings");
+export default function App() {
+  const [view, setView] = useState('settings');
   const [settings, setSettings] = useState(null);
-  const [selectedRepo, setSelectedRepo] = useState(null);
-  const [selectedProjects, setSelectedProjects] = useState([]);
-  const [ready, setReady] = useState(false);
-
+  const [error, setError] = useState(null);
   useEffect(() => {
-    async function init() {
-      try {
-        if (window.electronAPI?.loadSettings) {
-          const loaded = await window.electronAPI.loadSettings();
-          setSettings(loaded || {});
-        } else {
-          setSettings({});
-        }
-      } catch (error) {
-        console.error("Failed to load settings:", error);
+    window.electronAPI.loadSettings()
+      .then(setSettings)
+      .catch((caught) => {
+        setError(caught.message);
         setSettings({});
-      } finally {
-        setReady(true);
-      }
-    }
-    init();
+      });
   }, []);
-
-  const handleNavigate = useCallback(
-    (view) => {
-      if (view !== "migration") {
-        setSelectedRepo(null);
-      }
-      setCurrentView(view);
-    },
-    [],
-  );
-
-  const handleSettingsSaved = useCallback((newSettings) => {
-    setSettings(newSettings);
-  }, []);
-
-  const handleMigrationStart = useCallback((repo) => {
-    setSelectedRepo(repo);
-    setCurrentView("migration");
-  }, []);
-
-  const handleCloneSelected = useCallback((projects) => {
-    setSelectedProjects(projects);
-    setCurrentView("clone");
-  }, []);
-
-  const handleMigrationComplete = useCallback(() => {
-    setCurrentView("repos");
-    setSelectedRepo(null);
-  }, []);
-
-  if (!ready) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spin size="large" />
-      </div>
-    );
-  }
-
-  const clonePath = settings?.clonePath || "";
-
+  if (!settings) return <Spin fullscreen />;
   return (
-    <AppLayout currentView={currentView} onNavigate={handleNavigate}>
-      {currentView === "settings" && (
-        <SettingsPage settings={settings} onSave={handleSettingsSaved} />
-      )}
-
-      {currentView === "projects" && (
-        <ProjectsPage
-          settings={settings}
-          onCloneSelected={handleCloneSelected}
-        />
-      )}
-
-      {currentView === "clone" && (
-        <ClonePage
-          projects={selectedProjects}
-          settings={settings}
-          onNavigateToRepos={() => setCurrentView("repos")}
-        />
-      )}
-
-      {currentView === "repos" && (
-        <RepoList
-          clonePath={clonePath}
-          onSelectRepo={setSelectedRepo}
-          onMigrationStart={handleMigrationStart}
-        />
-      )}
-
-      {currentView === "migration" && selectedRepo && (
-        <MigrationWizard
-          repo={selectedRepo}
-          onComplete={handleMigrationComplete}
-          onCancel={() => {
-            setCurrentView("repos");
-            setSelectedRepo(null);
-          }}
-        />
-      )}
-
-      {currentView === "migration" && !selectedRepo && (
-        <div className="p-6 text-center">
-          <p className="mb-4 text-gray-500">
-            Select a repository to migrate from the Repositories tab.
-          </p>
-          <button
-            className="text-blue-500 underline"
-            onClick={() => setCurrentView("repos")}
-          >
-            Go to Repositories
-          </button>
-        </div>
-      )}
+    <AppLayout currentView={view} onNavigate={setView}>
+      {error && <Alert type="error" title={error} />}
+      {view === 'settings' && <SettingsPage settings={settings} onSave={(saved) => setSettings((current) => ({ ...current, ...saved }))} />}
+      {view === 'clone' && <ClonePage />}
+      {view === 'transfer' && <TransferPage />}
+      {view === 'rewrite' && <HistoryRewritePage />}
     </AppLayout>
   );
 }
-
-export default App;
