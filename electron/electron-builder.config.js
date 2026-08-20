@@ -1,7 +1,3 @@
-/**
- * electron-builder configuration for single-file distribution
- * Supports Windows (portable .exe), macOS (.app), and Linux (AppImage)
- */
 module.exports = {
   appId: 'com.gitlabdump.app',
   productName: 'GitLab Dump',
@@ -12,26 +8,37 @@ module.exports = {
   files: [
     'main.js',
     'preload.js',
-    'env.js',
+    'ipc-handlers.js',
+    'operation-registry.js',
+    'window-security.js',
     'dist/**/*',
-    'node_modules/**/*',
-    '!node_modules/@gitlab-dump/core',
-    { from: '../lib', to: 'node_modules/@gitlab-dump/core', filter: ['**/*', '!node_modules', '!__tests__'] },
+    '!node_modules/@gitlab-dump/core/**/*',
+    {
+      from: '../lib',
+      to: 'node_modules/@gitlab-dump/core',
+      filter: [
+        '**/*',
+        '!node_modules/**/*',
+        '!__tests__/**/*',
+        '!coverage/**/*',
+        '!jest.config.js',
+        '!eslint.config.js',
+      ],
+    },
   ],
   // Windows configuration - single portable exe
   win: {
+    icon: 'assets/icon.png',
     target: [
       {
         target: 'portable',
-        arch: ['x64', 'ia32'],
+        arch: ['x64'],
       },
     ],
-    signingHashAlgorithms: ['sha256'],
   },
   portable: {
     artifactName: '${productName}-${version}-${os}-${arch}.${ext}',
   },
-  // macOS configuration
   mac: {
     target: ['dmg', 'zip'],
     category: 'public.app-category.utilities',
@@ -59,22 +66,15 @@ module.exports = {
       },
     ],
   },
-  // Linux configuration - AppImage for universal Linux distribution
   linux: {
     target: ['AppImage'],
     category: 'Utility',
     icon: 'assets/icon.png',
-    desktop: {
-      Name: 'GitLab Dump',
-      Comment: 'Desktop application for GitLab repository management',
-      Type: 'Application',
-      Categories: 'Development;',
-    },
+    description: 'Conservative GitLab repository transfer tool',
   },
   appImage: {
     artifactName: '${productName}-${version}.${ext}',
   },
-  // Build configuration
   buildDependenciesFromSource: false,
   nodeGypRebuild: false,
   asar: true,

@@ -2,8 +2,20 @@ module.exports = {
   projects: [
     {
       displayName: 'main',
-      testMatch: ['<rootDir>/__tests__/main.test.js'],
+      testMatch: [
+        '<rootDir>/__tests__/main.test.js',
+        '<rootDir>/__tests__/preload.test.js',
+      ],
       testEnvironment: 'node',
+      collectCoverageFrom: [
+        '<rootDir>/ipc-handlers.js',
+        '<rootDir>/operation-registry.js',
+        '<rootDir>/window-security.js',
+        '<rootDir>/preload.js',
+      ],
+      coverageThreshold: {
+        global: { statements: 80, lines: 80, functions: 80, branches: 70 },
+      },
     },
     {
       displayName: 'components',
@@ -13,8 +25,18 @@ module.exports = {
       transform: {
         '^.+\\.jsx?$': 'babel-jest',
       },
+      transformIgnorePatterns: [
+        '/node_modules/(?!(?:@ant-design/colors|@ant-design/fast-color)/)',
+      ],
       moduleNameMapper: {
         '\\.css$': '<rootDir>/__tests__/__mocks__/styleMock.js',
+      },
+      collectCoverageFrom: [
+        '<rootDir>/src/App.js',
+        '<rootDir>/src/components/**/*.js',
+      ],
+      coverageThreshold: {
+        global: { statements: 80, lines: 80, functions: 80, branches: 70 },
       },
     },
     {

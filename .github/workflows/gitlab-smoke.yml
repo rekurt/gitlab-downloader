@@ -1,0 +1,31 @@
+name: GitLab opt-in smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  transfer-smoke:
+    runs-on: ubuntu-latest
+    environment: gitlab-smoke
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y git-lfs git-filter-repo
+      - run: npm ci
+      - run: node scripts/gitlab-smoke.js
+        env:
+          GITLAB_SOURCE_URL: ${{ secrets.GITLAB_SOURCE_URL }}
+          GITLAB_DESTINATION_URL: ${{ secrets.GITLAB_DESTINATION_URL }}
+          GITLAB_SOURCE_TOKEN: ${{ secrets.GITLAB_SOURCE_TOKEN }}
+          GITLAB_DESTINATION_TOKEN: ${{ secrets.GITLAB_DESTINATION_TOKEN }}
+          GITLAB_SMOKE_NEW_GROUP: ${{ vars.GITLAB_SMOKE_NEW_GROUP }}
+          GITLAB_SMOKE_EXISTING_PROJECT: ${{ vars.GITLAB_SMOKE_EXISTING_PROJECT }}
+          GITLAB_SMOKE_CANCEL_GROUP: ${{ vars.GITLAB_SMOKE_CANCEL_GROUP }}
+          GITLAB_SMOKE_RELATION_FAILURE_GROUP: ${{ vars.GITLAB_SMOKE_RELATION_FAILURE_GROUP }}
+          GITLAB_SMOKE_DESTINATION_NAMESPACE: ${{ vars.GITLAB_SMOKE_DESTINATION_NAMESPACE }}

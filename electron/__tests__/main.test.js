@@ -1,625 +1,652 @@
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
+const { EventEmitter } = require('node:events');
+const { mkdtemp, writeFile } = require('node:fs/promises');
+const { tmpdir } = require('node:os');
+const { join } = require('node:path');
 
-// We need to mock Electron modules before requiring main.js
 jest.mock('electron', () => ({
   app: {
     on: jest.fn(),
     quit: jest.fn(),
-    getPath: jest.fn().mockReturnValue('/tmp/test-userdata'),
-    getVersion: jest.fn().mockReturnValue('0.1.0'),
-    getName: jest.fn().mockReturnValue('gitlab-dump-desktop'),
+    getPath: jest.fn().mockReturnValue('/tmp/gitlab-dump-test'),
+    isPackaged: true,
   },
-  BrowserWindow: jest.fn().mockImplementation(() => ({
-    loadURL: jest.fn(),
-    on: jest.fn(),
-    webContents: {
-      openDevTools: jest.fn(),
-      send: jest.fn(),
-    },
-    isDestroyed: jest.fn().mockReturnValue(false),
-  })),
+  BrowserWindow: jest.fn(),
   Menu: {
     buildFromTemplate: jest.fn().mockReturnValue({}),
     setApplicationMenu: jest.fn(),
   },
-  ipcMain: {
-    handle: jest.fn(),
-  },
-  dialog: {
-    showOpenDialog: jest.fn().mockResolvedValue({ canceled: false, filePaths: ['/tmp/selected'] }),
-  },
-  shell: {
-    openPath: jest.fn().mockResolvedValue(''),
+  ipcMain: { handle: jest.fn(), removeHandler: jest.fn() },
+  dialog: { showOpenDialog: jest.fn() },
+  shell: { openExternal: jest.fn(), openPath: jest.fn() },
+  safeStorage: {
+    isEncryptionAvailable: jest.fn().mockReturnValue(true),
+    encryptString: jest.fn((value) => Buffer.from(`encrypted:${value}`)),
+    decryptString: jest.fn((value) => value.toString().replace(/^encrypted:/, '')),
   },
 }));
 
-jest.mock('electron-is-dev', () => false);
+const { BrowserWindow, Menu, app, safeStorage } = require('electron');
+const { createOperationRegistry } = require('../operation-registry');
+const { createMainWindow, installApplicationMenu } = require('../window-security');
+const { createIpcHandlers, registerIpcHandlers, safeOAuthUrl } = require('../ipc-handlers');
 
-jest.mock('electron-store', () => {
-  return jest.fn().mockImplementation(() => ({
-    get: jest.fn().mockReturnValue({}),
-    set: jest.fn(),
-  }));
-});
+function memoryStore() {
+  const values = new Map();
+  return {
+    get: jest.fn((key, fallback) => values.has(key) ? values.get(key) : fallback),
+    set: jest.fn((key, value) => values.set(key, value)),
+    values,
+  };
+}
 
-const { findGitRepos, resolveClonePath } = require('../main');
-
-describe('findGitRepos', () => {
-  let tmpDir;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'electron-test-'));
+describe('operation registry', () => {
+  test('uses an independent AbortController for every operation', () => {
+    const registry = createOperationRegistry({ id: (() => {
+      let value = 0;
+      return () => `op-${++value}`;
+    })() });
+    const first = registry.begin('clone', 10);
+    const second = registry.begin('oauth', 10);
+    registry.cancel(first.id, 10);
+    expect(first.signal.aborted).toBe(true);
+    expect(second.signal.aborted).toBe(false);
+    expect(registry.status(first.id, 10)).toMatchObject({ status: 'canceled' });
   });
 
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+  test('does not expose one renderer operation to another sender', () => {
+    const registry = createOperationRegistry({ id: () => 'op-private' });
+    registry.begin('transfer', 10);
+    expect(() => registry.status('op-private', 11)).toThrow('not available');
   });
 
-  test('finds repos with .git directories', () => {
-    // Create a fake repo
-    const repoDir = path.join(tmpDir, 'my-repo');
-    fs.mkdirSync(path.join(repoDir, '.git'), { recursive: true });
+  test('records partial, successful, failed, and shutdown states', () => {
+    let value = 0;
+    const registry = createOperationRegistry({ id: () => `state-${++value}` });
+    const partial = registry.begin('transfer', 1);
+    registry.complete(partial.id, { status: 'partial', failures: [] });
+    expect(registry.status(partial.id, 1)).toMatchObject({ status: 'partial' });
 
-    const repos = findGitRepos(tmpDir);
-    expect(repos).toHaveLength(1);
-    expect(repos[0].name).toBe('my-repo');
-    expect(repos[0].path).toBe(repoDir);
-  });
+    const finished = registry.begin('clone', 1);
+    registry.complete(finished.id, { status: 'finished' });
+    registry.complete(finished.id, { status: 'partial' });
+    expect(registry.status(finished.id, 1)).toMatchObject({ status: 'finished' });
 
-  test('finds nested repos', () => {
-    const groupDir = path.join(tmpDir, 'group');
-    const repoDir = path.join(groupDir, 'subgroup', 'repo');
-    fs.mkdirSync(path.join(repoDir, '.git'), { recursive: true });
+    const failed = registry.begin('rewrite', 1);
+    registry.fail(failed.id, new Error('rewrite failed'));
+    registry.fail(failed.id, new Error('ignored'));
+    expect(registry.status(failed.id, 1)).toMatchObject({ status: 'failed', error: 'rewrite failed' });
 
-    const repos = findGitRepos(tmpDir);
-    expect(repos).toHaveLength(1);
-    expect(repos[0].name).toBe('repo');
-  });
-
-  test('returns empty array for non-existent path', () => {
-    const repos = findGitRepos('/nonexistent/path/12345');
-    expect(repos).toEqual([]);
-  });
-
-  test('returns empty array for empty directory', () => {
-    const repos = findGitRepos(tmpDir);
-    expect(repos).toEqual([]);
-  });
-
-  test('does not recurse into .git directories', () => {
-    const repoDir = path.join(tmpDir, 'repo');
-    fs.mkdirSync(path.join(repoDir, '.git', 'refs'), { recursive: true });
-
-    const repos = findGitRepos(tmpDir);
-    expect(repos).toHaveLength(1);
-    expect(repos[0].path).toBe(repoDir);
-  });
-
-  test('finds multiple repos at same level', () => {
-    fs.mkdirSync(path.join(tmpDir, 'repo1', '.git'), { recursive: true });
-    fs.mkdirSync(path.join(tmpDir, 'repo2', '.git'), { recursive: true });
-    fs.mkdirSync(path.join(tmpDir, 'repo3', '.git'), { recursive: true });
-
-    const repos = findGitRepos(tmpDir);
-    expect(repos).toHaveLength(3);
-    const names = repos.map((r) => r.name).sort();
-    expect(names).toEqual(['repo1', 'repo2', 'repo3']);
-  });
-
-  test('reads remote origin URL from git config', () => {
-    const repoDir = path.join(tmpDir, 'repo');
-    const gitDir = path.join(repoDir, '.git');
-    fs.mkdirSync(gitDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(gitDir, 'config'),
-      '[remote "origin"]\n\turl = https://gitlab.com/group/repo.git\n',
-    );
-
-    const repos = findGitRepos(tmpDir);
-    expect(repos).toHaveLength(1);
-    expect(repos[0].url).toBe('https://gitlab.com/group/repo.git');
-  });
-
-  test('handles missing git config gracefully', () => {
-    const repoDir = path.join(tmpDir, 'repo');
-    fs.mkdirSync(path.join(repoDir, '.git'), { recursive: true });
-
-    const repos = findGitRepos(tmpDir);
-    expect(repos).toHaveLength(1);
-    expect(repos[0].url).toBe('');
-  });
-
-  test('respects maxDepth parameter', () => {
-    // Create a deeply nested repo
-    const deepPath = path.join(tmpDir, 'a', 'b', 'c', 'repo');
-    fs.mkdirSync(path.join(deepPath, '.git'), { recursive: true });
-
-    // With maxDepth 2, should not find repo at depth 4
-    const repos = findGitRepos(tmpDir, 2);
-    expect(repos).toHaveLength(0);
-
-    // With maxDepth 5, should find it
-    const repos2 = findGitRepos(tmpDir, 5);
-    expect(repos2).toHaveLength(1);
-  });
-
-  test('skips node_modules directories', () => {
-    fs.mkdirSync(path.join(tmpDir, 'node_modules', 'some-pkg', '.git'), {
-      recursive: true,
-    });
-    fs.mkdirSync(path.join(tmpDir, 'real-repo', '.git'), { recursive: true });
-
-    const repos = findGitRepos(tmpDir);
-    expect(repos).toHaveLength(1);
-    expect(repos[0].name).toBe('real-repo');
-  });
-
-  test('skips hidden directories (except .git)', () => {
-    fs.mkdirSync(path.join(tmpDir, '.hidden', 'repo', '.git'), {
-      recursive: true,
-    });
-    fs.mkdirSync(path.join(tmpDir, 'visible-repo', '.git'), {
-      recursive: true,
+    const reportedFailure = registry.begin('rewrite', 1);
+    registry.complete(reportedFailure.id, { status: 'failed', backupPath: '/safe/before.bundle' });
+    expect(registry.status(reportedFailure.id, 1)).toMatchObject({
+      status: 'failed', result: { status: 'failed', backupPath: '/safe/before.bundle' },
     });
 
-    const repos = findGitRepos(tmpDir);
-    expect(repos).toHaveLength(1);
-    expect(repos[0].name).toBe('visible-repo');
+    const running = registry.begin('oauth', 1);
+    registry.cancelAll();
+    expect(running.signal.aborted).toBe(true);
+    expect(registry.status(running.id, 1)).toMatchObject({ status: 'canceled' });
   });
 
-  test('includes last_updated from FETCH_HEAD if available', () => {
-    const repoDir = path.join(tmpDir, 'repo');
-    const gitDir = path.join(repoDir, '.git');
-    fs.mkdirSync(gitDir, { recursive: true });
-    fs.writeFileSync(path.join(gitDir, 'FETCH_HEAD'), 'dummy');
-
-    const repos = findGitRepos(tmpDir);
-    expect(repos).toHaveLength(1);
-    expect(repos[0].last_updated).toBeTruthy();
-    // Should be a valid ISO date
-    expect(new Date(repos[0].last_updated).getTime()).toBeGreaterThan(0);
-  });
-
-  test('falls back to HEAD for last_updated', () => {
-    const repoDir = path.join(tmpDir, 'repo');
-    const gitDir = path.join(repoDir, '.git');
-    fs.mkdirSync(gitDir, { recursive: true });
-    fs.writeFileSync(path.join(gitDir, 'HEAD'), 'ref: refs/heads/main');
-
-    const repos = findGitRepos(tmpDir);
-    expect(repos).toHaveLength(1);
-    expect(repos[0].last_updated).toBeTruthy();
+  test('rejects duplicate operation IDs and marks an aborted failure as canceled', () => {
+    const registry = createOperationRegistry({ id: () => 'duplicate' });
+    const operation = registry.begin('clone', 1);
+    expect(() => registry.begin('clone', 1)).toThrow('already exists');
+    operation.controller.abort();
+    registry.fail(operation.id, 'aborted');
+    expect(registry.status(operation.id, 1).status).toBe('canceled');
   });
 });
 
-describe('resolveClonePath', () => {
-  const originalEnv = process.env.CLONE_PATH;
+describe('window security', () => {
+  test('enables sandbox and blocks renderer navigation and window creation', () => {
+    const webContents = new EventEmitter();
+    webContents.setWindowOpenHandler = jest.fn();
+    const window = {
+      webContents,
+      loadURL: jest.fn(),
+      on: jest.fn(),
+    };
+    BrowserWindow.mockImplementationOnce((options) => {
+      window.options = options;
+      return window;
+    });
+    createMainWindow({ baseDirectory: '/app/electron', isDev: false });
 
-  afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.CLONE_PATH = originalEnv;
-    } else {
-      delete process.env.CLONE_PATH;
-    }
+    expect(window.options.webPreferences).toMatchObject({
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+    });
+    expect(webContents.setWindowOpenHandler).toHaveBeenCalledWith(expect.any(Function));
+    expect(webContents.setWindowOpenHandler.mock.calls[0][0]()).toEqual({ action: 'deny' });
+    const navigation = { preventDefault: jest.fn() };
+    webContents.emit('will-navigate', navigation, 'https://evil.example.com');
+    expect(navigation.preventDefault).toHaveBeenCalled();
   });
 
-  test('returns default repositories path when CLONE_PATH not set', () => {
-    delete process.env.CLONE_PATH;
-    const result = resolveClonePath();
-    expect(result).toBe(path.resolve(os.homedir(), 'repositories'));
+  test('loads the development URL and allows only the exact current navigation', () => {
+    const webContents = new EventEmitter();
+    webContents.setWindowOpenHandler = jest.fn();
+    const window = { webContents, loadURL: jest.fn() };
+    BrowserWindow.mockImplementationOnce(() => window);
+    createMainWindow({ baseDirectory: '/app/electron', isDev: true });
+    expect(window.loadURL).toHaveBeenCalledWith('http://localhost:8000');
+    const same = { preventDefault: jest.fn() };
+    webContents.emit('will-navigate', same, 'http://localhost:8000');
+    expect(same.preventDefault).not.toHaveBeenCalled();
   });
 
-  test('resolves CLONE_PATH from env', () => {
-    process.env.CLONE_PATH = '/tmp/my-repos';
-    const result = resolveClonePath();
-    expect(result).toBe('/tmp/my-repos');
-  });
-
-  test('expands tilde in CLONE_PATH', () => {
-    process.env.CLONE_PATH = '~/gitlab-repos';
-    const result = resolveClonePath();
-    expect(result).toBe(path.join(os.homedir(), 'gitlab-repos'));
-  });
-
-  test('resolves relative CLONE_PATH against homedir', () => {
-    process.env.CLONE_PATH = 'my-repos';
-    const result = resolveClonePath();
-    expect(result).toBe(path.resolve(os.homedir(), 'my-repos'));
+  test('installs an application menu whose exit item quits', () => {
+    installApplicationMenu();
+    const template = Menu.buildFromTemplate.mock.calls.at(-1)[0];
+    template[0].submenu[0].click();
+    expect(app.quit).toHaveBeenCalled();
+    expect(Menu.setApplicationMenu).toHaveBeenCalled();
   });
 });
 
-describe('setupIpcHandlers', () => {
-  const { ipcMain } = require('electron');
+describe('IPC security and OAuth', () => {
+  function fixture(overrides = {}) {
+    const store = memoryStore();
+    let operationNumber = 0;
+    const registry = createOperationRegistry({ id: () => `op-${++operationNumber}` });
+    const sent = [];
+    const sender = { id: 7, send: (...args) => sent.push(args), isDestroyed: () => false };
+    const event = { sender };
+    const core = {
+      validateGitlabUrl: () => true,
+      deviceAuthorize: jest.fn().mockResolvedValue({
+        device_code: 'device-1',
+        verification_uri: 'https://gitlab.example.com/oauth/device',
+        verification_uri_complete: 'https://gitlab.example.com/oauth/device?code=abc',
+        user_code: 'ABCD',
+        interval: 1,
+        expires_in: 60,
+      }),
+      pollDeviceToken: jest.fn().mockResolvedValue({ access_token: 'oauth-secret' }),
+      getCurrentUser: jest.fn().mockResolvedValue({ username: 'alice', name: 'Alice' }),
+      findGitRepositories: jest.fn().mockReturnValue([]),
+      getUserProjects: jest.fn().mockResolvedValue([]),
+      getAllProjects: jest.fn().mockResolvedValue([]),
+      fetchGroupMetadata: jest.fn().mockResolvedValue({ full_path: 'team' }),
+      cloneAllRepositories: jest.fn().mockResolvedValue([]),
+      planTransfer: jest.fn().mockResolvedValue({ warnings: [], entities: [] }),
+      executeTransfer: jest.fn().mockResolvedValue({ status: 'finished', entities: [] }),
+      validateHistoryMapping: jest.fn((mapping) => mapping),
+      previewHistoryRewrite: jest.fn().mockResolvedValue({ status: 'preview', changedCommits: 1, changedRefs: [] }),
+      rewriteHistory: jest.fn().mockResolvedValue({ status: 'finished', changedCommits: 1, changedRefs: [] }),
+      ...overrides.core,
+    };
+    const openExternal = overrides.openExternal || jest.fn();
+    const openPath = overrides.openPath || jest.fn().mockResolvedValue('');
+    const quit = overrides.quit || jest.fn();
+    const handlers = createIpcHandlers({
+      store,
+      safeStorage,
+      registry,
+      core,
+      isTrustedSender: (candidate) => candidate.sender.id === 7,
+      selectDirectory: overrides.selectDirectory,
+      selectRepository: overrides.selectRepository,
+      selectMapping: overrides.selectMapping,
+      openExternal,
+      openPath,
+      quit,
+      now: overrides.now,
+    });
+    return { handlers, store, registry, core, event, sent, openExternal, openPath, quit };
+  }
 
-  beforeEach(() => {
-    ipcMain.handle.mockClear();
-  });
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-  test('registers all expected IPC channels', () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const registeredChannels = ipcMain.handle.mock.calls.map(
-      (call) => call[0],
+  test('encrypts PATs and never returns them to the renderer', async () => {
+    const { handlers, store, event } = fixture();
+    await handlers['settings:save'](event, {
+      gitlabUrl: 'https://gitlab.example.com',
+      sourceToken: 'source-plaintext',
+    });
+    const loaded = await handlers['settings:load'](event);
+    expect(loaded).toMatchObject({
+      gitlabUrl: 'https://gitlab.example.com',
+      hasSourceToken: true,
+    });
+    expect(JSON.stringify(loaded)).not.toContain('source-plaintext');
+    expect(JSON.stringify([...store.values])).not.toContain('source-plaintext');
+    expect(store.get('secrets.sourceToken')).toBe(
+      Buffer.from('encrypted:source-plaintext').toString('base64'),
     );
-    expect(registeredChannels).toContain('get-clone-path');
-    expect(registeredChannels).toContain('get-repos');
-    expect(registeredChannels).toContain('get-author-mappings');
-    expect(registeredChannels).toContain('save-author-mappings');
-    expect(registeredChannels).toContain('get-config');
-    expect(registeredChannels).toContain('save-config');
-    expect(registeredChannels).toContain('start-migration');
-    expect(registeredChannels).toContain('cancel-migration');
-    expect(registeredChannels).toContain('request-shutdown');
-    expect(registeredChannels).toContain('load-settings');
-    expect(registeredChannels).toContain('save-settings');
-    expect(registeredChannels).toContain('test-connection');
-    expect(registeredChannels).toContain('select-directory');
-    expect(registeredChannels).toContain('start-oauth-device-flow');
-    expect(registeredChannels).toContain('fetch-projects');
-    expect(registeredChannels).toContain('cancel-fetch-projects');
-    expect(registeredChannels).toContain('clone-repositories');
-    expect(registeredChannels).toContain('cancel-clone');
-    expect(registeredChannels).toContain('dry-run-projects');
-    expect(registeredChannels).toContain('open-path');
   });
 
-  test('get-clone-path handler returns resolved path', () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const getClonePathCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'get-clone-path',
-    );
-    expect(getClonePathCall).toBeTruthy();
-
-    const handler = getClonePathCall[1];
-    const result = handler();
-    expect(typeof result).toBe('string');
-    expect(path.isAbsolute(result)).toBe(true);
-  });
-
-  test('get-repos handler returns repositories object', () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const getReposCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'get-repos',
-    );
-    expect(getReposCall).toBeTruthy();
-
-    const handler = getReposCall[1];
-    // Call with a non-existent path to get empty result
-    const result = handler(null, '/nonexistent/path/12345');
-    expect(result).toEqual({ repositories: [] });
-  });
-
-  test('get-repos handler accepts custom clone path', () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ipc-test-'));
-    try {
-      fs.mkdirSync(path.join(tmpDir, 'test-repo', '.git'), {
-        recursive: true,
-      });
-
-      const { setupIpcHandlers } = require('../main');
-      setupIpcHandlers();
-
-      const getReposCall = ipcMain.handle.mock.calls.find(
-        (c) => c[0] === 'get-repos',
-      );
-      const handler = getReposCall[1];
-      const result = handler(null, tmpDir);
-      expect(result.repositories).toHaveLength(1);
-      expect(result.repositories[0].name).toBe('test-repo');
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  test('cancel-migration handler returns error for unknown migration', () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const cancelCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'cancel-migration',
-    );
-    const handler = cancelCall[1];
-    const result = handler(null, 'nonexistent-id');
-    expect(result).toEqual({ success: false, error: 'Migration not found' });
-  });
-
-  test('load-settings handler returns stored settings', async () => {
-    const mockStore = { get: jest.fn().mockReturnValue({ gitlabUrl: 'https://gitlab.com' }) };
-    jest.doMock('electron-store', () => {
-      return jest.fn().mockImplementation(() => mockStore);
+  test('migrates legacy plaintext settings secrets before returning settings', async () => {
+    const legacy = fixture();
+    legacy.store.set('settings', {
+      gitlabUrl: 'https://gitlab.example.com',
+      token: 'legacy-plaintext-token',
+      oauthToken: 'legacy-oauth-token',
+      obsoleteField: 'discard-me',
     });
 
-    // Reset the cached store to force re-import
-    const mainModule = require('../main');
-    // We need to access the handler directly via ipcMain.handle mock
-    mainModule.setupIpcHandlers();
+    const loaded = await legacy.handlers['settings:load'](legacy.event);
 
-    const loadSettingsCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'load-settings',
-    );
-    expect(loadSettingsCall).toBeTruthy();
-  });
-
-  test('save-settings handler validates and saves settings', async () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const saveCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'save-settings',
-    );
-    expect(saveCall).toBeTruthy();
-  });
-
-  test('test-connection handler returns error for missing URL', async () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const testConnCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'test-connection',
-    );
-    expect(testConnCall).toBeTruthy();
-
-    const handler = testConnCall[1];
-    const result = await handler(null, { gitlabUrl: '', token: '' });
-    expect(result).toEqual({ success: false, error: 'GitLab URL is required' });
-  });
-
-  test('select-directory handler returns selected path', async () => {
-    const { dialog } = require('electron');
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const selectDirCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'select-directory',
-    );
-    expect(selectDirCall).toBeTruthy();
-
-    const handler = selectDirCall[1];
-    const result = await handler();
-    expect(result).toBe('/tmp/selected');
-    expect(dialog.showOpenDialog).toHaveBeenCalled();
-  });
-
-  test('start-oauth-device-flow handler returns error when settings missing', async () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const oauthCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'start-oauth-device-flow',
-    );
-    expect(oauthCall).toBeTruthy();
-
-    const handler = oauthCall[1];
-    const result = await handler({ sender: { send: jest.fn() } });
-    expect(result.success).toBe(false);
-    // Should fail because gitlabUrl is empty in default store
-    expect(result.error).toBeTruthy();
-  });
-
-  test('start-oauth-device-flow handler is registered', () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const oauthCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'start-oauth-device-flow',
-    );
-    expect(oauthCall).toBeTruthy();
-    expect(typeof oauthCall[1]).toBe('function');
-  });
-
-  test('select-directory handler returns null when canceled', async () => {
-    const { dialog } = require('electron');
-    dialog.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] });
-
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const selectDirCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'select-directory',
-    );
-    const handler = selectDirCall[1];
-    const result = await handler();
-    expect(result).toBeNull();
-  });
-
-  test('fetch-projects handler is registered', () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const registeredChannels = ipcMain.handle.mock.calls.map(
-      (call) => call[0],
-    );
-    expect(registeredChannels).toContain('fetch-projects');
-    expect(registeredChannels).toContain('cancel-fetch-projects');
-  });
-
-  test('fetch-projects handler returns error when URL missing', async () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const fetchCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'fetch-projects',
-    );
-    expect(fetchCall).toBeTruthy();
-
-    const handler = fetchCall[1];
-    const result = await handler(null, {});
-    expect(result.success).toBe(false);
-    expect(result.error).toBeTruthy();
-  });
-
-  test('cancel-fetch-projects handler returns error when no active fetch', () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const cancelCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'cancel-fetch-projects',
-    );
-    expect(cancelCall).toBeTruthy();
-
-    const handler = cancelCall[1];
-    const result = handler();
-    expect(result).toEqual({ success: false, error: 'No active fetch' });
-  });
-
-  test('registers clone-repositories, cancel-clone, and dry-run-projects channels', () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const registeredChannels = ipcMain.handle.mock.calls.map(
-      (call) => call[0],
-    );
-    expect(registeredChannels).toContain('clone-repositories');
-    expect(registeredChannels).toContain('cancel-clone');
-    expect(registeredChannels).toContain('dry-run-projects');
-  });
-
-  test('clone-repositories handler returns error when no projects', async () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const cloneCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'clone-repositories',
-    );
-    expect(cloneCall).toBeTruthy();
-
-    const handler = cloneCall[1];
-    const result = await handler(null, { projects: [], updateExisting: false });
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('No projects to clone');
-  });
-
-  test('clone-repositories handler returns error with empty projects', async () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const cloneCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'clone-repositories',
-    );
-    const handler = cloneCall[1];
-    const result = await handler(null, { projects: null });
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('No projects to clone');
-  });
-
-  test('cancel-clone handler returns error when no active clone', () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const cancelCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'cancel-clone',
-    );
-    expect(cancelCall).toBeTruthy();
-
-    const handler = cancelCall[1];
-    const result = handler();
-    expect(result).toEqual({ success: false, error: 'No active clone' });
-  });
-
-  test('dry-run-projects handler returns empty targets for empty projects', async () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const dryRunCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'dry-run-projects',
-    );
-    expect(dryRunCall).toBeTruthy();
-
-    const handler = dryRunCall[1];
-    const result = await handler(null, { projects: [] });
-    expect(result).toEqual({ success: true, targets: [] });
-  });
-
-  test('open-path handler returns error when path is empty', async () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const openPathCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'open-path',
-    );
-    expect(openPathCall).toBeTruthy();
-
-    const handler = openPathCall[1];
-    const result = await handler(null, '');
-    expect(result).toEqual({ success: false, error: 'Path is required' });
-  });
-
-  test('open-path handler calls shell.openPath for valid path', async () => {
-    const { shell } = require('electron');
-    const { setupIpcHandlers } = require('../main');
-    const originalClonePath = process.env.CLONE_PATH;
-    process.env.CLONE_PATH = '/tmp';
-    setupIpcHandlers();
-
-    const openPathCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'open-path',
-    );
-    const handler = openPathCall[1];
-    const result = await handler(null, '/tmp/some-dir');
-    expect(result).toEqual({ success: true });
-    expect(shell.openPath).toHaveBeenCalledWith('/tmp/some-dir');
-    process.env.CLONE_PATH = originalClonePath;
-  });
-
-  test('open-path handler returns error when shell.openPath fails', async () => {
-    const { shell } = require('electron');
-    shell.openPath.mockResolvedValueOnce('Failed to open path');
-    const originalClonePath = process.env.CLONE_PATH;
-    process.env.CLONE_PATH = '/tmp';
-
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const openPathCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'open-path',
-    );
-    const handler = openPathCall[1];
-    const result = await handler(null, '/tmp/bad-path');
-    expect(result).toEqual({ success: false, error: 'Failed to open path' });
-    process.env.CLONE_PATH = originalClonePath;
-  });
-
-  test('open-path handler rejects path outside clone directory', async () => {
-    const { setupIpcHandlers } = require('../main');
-    const originalClonePath = process.env.CLONE_PATH;
-    process.env.CLONE_PATH = '/tmp/clone-root';
-    setupIpcHandlers();
-
-    const openPathCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'open-path',
-    );
-    const handler = openPathCall[1];
-    const result = await handler(null, '/etc/passwd');
-    expect(result).toEqual({ success: false, error: 'Path is outside clone directory' });
-    process.env.CLONE_PATH = originalClonePath;
-  });
-
-  test('dry-run-projects handler is callable with projects', async () => {
-    const { setupIpcHandlers } = require('../main');
-    setupIpcHandlers();
-
-    const dryRunCall = ipcMain.handle.mock.calls.find(
-      (c) => c[0] === 'dry-run-projects',
-    );
-    const handler = dryRunCall[1];
-    // Handler requires ESM core lib; verify it returns a result object
-    // (either success with targets or error from ESM import)
-    const result = await handler(null, {
-      projects: [
-        { name: 'my-repo', group_path: 'group' },
-      ],
+    expect(loaded).toMatchObject({
+      gitlabUrl: 'https://gitlab.example.com',
+      hasToken: true,
+      hasOAuthToken: true,
     });
-    expect(result).toHaveProperty('success');
-    if (result.success) {
-      expect(result.targets).toHaveLength(1);
-      expect(result.targets[0].name).toBe('my-repo');
-    }
+    expect(JSON.stringify(loaded)).not.toContain('legacy-plaintext-token');
+    expect(legacy.store.get('settings')).toEqual({
+      gitlabUrl: 'https://gitlab.example.com',
+    });
+    expect(JSON.stringify([...legacy.store.values])).not.toContain('legacy-plaintext-token');
+    expect(JSON.stringify([...legacy.store.values])).not.toContain('legacy-oauth-token');
+  });
+
+  test('persists only allowlisted public settings and validates them before secrets', async () => {
+    const { handlers, store, event } = fixture({
+      core: { validateGitlabUrl: (url) => url === 'https://gitlab.example.com' },
+    });
+    await expect(handlers['settings:save'](event, {
+      gitlabUrl: 'https://invalid.example.com',
+      sourceToken: 'must-not-be-saved',
+    })).resolves.toMatchObject({ success: false });
+    expect(store.get('secrets.sourceToken', null)).toBeNull();
+
+    await handlers['settings:save'](event, {
+      gitlabUrl: 'https://gitlab.example.com',
+      group: 'team',
+      maxConcurrency: 4,
+      unexpectedSecret: 'must-not-be-persisted',
+    });
+    expect(store.get('settings')).toEqual({
+      gitlabUrl: 'https://gitlab.example.com',
+      group: 'team',
+      maxConcurrency: 4,
+    });
+    expect(JSON.stringify([...store.values])).not.toContain('must-not-be-persisted');
+  });
+
+  test('uses current unsaved OAuth form values and emits profile without access token', async () => {
+    const { handlers, core, event, sent } = fixture();
+    const started = await handlers['oauth:start'](event, {
+      gitlabUrl: 'https://gitlab.example.com',
+      oauthClientId: 'current-form-client',
+      oauthScope: 'api',
+    });
+    expect(started).toMatchObject({ success: true, operationId: 'op-1', userCode: 'ABCD' });
+    expect(core.deviceAuthorize.mock.calls[0][0]).toMatchObject({
+      url: 'https://gitlab.example.com',
+      oauthClientId: 'current-form-client',
+      oauthScope: 'api',
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    const serialized = JSON.stringify(sent);
+    expect(serialized).toContain('alice');
+    expect(serialized).not.toContain('oauth-secret');
+  });
+
+  test('does not persist an OAuth token when cancellation wins the profile race', async () => {
+    let releaseProfile;
+    const profileGate = new Promise((resolve) => { releaseProfile = resolve; });
+    const oauth = fixture({
+      core: {
+        getCurrentUser: jest.fn(async () => {
+          await profileGate;
+          return { username: 'late-user', name: 'Late User' };
+        }),
+      },
+    });
+    const started = await oauth.handlers['oauth:start'](oauth.event, {
+      gitlabUrl: 'https://gitlab.example.com',
+      oauthClientId: 'client',
+    });
+    await flush();
+    await oauth.handlers['operation:cancel'](oauth.event, { operationId: started.operationId });
+    releaseProfile();
+    await flush();
+
+    await expect(oauth.handlers['settings:load'](oauth.event)).resolves.toMatchObject({
+      hasOAuthToken: false,
+    });
+    expect(JSON.stringify([...oauth.store.values])).not.toContain('oauth-secret');
+    expect(oauth.sent.flat()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ operationId: started.operationId, status: 'canceled' }),
+    ]));
+  });
+
+  test('rejects OAuth instance URLs containing embedded credentials', async () => {
+    const { handlers, event } = fixture();
+    await expect(handlers['oauth:start'](event, {
+      gitlabUrl: 'https://oauth2:must-not-leak@gitlab.example.com',
+      oauthClientId: 'client',
+    })).rejects.toThrow(/credentials/i);
+  });
+
+  test('rejects untrusted senders before invoking a handler', async () => {
+    const { handlers } = fixture();
+    await expect(handlers['settings:load']({ sender: { id: 99 } })).rejects.toThrow(
+      'Untrusted renderer',
+    );
+  });
+
+  test('accepts only directory IDs issued by the main process', async () => {
+    const { handlers, event } = fixture({
+      selectDirectory: jest.fn().mockResolvedValue('/allowed/repositories'),
+    });
+    const selected = await handlers['directory:select'](event);
+    await expect(handlers['repositories:list'](event, {
+      directoryId: selected.directoryId,
+    })).resolves.toEqual({ success: true, repositories: [] });
+    await expect(handlers['repositories:list'](event, {
+      directoryId: '/arbitrary/path',
+    })).rejects.toThrow('Unknown directory');
+  });
+
+  test('validates public settings and connection prerequisites/results', async () => {
+    const { handlers, core, event } = fixture({
+      core: { validateGitlabUrl: (url) => url.startsWith('https://') },
+    });
+    await expect(handlers['settings:save'](event, { gitlabUrl: 'http://unsafe.example.com' }))
+      .resolves.toMatchObject({ success: false });
+    await expect(handlers['connection:test'](event, { gitlabUrl: 'https://gitlab.example.com/' }))
+      .resolves.toMatchObject({ success: false });
+    await handlers['settings:save'](event, {
+      gitlabUrl: 'https://gitlab.example.com', token: 'shared-secret',
+    });
+    await expect(handlers['connection:test'](event, { gitlabUrl: 'https://gitlab.example.com/' }))
+      .resolves.toEqual({ success: true, profile: { username: 'alice', name: 'Alice' } });
+    expect(core.getCurrentUser).toHaveBeenCalledWith({
+      url: 'https://gitlab.example.com', token: 'shared-secret',
+    });
+  });
+
+  test('keeps secrets in memory when OS encryption is unavailable', async () => {
+    safeStorage.isEncryptionAvailable.mockReturnValueOnce(false).mockReturnValueOnce(false);
+    const { handlers, store, event } = fixture();
+    await handlers['settings:save'](event, { sourceToken: 'memory-only' });
+    const loaded = await handlers['settings:load'](event);
+    expect(loaded.hasSourceToken).toBe(true);
+    expect(store.set).toHaveBeenCalledWith('settings', {});
+    expect(JSON.stringify([...store.values])).not.toContain('memory-only');
+  });
+
+  test('handles canceled directory selection and repository open results', async () => {
+    const canceled = fixture({ selectDirectory: jest.fn().mockResolvedValue(null) });
+    await expect(canceled.handlers['directory:select'](canceled.event))
+      .resolves.toEqual({ success: false, canceled: true });
+
+    const openPath = jest.fn().mockResolvedValueOnce('No application').mockResolvedValueOnce('');
+    const found = fixture({
+      selectDirectory: jest.fn().mockResolvedValue('/allowed'),
+      openPath,
+      core: {
+        findGitRepositories: () => [{
+          name: 'app', path: '/allowed/app', url: 'https://gitlab.example.com/team/app.git', last_updated: 'today',
+        }],
+      },
+    });
+    const directory = await found.handlers['directory:select'](found.event);
+    const listed = await found.handlers['repositories:list'](found.event, directory);
+    expect(listed.repositories[0]).not.toHaveProperty('path');
+    await expect(found.handlers['repository:open'](found.event, listed.repositories[0]))
+      .resolves.toMatchObject({ success: false });
+    await expect(found.handlers['repository:open'](found.event, listed.repositories[0]))
+      .resolves.toEqual({ success: true });
+  });
+
+  test('validates OAuth HTTPS/origin, opens the issued URL, and reports polling errors', async () => {
+    const openExternal = jest.fn();
+    const ok = fixture({ openExternal });
+    const started = await ok.handlers['oauth:start'](ok.event, {
+      gitlabUrl: 'https://gitlab.example.com/', oauthClientId: 'client', oauthScope: 'api',
+    });
+    await ok.handlers['oauth:open'](ok.event, { operationId: started.operationId });
+    expect(openExternal).toHaveBeenCalledWith('https://gitlab.example.com/oauth/device?code=abc');
+    await expect(ok.handlers['oauth:open'](ok.event, { operationId: 'missing' })).rejects.toThrow();
+
+    await expect(ok.handlers['oauth:start'](ok.event, {
+      gitlabUrl: 'http://gitlab.example.com', oauthClientId: 'client',
+    })).rejects.toThrow('HTTPS');
+    await expect(ok.handlers['oauth:start'](ok.event, {
+      gitlabUrl: 'https://gitlab.example.com', oauthClientId: '',
+    })).resolves.toMatchObject({ success: false });
+
+    const badOrigin = fixture({
+      core: { deviceAuthorize: jest.fn().mockResolvedValue({
+        device_code: 'device', verification_uri: 'https://evil.example.com/oauth',
+      }) },
+    });
+    await expect(badOrigin.handlers['oauth:start'](badOrigin.event, {
+      gitlabUrl: 'https://gitlab.example.com', oauthClientId: 'client',
+    })).rejects.toThrow('unexpected origin');
+
+    const pollFailure = fixture({
+      core: { pollDeviceToken: jest.fn().mockRejectedValue(new Error('authorization denied')) },
+    });
+    const failed = await pollFailure.handlers['oauth:start'](pollFailure.event, {
+      gitlabUrl: 'https://gitlab.example.com', oauthClientId: 'client',
+    });
+    await flush();
+    expect(pollFailure.registry.status(failed.operationId, 7)).toMatchObject({ status: 'failed' });
+    expect(pollFailure.sent.flat()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ status: 'failed', message: 'authorization denied' }),
+    ]));
+  });
+
+  test('fetches project sessions by user/group and starts clone with partial/failed outcomes', async () => {
+    const group = fixture({
+      selectDirectory: jest.fn().mockResolvedValue('/allowed'),
+      core: {
+        getAllProjects: jest.fn().mockResolvedValue([
+          { id: 1, name: 'App', path_with_namespace: 'team/app' },
+          { id: 2, name: 'Other', path_with_namespace: 'team/other' },
+        ]),
+        cloneAllRepositories: jest.fn().mockImplementation(async (projects, _config, options) => {
+          options.onResult({ id: 1, status: 'finished' });
+          expect(projects.map((project) => project.id)).toEqual([1]);
+          return [{ id: 1, status: 'failed' }];
+        }),
+      },
+    });
+    await group.handlers['settings:save'](group.event, {
+      gitlabUrl: 'https://gitlab.example.com', sourceToken: 'source-token', maxConcurrency: 2,
+    });
+    const session = await group.handlers['projects:fetch'](group.event, { group: 'team' });
+    expect(session.projects).toHaveLength(2);
+    const directory = await group.handlers['directory:select'](group.event);
+    await expect(group.handlers['clone:start'](group.event, {
+      sessionId: session.sessionId,
+      projectIds: [999],
+      directoryId: directory.directoryId,
+    })).rejects.toThrow(/project IDs/i);
+    const clone = await group.handlers['clone:start'](group.event, {
+      sessionId: session.sessionId, projectIds: [1], directoryId: directory.directoryId, updateExisting: true,
+    });
+    await flush();
+    expect(group.registry.status(clone.operationId, 7)).toMatchObject({ status: 'failed' });
+    expect(group.sent.flat()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ operationId: clone.operationId, status: 'running', entityId: 1 }),
+      expect.objectContaining({ operationId: clone.operationId, status: 'failed' }),
+    ]));
+
+    const missing = fixture();
+    await expect(missing.handlers['projects:fetch'](missing.event, {}))
+      .resolves.toMatchObject({ success: false });
+
+    const failed = fixture({
+      core: { getUserProjects: jest.fn().mockRejectedValue(new Error('project fetch failed')) },
+    });
+    await failed.handlers['settings:save'](failed.event, {
+      gitlabUrl: 'https://gitlab.example.com', token: 'token',
+    });
+    await expect(failed.handlers['projects:fetch'](failed.event, {})).rejects.toThrow('project fetch failed');
+  });
+
+  test('plans and executes transfers with true partial and failed states', async () => {
+    const transfer = fixture({
+      core: {
+        planTransfer: jest.fn().mockResolvedValue({ warnings: [], entities: [{ id: 'one' }] }),
+        executeTransfer: jest.fn().mockImplementation(async (_plan, options) => {
+          options.onEvent({ entityId: 'one', phase: 'git_sync', status: 'running' });
+          return { status: 'partial', failures: [{ message: 'conflict' }] };
+        }),
+      },
+    });
+    await expect(transfer.handlers['transfer:plan'](transfer.event, {}))
+      .resolves.toMatchObject({ success: false });
+    await transfer.handlers['settings:save'](transfer.event, {
+      sourceToken: 'source', destinationToken: 'destination',
+    });
+    const planned = await transfer.handlers['transfer:plan'](transfer.event, {
+      source: { url: 'https://source.example.com', fullPath: 'team', type: 'group' },
+      destination: { url: 'https://destination.example.com', namespace: 'archive' },
+    });
+    expect(JSON.stringify(planned)).not.toContain('source');
+    const started = await transfer.handlers['transfer:start'](transfer.event, { planId: planned.planId });
+    await flush();
+    expect(transfer.registry.status(started.operationId, 7)).toMatchObject({ status: 'partial' });
+    expect(transfer.sent.flat()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ operationId: started.operationId, entityId: 'one' }),
+      expect.objectContaining({ operationId: started.operationId, status: 'partial' }),
+    ]));
+
+    const failed = fixture({
+      core: { executeTransfer: jest.fn().mockRejectedValue(new Error('transfer crashed')) },
+    });
+    await failed.handlers['settings:save'](failed.event, { sourceToken: 's', destinationToken: 'd' });
+    const failedPlan = await failed.handlers['transfer:plan'](failed.event, { source: {}, destination: {} });
+    const failedRun = await failed.handlers['transfer:start'](failed.event, { planId: failedPlan.planId });
+    await flush();
+    expect(failed.registry.status(failedRun.operationId, 7)).toMatchObject({ status: 'failed' });
+  });
+
+  test('selects, validates, previews, and rewrites history using issued resource IDs', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'gitlab-dump-electron-mapping-'));
+    const mappingPath = join(root, 'mapping.json');
+    await writeFile(mappingPath, JSON.stringify({ schemaVersion: 1, mappings: [{ match: {}, replace: {} }] }));
+    let currentTime = 1_000_000;
+    const rewrite = fixture({
+      selectDirectory: jest.fn().mockResolvedValue('/allowed/output'),
+      selectRepository: jest.fn().mockResolvedValue('/allowed/source.git'),
+      selectMapping: jest.fn().mockResolvedValue(mappingPath),
+      now: () => currentTime,
+    });
+    await rewrite.handlers['settings:save'](rewrite.event, {
+      sourceToken: 'source', destinationToken: 'destination',
+    });
+    const repository = await rewrite.handlers['rewrite:select-repository'](rewrite.event);
+    const mapping = await rewrite.handlers['rewrite:select-mapping'](rewrite.event);
+    const directory = await rewrite.handlers['directory:select'](rewrite.event);
+    await expect(rewrite.handlers['rewrite:start'](rewrite.event, {
+      repositoryId: repository.repositoryId,
+      mappingId: mapping.mappingId,
+      outputDirectoryId: directory.directoryId,
+      outputName: 'without-preview.git',
+      push: true,
+      confirmation: 'confirmed',
+    })).rejects.toThrow('successful preview');
+    const preview = await rewrite.handlers['rewrite:preview'](rewrite.event, {
+      repositoryId: repository.repositoryId, mappingId: mapping.mappingId,
+    });
+    await flush();
+    expect(rewrite.registry.status(preview.operationId, 7)).toMatchObject({ status: 'finished' });
+
+    currentTime += 5 * 60 * 1_000 + 1;
+    await expect(rewrite.handlers['rewrite:start'](rewrite.event, {
+      repositoryId: repository.repositoryId,
+      mappingId: mapping.mappingId,
+      outputDirectoryId: directory.directoryId,
+      outputName: 'stale-preview.git',
+      push: true,
+      confirmation: 'confirmed',
+      previewId: preview.operationId,
+    })).rejects.toThrow('fresh preview');
+    currentTime = 1_000_000;
+
+    await expect(rewrite.handlers['rewrite:start'](rewrite.event, {
+      repositoryId: repository.repositoryId,
+      mappingId: mapping.mappingId,
+      outputDirectoryId: directory.directoryId,
+      outputName: '../escape',
+    })).rejects.toThrow('safe directory name');
+    const started = await rewrite.handlers['rewrite:start'](rewrite.event, {
+      repositoryId: repository.repositoryId,
+      mappingId: mapping.mappingId,
+      outputDirectoryId: directory.directoryId,
+      outputName: 'rewritten.git',
+      push: true,
+      confirmation: 'confirmed',
+      previewId: preview.operationId,
+    });
+    await flush();
+    expect(rewrite.core.rewriteHistory).toHaveBeenCalledWith(expect.objectContaining({
+      repository: '/allowed/source.git',
+      output: '/allowed/output/rewritten.git',
+      token: 'source',
+      destinationToken: 'destination',
+      preview: expect.objectContaining({ status: 'preview' }),
+    }), expect.any(Object));
+    expect(rewrite.registry.status(started.operationId, 7)).toMatchObject({ status: 'finished' });
+    await expect(rewrite.handlers['rewrite:start'](rewrite.event, {
+      repositoryId: repository.repositoryId,
+      mappingId: mapping.mappingId,
+      outputDirectoryId: directory.directoryId,
+      outputName: 'reused-preview.git',
+      push: true,
+      confirmation: 'confirmed',
+      previewId: preview.operationId,
+    })).rejects.toThrow('successful preview');
+
+    rewrite.core.rewriteHistory.mockResolvedValueOnce({
+      status: 'failed', backupPath: '/allowed/output/failed.bundle', error: 'lease conflict',
+    });
+    const failed = await rewrite.handlers['rewrite:start'](rewrite.event, {
+      repositoryId: repository.repositoryId,
+      mappingId: mapping.mappingId,
+      outputDirectoryId: directory.directoryId,
+      outputName: 'failed.git',
+    });
+    await flush();
+    expect(rewrite.registry.status(failed.operationId, 7)).toMatchObject({ status: 'failed' });
+    expect(rewrite.sent.flat()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ operationId: failed.operationId, status: 'failed' }),
+    ]));
+  });
+
+  test('handles canceled rewrite pickers, operation controls, and shutdown', async () => {
+    const canceled = fixture({
+      selectRepository: jest.fn().mockResolvedValue(null),
+      selectMapping: jest.fn().mockResolvedValue(null),
+    });
+    await expect(canceled.handlers['rewrite:select-repository'](canceled.event))
+      .resolves.toEqual({ success: false, canceled: true });
+    await expect(canceled.handlers['rewrite:select-mapping'](canceled.event))
+      .resolves.toEqual({ success: false, canceled: true });
+
+    const operation = canceled.registry.begin('test', 7);
+    await expect(canceled.handlers['operation:status'](canceled.event, { operationId: operation.id }))
+      .resolves.toMatchObject({ success: true, status: 'running' });
+    await expect(canceled.handlers['operation:cancel'](canceled.event, { operationId: operation.id }))
+      .resolves.toMatchObject({ success: true, status: 'canceled' });
+    await expect(canceled.handlers['app:shutdown'](canceled.event)).resolves.toEqual({ success: true });
+    expect(canceled.quit).toHaveBeenCalled();
+  });
+
+  test('registers every IPC handler after removing stale registrations', () => {
+    const ipcMain = { removeHandler: jest.fn(), handle: jest.fn() };
+    registerIpcHandlers(ipcMain, { one: jest.fn(), two: jest.fn() });
+    expect(ipcMain.removeHandler).toHaveBeenCalledTimes(2);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(2);
+  });
+
+  test('safeOAuthUrl accepts only HTTPS on the exact expected origin', () => {
+    expect(safeOAuthUrl('https://gitlab.example.com/oauth', 'https://gitlab.example.com'))
+      .toBe('https://gitlab.example.com/oauth');
+    expect(() => safeOAuthUrl('http://gitlab.example.com/oauth', 'http://gitlab.example.com')).toThrow();
+    expect(() => safeOAuthUrl('https://evil.example.com/oauth', 'https://gitlab.example.com')).toThrow();
+    expect(() => safeOAuthUrl(
+      'https://oauth2:secret@gitlab.example.com/oauth',
+      'https://gitlab.example.com',
+    )).toThrow();
   });
 });
