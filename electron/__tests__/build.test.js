@@ -1,6 +1,7 @@
 const { execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { stripVTControlCharacters } = require('util');
 
 const electronDir = path.resolve(__dirname, '..');
 
@@ -11,8 +12,9 @@ describe('Webpack build', () => {
       encoding: 'utf-8',
       timeout: 120000,
     });
-    expect(result).toMatch(/compiled (successfully|with \d+ warnings?)/);
-    expect(result).not.toMatch(/ERROR/);
+    const plainResult = stripVTControlCharacters(result);
+    expect(plainResult).toMatch(/compiled (successfully|with \d+ warnings?)/);
+    expect(plainResult).not.toMatch(/ERROR/);
   });
 
   test('production build generates bundle.js', () => {
