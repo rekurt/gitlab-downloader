@@ -4,6 +4,8 @@
 
 GitLab Dump clones repositories and performs conservative transfers between GitLab instances. The CLI and Electron application are thin shells over the same `@gitlab-dump/core` workspace.
 
+[Project website](https://rekurt.github.io/gitlab-downloader/) · [All projects by rekurt](https://rekurt.github.io/projects/)
+
 Version 0.2 intentionally breaks the 0.1 CLI. Every operation now requires an explicit subcommand. PAT flags, PAT-bearing clone URLs, plaintext migration configs, `MigrationExecutor`, and `git filter-branch` are gone.
 
 ## Requirements
