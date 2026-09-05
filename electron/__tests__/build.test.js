@@ -11,7 +11,7 @@ describe('Webpack build', () => {
       encoding: 'utf-8',
       timeout: 120000,
     });
-    expect(result).toMatch(/compiled (successfully|with \d+ warning)/);
+    expect(result).toMatch(/compiled (successfully|with \d+ warnings?)/);
     expect(result).not.toMatch(/ERROR/);
   });
 
