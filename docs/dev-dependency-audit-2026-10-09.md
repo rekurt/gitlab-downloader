@@ -2,6 +2,8 @@
 
 Scope: desktop runtime, developer server, tests, and packaging. Follow-up to the npm release; core/CLI versions and published artifacts remain unchanged.
 
+The subsequent [dev-server migration report](dev-server-migration-2026-10-09.md) records the completed server 6 migration and corrects the proposed braces outcome below: the proxy-middleware chain still remains. The figures in this initial report describe the first compatible-fix commit.
+
 ## Results
 
 Full npm audit: 36 affected dependency entries before (28 moderate, 6 high, 2 critical), 33 after (28 moderate, 5 high, 0 critical). These are affected packages, not independent vulnerabilities: five distinct root advisories initially, three remaining. The install summary reported 24, but the subsequent standalone audit reports 33; use the latter for acceptance. Production-only audit reports zero. Electron is a devDependency but its binary ships in the desktop application; production-only audit does not cover that runtime.

@@ -31,6 +31,7 @@ describe('ClonePage', () => {
     await waitFor(() => expect(window.electronAPI.startClone).toHaveBeenCalledWith({
       sessionId: 'session-1', projectIds: [77], directoryId: 'directory-1', updateExisting: true,
     }));
+    await screen.findByText('Clone: running');
     await act(async () => listener({ operationId: 'other', status: 'failed' }));
     expect(screen.getByText('Clone: running')).toBeInTheDocument();
     await act(async () => listener({ operationId: 'clone-1', status: 'partial', message: 'one failed' }));

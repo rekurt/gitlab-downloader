@@ -34,6 +34,7 @@ npm run lint
 npm test
 npm run test:coverage
 npm run build
+npm run test:dev-server
 npm run pack
 npm audit --omit=dev --audit-level=high
 ```
@@ -118,6 +119,8 @@ Do not silence React, Ant Design, or jsdom warnings. Fix their source. Generated
 ## Packaging and CI
 
 CI uses `npm ci`, Node 24, lint, coverage, production build, production dependency audit, and unsigned `electron-builder --dir` smoke packaging on Linux, macOS, and Windows. Signing and notarization require release-owner certificates.
+
+`npm run test:dev-server` starts the real renderer through the local webpack-cli on a loopback port, checks HTTP/static assets and same-origin WebSocket hot mode, changes a temporary entry wrapper, and verifies watching/recompilation. It stops its child server and removes its fixtures; production sources and development host/origin protections remain unchanged. The direct js-yaml development dependency satisfies webpack-cli's optional peer range instead of reusing Jest's older loader.
 
 The opt-in GitLab smoke workflow receives credentials only from CI secrets and covers Direct Transfer, existing-project Git-sync, cancel/resume, and relation-failure reporting.
 

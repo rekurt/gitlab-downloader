@@ -7,7 +7,9 @@ const electronDir = path.resolve(__dirname, '..');
 
 describe('Webpack build', () => {
   test('production build succeeds without errors', () => {
-    const result = execFileSync('npx', ['webpack', '--mode', 'production'], {
+    const result = execFileSync(process.execPath, [
+      require.resolve('webpack-cli/bin/cli.js'), '--mode', 'production',
+    ], {
       cwd: electronDir,
       encoding: 'utf-8',
       timeout: 120000,
