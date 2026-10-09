@@ -6,6 +6,16 @@ GitLab Dump клонирует репозитории и выполняет ко
 
 Версия 0.2 намеренно несовместима с CLI 0.1. Удалены token-флаги, PAT в URL, plaintext migration config, `MigrationExecutor` и `git filter-branch`.
 
+## Установка из npm
+
+```bash
+npm install -g gitlab-dump-cli@0.2.0
+gitlab-dump --help
+```
+
+Для использования библиотеки установите `@gitlab-dump/core@0.2.0`.
+Оба пакета требуют Node.js 24; desktop-приложение распространяется отдельно.
+
 ## Требования
 
 - Node.js 24 LTS и npm 11;
