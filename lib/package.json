@@ -35,5 +35,36 @@
   "devDependencies": {
     "@jest/globals": "30.4.1"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "files": [
+    "auth.js",
+    "client.js",
+    "cloner.js",
+    "config.js",
+    "constants.js",
+    "git-auth.js",
+    "git-sync.js",
+    "gitlab-api.js",
+    "history-rewrite.js",
+    "index.js",
+    "preflight.js",
+    "repository-discovery.js",
+    "transfer-schema.js",
+    "transfer.js",
+    "utils.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rekurt/gitlab-downloader.git",
+    "directory": "lib"
+  },
+  "bugs": {
+    "url": "https://github.com/rekurt/gitlab-downloader/issues"
+  },
+  "homepage": "https://github.com/rekurt/gitlab-downloader#readme",
+  "publishConfig": {
+    "access": "public"
+  }
 }
