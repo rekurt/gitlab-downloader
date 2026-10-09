@@ -22,5 +22,23 @@
   "devDependencies": {
     "@jest/globals": "30.4.1"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "files": [
+    "index.js",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rekurt/gitlab-downloader.git",
+    "directory": "cli"
+  },
+  "bugs": {
+    "url": "https://github.com/rekurt/gitlab-downloader/issues"
+  },
+  "homepage": "https://github.com/rekurt/gitlab-downloader#readme",
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -8,6 +8,16 @@ GitLab Dump clones repositories and performs conservative transfers between GitL
 
 Version 0.2 intentionally breaks the 0.1 CLI. Every operation now requires an explicit subcommand. PAT flags, PAT-bearing clone URLs, plaintext migration configs, `MigrationExecutor`, and `git filter-branch` are gone.
 
+## Install from npm
+
+```bash
+npm install -g gitlab-dump-cli@0.2.0
+gitlab-dump --help
+```
+
+For programmatic use, install `@gitlab-dump/core@0.2.0`.
+Both packages require Node.js 24; the desktop application is distributed separately.
+
 ## Requirements
 
 - Node.js 24 LTS and npm 11.
