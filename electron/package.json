@@ -9,9 +9,9 @@
   "scripts": {
     "start": "concurrently \"npm run webpack-dev\" \"npm run electron-dev\"",
     "dev": "concurrently \"npm run webpack-dev\" \"npm run electron-dev\"",
-    "webpack-dev": "webpack serve --mode development",
+    "webpack-dev": "webpack-cli serve --mode development",
     "electron-dev": "wait-on http://localhost:8000 && electron . --remote-debugging-port=9222",
-    "build": "webpack --mode production",
+    "build": "webpack-cli --mode production",
     "pack": "electron-builder --config electron-builder.config.js --dir",
     "dist": "npm run build && electron-builder --config electron-builder.config.js",
     "dist-win": "npm run build && electron-builder --config electron-builder.config.js --win",
@@ -19,6 +19,7 @@
     "dist-linux": "npm run build && electron-builder --config electron-builder.config.js --linux",
     "test": "node ../node_modules/jest/bin/jest.js --config jest.config.js",
     "test:coverage": "node ../node_modules/jest/bin/jest.js --config jest.config.js --coverage",
+    "test:dev-server": "node dev-server-smoke.js",
     "lint": "eslint main.js preload.js src __tests__ webpack.config.js electron-builder.config.js"
   },
   "engines": {
@@ -47,6 +48,7 @@
     "electron-builder": "26.15.7",
     "html-webpack-plugin": "5.6.8",
     "jest-environment-jsdom": "30.4.1",
+    "js-yaml": "5.4.3",
     "postcss": "8.5.26",
     "postcss-loader": "8.2.1",
     "react": "19.2.8",
@@ -55,7 +57,7 @@
     "tailwindcss": "4.3.3",
     "wait-on": "9.1.0",
     "webpack": "5.109.2",
-    "webpack-cli": "6.0.1",
-    "webpack-dev-server": "5.2.6"
+    "webpack-cli": "7.2.3",
+    "webpack-dev-server": "6.0.0"
   }
 }

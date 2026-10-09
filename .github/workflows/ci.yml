@@ -23,6 +23,7 @@ jobs:
       - run: npm run lint
       - run: npm run test:coverage
       - run: npm run build
+      - run: npm run test:dev-server
       - run: npm audit --omit=dev --audit-level=high
 
   package-smoke:

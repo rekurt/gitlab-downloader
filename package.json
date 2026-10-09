@@ -16,6 +16,7 @@
     "lint": "eslint .",
     "test": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "test:dev-server": "npm run test:dev-server --workspace gitlab-dump-desktop",
     "build": "npm run build --workspace gitlab-dump-desktop",
     "pack": "npm run pack --workspace gitlab-dump-desktop",
     "audit": "npm audit --omit=dev --audit-level=high",
